@@ -3,5 +3,5 @@
   "compilerOptions": {
     "outDir": "./.tsc"
   },
-  "include": ["src", "*.ts", "*.js"]
+  "include": ["src"]
 }
