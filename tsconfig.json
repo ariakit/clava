@@ -1,7 +1,4 @@
 {
   "files": [],
-  "references": [
-    { "path": "./packages/clava" },
-    { "path": "./app" }
-  ]
+  "references": [{ "path": "./packages/clava" }, { "path": "./app" }]
 }
