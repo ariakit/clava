@@ -11,8 +11,7 @@
     }
   },
   "scripts": {
-    "build": "vite build",
-    "test": "vitest",
-    "dev": "vite build --watch"
+    "build": "rolldown -c",
+    "test": "vitest"
   }
 }
