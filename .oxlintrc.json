@@ -1,6 +1,4 @@
 {
   "rules": {},
-  "ignore": {
-    "patterns": ["**/node_modules", "**/dist", "**/.git"]
-  }
+  "ignorePatterns": ["**/node_modules", "**/dist", "**/.git"]
 }

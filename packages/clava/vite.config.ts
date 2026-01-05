@@ -7,15 +7,8 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'Clava',
-      formats: ['es', 'cjs'],
-      fileName: (format) => {
-        if (format === 'es') return 'index.js';
-        if (format === 'cjs') return 'index.cjs';
-        return `index.${format}.js`;
-      },
-    },
-    rollupOptions: {
-      external: [],
+      formats: ['es'],
+      fileName: () => 'index.js',
     },
     sourcemap: true,
   },
