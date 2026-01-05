@@ -1,0 +1,30 @@
+{
+  "name": "clava-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Clava monorepo",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "vitest",
+    "tsc": "tsc --build",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "oxfmt": "^0.21.0",
+    "oxlint": "^1.36.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0",
+    "vitest": "^4.0.16"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
