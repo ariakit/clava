@@ -6,6 +6,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+.tsc
 *.tsbuildinfo
 
 # Testing
@@ -19,7 +20,6 @@ coverage/
 .env.production.local
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo

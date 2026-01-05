@@ -1,4 +1,10 @@
 {
-  "files": [],
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "emitDeclarationOnly": false
+  },
+  "include": ["**/*.ts", "**/*.js"],
   "references": [{ "path": "./packages/clava" }, { "path": "./app" }]
 }

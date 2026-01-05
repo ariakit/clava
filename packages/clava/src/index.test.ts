@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { add, subtract } from "./index";
+import { describe, expect, it } from "vitest";
+
+import { add, subtract } from "./index.ts";
 
 describe("add", () => {
   it("should add two numbers correctly", () => {

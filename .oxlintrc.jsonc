@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "warn",
+  },
+  "rules": {
+    "typescript/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "eslint/no-unused-vars": "error",
+    "eslint/sort-imports": "error",
+  },
+}

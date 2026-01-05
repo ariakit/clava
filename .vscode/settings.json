@@ -1,0 +1,24 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "tailwindCSS.classFunctions": ["clsx", "cx", "clava"],
+  "editor.snippetSuggestions": "bottom",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit"
+  },
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "[astro]": {
+    "editor.defaultFormatter": "astro-build.astro-vscode",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.removeUnusedImports": "explicit"
+    }
+  },
+  "[markdown]": {
+    "editor.wordWrap": "on"
+  },
+  "[mdx]": {
+    "editor.wordWrap": "on"
+  }
+}
