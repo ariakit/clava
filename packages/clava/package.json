@@ -2,9 +2,6 @@
   "name": "clava",
   "version": "0.0.1",
   "description": "Clava library",
-  "files": [
-    "dist"
-  ],
   "type": "module",
   "exports": {
     ".": {
@@ -17,11 +14,5 @@
     "build": "vite build",
     "test": "vitest",
     "dev": "vite build --watch"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.5",
-    "vite": "^7.3.0",
-    "vite-plugin-dts": "^4.3.0",
-    "vitest": "^4.0.16"
   }
 }
