@@ -1,6 +1,24 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "extends": ["config:recommended"],
+  "semanticCommits": "disabled",
+  "packageRules": [
+    {
+      "groupName": "oxc",
+      "matchPackageNames": ["/^oxlint/", "/^oxfmt/"]
+    },
+    {
+      "matchPackageNames": [
+        "/^@types//",
+        "/^oxlint/",
+        "/^oxfmt/",
+        "/^rolldown/",
+        "/^vite/",
+        "/^typescript/"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    }
   ]
 }

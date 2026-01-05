@@ -8,6 +8,9 @@
     "source.fixAll.oxc": "explicit"
   },
   "editor.defaultFormatter": "oxc.oxc-vscode",
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
   "[astro]": {
     "editor.defaultFormatter": "astro-build.astro-vscode",
     "editor.codeActionsOnSave": {
