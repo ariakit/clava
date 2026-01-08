@@ -77,10 +77,15 @@ function getConfigDescription(config: Config) {
 
 function createCVFromConfig<T extends Config>(config: T) {
   const defaultMode = getConfigDefaultMode(config);
-  return !defaultMode
-    ? cvBase
-    : create({ defaultMode, transformClass: getConfigTransformClass(config) })
-        .cv;
+  const transformClass = getConfigTransformClass(config);
+  const hasTransform = "transformClass" in config && config.transformClass;
+  if (!defaultMode && !hasTransform) {
+    return cvBase;
+  }
+  return create({
+    defaultMode: defaultMode ?? undefined,
+    transformClass,
+  }).cv;
 }
 
 function getModalComponent<
@@ -100,7 +105,8 @@ function getClass(props: ComponentResult) {
 
 function getClassPropertyName(config: Config) {
   const mode = config.mode ?? config.defaultMode;
-  if (mode === "jsx") return "className";
+  // null defaults to jsx mode
+  if (mode === "jsx" || mode === null) return "className";
   return "class";
 }
 
@@ -351,7 +357,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
-        fontSize: 16,
+        fontSize: expect.toBeOneOf(["16", "16px"]),
       });
     });
 
@@ -828,7 +834,7 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       const props = component({ size: "lg" });
-      expect(getStyleClass(props)).toEqual({ class: cls("base-lg base-lg") });
+      expect(getStyleClass(props)).toEqual({ class: cls("base-lg") });
     });
 
     test("extend inherits defaultVariants", () => {

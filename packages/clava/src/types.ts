@@ -57,6 +57,8 @@ export interface ModalComponent<V, R extends ComponentResult> {
   getVariants: GetVariants<V>;
   keys: (keyof V | keyof R)[];
   onlyVariants: OnlyVariantsComponent<V>;
+  /** @internal Base class without variants */
+  _baseClass: string;
 }
 
 export interface Component<
