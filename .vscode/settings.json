@@ -4,7 +4,6 @@
   "tailwindCSS.classFunctions": ["clsx", "cx", "clava"],
   "editor.snippetSuggestions": "bottom",
   "editor.formatOnSave": true,
-  "editor.rulers": [{ "column": 100 }],
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
   },
