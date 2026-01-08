@@ -17,7 +17,7 @@ export function hyphenToCamel(str: string) {
   if (str.startsWith("--")) {
     return str;
   }
-  return str.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+  return str.replace(/-([a-z])/gi, (_, letter) => letter.toUpperCase());
 }
 
 /**
