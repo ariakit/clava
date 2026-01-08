@@ -841,6 +841,122 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
+    test("computedVariants changes extended boolean variant to string", () => {
+      const base = cv({
+        variants: { disabled: { true: "disabled", false: "enabled" } },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computedVariants: {
+            disabled: (value: "yes" | "no" | "maybe") => {
+              if (value === "yes") return "state-disabled";
+              if (value === "no") return "state-enabled";
+              return "state-pending";
+            },
+          },
+        }),
+      );
+      component({
+        // @ts-expect-error
+        disabled: true,
+      });
+      const props = component({ disabled: "maybe" });
+      expect(getStyleClass(props)).toEqual({ class: cls("state-pending") });
+    });
+
+    test("computedVariants changes extended string variant to boolean", () => {
+      const base = cv({ variants: { size: { sm: "sm", md: "md", lg: "lg" } } });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computedVariants: {
+            size: (value: boolean) => (value ? "size-large" : "size-small"),
+          },
+        }),
+      );
+      component({
+        // @ts-expect-error
+        size: "sm",
+      });
+      const propsTrue = component({ size: true });
+      expect(getStyleClass(propsTrue)).toEqual({ class: cls("size-large") });
+      const propsFalse = component({ size: false });
+      expect(getStyleClass(propsFalse)).toEqual({ class: cls("size-small") });
+    });
+
+    test("computedVariants with number type", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          computedVariants: {
+            columns: (value: number) => ({
+              class: `grid-cols-${value}`,
+              "--grid-columns": `${value}`,
+            }),
+          },
+        }),
+      );
+      const props = component({ columns: 3 });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("grid-cols-3"),
+        "--grid-columns": "3",
+      });
+    });
+
+    test("computedVariants with number type returns dynamic styles", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          computedVariants: {
+            gap: (value: number) => ({
+              "--gap": `${value * 4}px`,
+            }),
+            padding: (value: number) => ({
+              "--padding-x": `${value}px`,
+              "--padding-y": `${value * 0.5}px`,
+            }),
+          },
+        }),
+      );
+      const props = component({ gap: 4, padding: 16 });
+      expect(getStyleClass(props)).toEqual({
+        class: "",
+        "--gap": "16px",
+        "--padding-x": "16px",
+        "--padding-y": "8px",
+      });
+    });
+
+    test("computedVariants changes extended variant from string to number", () => {
+      const base = cv({
+        variants: { size: { sm: "text-sm", md: "text-md", lg: "text-lg" } },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computedVariants: {
+            size: (value: number) => ({
+              class: "text-custom",
+              fontSize: `${value}px`,
+            }),
+          },
+        }),
+      );
+      component({
+        // @ts-expect-error
+        size: "sm",
+      });
+      const props = component({ size: 18 });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("text-custom"),
+        fontSize: "18px",
+      });
+    });
+
     test("computed", () => {
       const component = getModalComponent(
         mode,
