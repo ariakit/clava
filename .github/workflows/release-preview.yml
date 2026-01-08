@@ -34,7 +34,9 @@ jobs:
         id: changeset-status
         run: |
           # Only consider changesets added since the base branch (i.e., in this PR)
-          if pnpm changeset status --since=${{ github.base_ref }} --output changes.json 2>/dev/null; then
+          # changeset status exits with non-zero when there are no changesets, so we ignore the exit code
+          pnpm changeset status --since=${{ github.base_ref }} --output changes.json || true
+          if [ -f changes.json ] && [ "$(jq '.releases | length' changes.json)" -gt 0 ]; then
             echo "has-changesets=true" >> $GITHUB_OUTPUT
           else
             echo "has-changesets=false" >> $GITHUB_OUTPUT
