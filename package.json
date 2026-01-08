@@ -17,7 +17,7 @@
     "format:check": "oxfmt --check .",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm build && changeset publish",
+    "release": "changeset publish",
     "prepare": "husky"
   },
   "devDependencies": {
