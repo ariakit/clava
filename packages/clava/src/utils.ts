@@ -126,7 +126,7 @@ export function styleValueToHTMLStyle(style: StyleValue): string {
 /**
  * Converts a StyleValue object to a hyphenated style object.
  * @example
- * styleValueToTMLObjStyle({ backgroundColor: "red", fontSize: "16px" });
+ * styleValueToHTMLObjStyle({ backgroundColor: "red", fontSize: "16px" });
  * // { "background-color": "red", "font-size": "16px" }
  */
 export function styleValueToHTMLObjStyle(style: StyleValue) {
