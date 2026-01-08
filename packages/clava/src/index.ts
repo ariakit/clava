@@ -20,6 +20,8 @@ import type {
   HTMLObjProps,
   OnlyVariantsComponent,
   ComponentProps,
+  SplitProps,
+  OnlyVariantsSplitProps,
 } from "./types.ts";
 
 import {
@@ -58,8 +60,6 @@ interface CreateParams<M extends Mode> {
   defaultMode?: M;
   transformClass?: (className: string) => string;
 }
-
-type SplitPropsResult<T, K extends keyof T> = [Pick<T, K>, Omit<T, K>];
 
 /**
  * Checks if a value is a style-class object (has style properties, not just a
@@ -225,10 +225,13 @@ function getVariantResult(
 /**
  * Processes extended components and returns base classes and variant classes separately.
  * Base classes should come before current component's base, variant classes come after.
+ * When overrideVariantKeys is provided, those variant keys are excluded from the extended
+ * component's result (used when current component's computedVariants overrides them).
  */
 function processExtended(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   resolvedVariants: Record<string, unknown>,
+  overrideVariantKeys: Set<string> = new Set(),
 ): {
   baseClasses: ClassValue[];
   variantClasses: ClassValue[];
@@ -240,9 +243,18 @@ function processExtended(
 
   if (config.extend) {
     for (const ext of config.extend) {
-      // Get the full result with resolved variants for style
-      const extResult = ext({ ...resolvedVariants });
-      style = { ...style, ...normalizeStyle(extResult.style) };
+      // Filter out variant keys that are being overridden by current component's computedVariants
+      const filteredVariants = { ...resolvedVariants };
+      for (const key of overrideVariantKeys) {
+        delete filteredVariants[key];
+      }
+
+      // Get the result with filtered variants (excluding overridden keys)
+      const extResult = ext({ ...filteredVariants });
+
+      // Only merge style for non-overridden keys
+      const extStyle = normalizeStyle(extResult.style);
+      style = { ...style, ...extStyle };
 
       // Get base class from internal property (no variants)
       const baseClass = ext._baseClass;
@@ -433,10 +445,16 @@ export function create<M extends Mode>({
       );
       resolvedVariants = computedResult.updatedVariants;
 
+      // Collect computedVariants keys that will override extended variants
+      const computedVariantKeys = new Set<string>(
+        config.computedVariants ? Object.keys(config.computedVariants) : [],
+      );
+
       // Process extended components (separates base and variant classes)
       const extendedResult = processExtended(
         config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
         resolvedVariants,
+        computedVariantKeys,
       );
 
       // 1. Extended base classes first
@@ -531,14 +549,9 @@ export function create<M extends Mode>({
 
       component.keys = propsKeys as (keyof MergedVariants | keyof R)[];
 
-      component.splitProps = <T extends Record<string, unknown>>(
-        props: T,
-      ): SplitPropsResult<T, Extract<keyof T, (typeof propsKeys)[number]>> => {
-        return splitPropsImpl(propsKeys, props) as SplitPropsResult<
-          T,
-          Extract<keyof T, (typeof propsKeys)[number]>
-        >;
-      };
+      component.splitProps = ((props: Record<string, unknown>) => {
+        return splitPropsImpl(propsKeys, props);
+      }) as SplitProps<MergedVariants, R>;
 
       component.onlyVariants = {
         getVariants: (
@@ -550,16 +563,9 @@ export function create<M extends Mode>({
           ) as VariantValues<MergedVariants>;
         },
         keys: variantKeys as (keyof MergedVariants)[],
-        splitProps: <T extends Record<string, unknown>>(
-          props: T,
-        ): SplitPropsResult<
-          T,
-          Extract<keyof T, (typeof variantKeys)[number]>
-        > =>
-          splitPropsImpl(variantKeys, props) as SplitPropsResult<
-            T,
-            Extract<keyof T, (typeof variantKeys)[number]>
-          >,
+        splitProps: ((props: Record<string, unknown>) => {
+          return splitPropsImpl(variantKeys, props);
+        }) as OnlyVariantsSplitProps<MergedVariants>,
       } as OnlyVariantsComponent<MergedVariants>;
 
       // Compute base class (without variants) - includes extended base classes

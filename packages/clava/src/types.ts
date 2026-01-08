@@ -43,8 +43,18 @@ export type ComponentProps<V = {}> = VariantValues<V> &
 
 export type GetVariants<V> = (variants?: VariantValues<V>) => VariantValues<V>;
 
+export type SplitProps<V, R extends ComponentResult> = <
+  T extends Partial<ComponentProps<V>>,
+>(
+  props: T,
+) => [Pick<T, Extract<keyof T, keyof V | keyof R>>, Omit<T, keyof V | keyof R>];
+
+export type OnlyVariantsSplitProps<V> = <T extends Partial<VariantValues<V>>>(
+  props: T,
+) => [Pick<T, Extract<keyof T, keyof V>>, Omit<T, keyof V>];
+
 export interface OnlyVariantsComponent<V> {
-  splitProps: (...args: any[]) => any;
+  splitProps: OnlyVariantsSplitProps<V>;
   getVariants: GetVariants<V>;
   keys: (keyof V)[];
 }
@@ -53,7 +63,7 @@ export interface ModalComponent<V, R extends ComponentResult> {
   (props?: ComponentProps<V>): R;
   class: (props?: ComponentProps<V>) => string;
   style: (props?: ComponentProps<V>) => R["style"];
-  splitProps: (...args: any[]) => any;
+  splitProps: SplitProps<V, R>;
   getVariants: GetVariants<V>;
   keys: (keyof V | keyof R)[];
   onlyVariants: OnlyVariantsComponent<V>;

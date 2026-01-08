@@ -595,6 +595,53 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
+    test("variant style does not accept numbers", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            // @ts-expect-error
+            size: {
+              sm: {
+                class: "sm",
+                fontSize: 12,
+              },
+              lg: { class: "lg", fontSize: "16px" },
+            },
+          },
+        }),
+      );
+      const props = component({ size: "sm" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("sm"),
+        fontSize: expect.toBeOneOf(["12", "12px"]),
+      });
+    });
+
+    test("variant props do not accept invalid values", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const props = component({
+        // @ts-expect-error
+        size: "invalid",
+      });
+      expect(getStyleClass(props)).toEqual({ class: "" });
+    });
+
+    test("variant props do not accept invalid keys", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const props = component({
+        // @ts-expect-error
+        invalidKey: "value",
+      });
+      expect(getStyleClass(props)).toEqual({ class: "" });
+    });
+
     test("defaultVariants", () => {
       const component = getModalComponent(
         mode,
@@ -655,6 +702,37 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
     });
 
+    test("defaultVariants does not accept invalid keys", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: {
+            size: "sm",
+            // @ts-expect-error
+            invalidKey: "value",
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
+    test("defaultVariants does not accept invalid values", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: {
+            // @ts-expect-error
+            size: "invalid",
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: "" });
+    });
+
     test("computedVariants", () => {
       const component = getModalComponent(
         mode,
@@ -684,6 +762,82 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({
         class: cls("large"),
         fontSize: "16px",
+      });
+    });
+
+    test("computedVariants overrides extended object variants", () => {
+      const base = cv({
+        variants: {
+          size: {
+            sm: { class: "base-sm", fontSize: "12px" },
+            lg: { class: "base-lg", fontSize: "16px" },
+          },
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computedVariants: {
+            size: (value: "sm" | "lg") => ({
+              class: value === "sm" ? "extended-sm" : "extended-lg",
+              backgroundColor: value === "sm" ? "lightgray" : "gray",
+            }),
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("extended-lg"),
+        backgroundColor: "gray",
+      });
+    });
+
+    test("computedVariants overrides extended computedVariants", () => {
+      const base = cv({
+        computedVariants: {
+          size: (value: "sm" | "lg") => ({
+            class: value === "sm" ? "base-sm" : "base-lg",
+            fontSize: value === "sm" ? "12px" : "16px",
+          }),
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computedVariants: {
+            size: (value: "sm" | "lg") => ({
+              class: value === "sm" ? "extended-sm" : "extended-lg",
+              backgroundColor: value === "sm" ? "lightgray" : "gray",
+            }),
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("extended-lg"),
+        backgroundColor: "gray",
+      });
+    });
+
+    test("computedVariants style does not accept numbers", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          computedVariants: {
+            // @ts-expect-error
+            size: (value: "sm" | "lg") => ({
+              class: value === "sm" ? "small" : "large",
+              fontSize: value === "sm" ? 12 : 16,
+            }),
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("large"),
+        fontSize: expect.toBeOneOf(["16", "16px"]),
       });
     });
 
@@ -755,6 +909,40 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg blue") });
     });
 
+    test("computed with defaultVariants", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          defaultVariants: { size: "lg" },
+          computed: ({ variants }) =>
+            variants.size === "lg" ? "computed-lg" : null,
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("lg computed-lg") });
+    });
+
+    test("computed with defaultVariants from extended", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "lg" },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computed: ({ variants }) =>
+            variants.size === "lg" ? "computed-lg" : null,
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("lg computed-lg") });
+    });
+
     test("computed with style", () => {
       const component = getModalComponent(
         mode,
@@ -787,6 +975,63 @@ for (const config of Object.values(CONFIGS)) {
         class: cls("lg computed-lg"),
         fontSize: "20px",
       });
+    });
+
+    test("computed style does not accept numbers", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          // @ts-expect-error
+          computed: ({ variants }) =>
+            variants.size === "lg"
+              ? {
+                  class: "computed-lg",
+                  fontSize: 20,
+                }
+              : null,
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg computed-lg"),
+        fontSize: expect.toBeOneOf(["20", "20px"]),
+      });
+    });
+
+    test("computed setVariants does not accept invalid keys", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ setVariants }) => {
+            setVariants({
+              // @ts-expect-error
+              invalidKey: "value",
+            });
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({ class: cls("lg") });
+    });
+
+    test("computed setVariants does not accept invalid values", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ setVariants }) => {
+            setVariants({
+              // @ts-expect-error
+              size: "invalid",
+            });
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      // Invalid value overrides the valid one, resulting in no match
+      expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("extend single component", () => {
@@ -956,6 +1201,44 @@ for (const config of Object.values(CONFIGS)) {
         style: "color: red;",
         [classNameProp]: "extra",
       });
+    });
+
+    test("splitProps result is type-safe", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const [variantProps, otherProps] = component.splitProps({
+        id: "test",
+        size: "lg",
+        style: { color: "red" },
+      });
+      expectTypeOf(variantProps).toEqualTypeOf<{
+        size: "lg";
+        style: { color: "red" };
+      }>();
+      expectTypeOf(otherProps).toEqualTypeOf<{ id: string }>();
+      expect(variantProps.size).toBe("lg");
+      expect(otherProps.id).toBe("test");
+    });
+
+    test("onlyVariants splitProps result is type-safe", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const [variantProps, otherProps] = component.onlyVariants.splitProps({
+        size: "lg",
+        id: "test",
+        style: { color: "red" },
+      });
+      expectTypeOf(variantProps).toEqualTypeOf<{ size: "lg" }>();
+      expectTypeOf(otherProps).toEqualTypeOf<{
+        id: string;
+        style: { color: string };
+      }>();
+      expect(variantProps.size).toBe("lg");
+      expect(otherProps.id).toBe("test");
     });
 
     test("onlyVariants getVariants", () => {
