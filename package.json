@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "description": "Clava monorepo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ariakit/clava.git"
+  },
   "scripts": {
     "build": "pnpm -r --filter './packages/**' build",
     "test": "vitest",
