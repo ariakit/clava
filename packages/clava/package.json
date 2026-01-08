@@ -2,7 +2,32 @@
   "name": "clava",
   "version": "0.0.1",
   "description": "Clava library",
+  "keywords": [
+    "class variance",
+    "clava",
+    "css",
+    "cva",
+    "styles",
+    "tailwind"
+  ],
+  "homepage": "https://clava.style",
+  "license": "MIT",
+  "author": {
+    "name": "Diego Haz",
+    "email": "hazdiego@gmail.com",
+    "url": "https://github.com/diegohaz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ariakit/clava.git",
+    "directory": "packages/clava"
+  },
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/ariakit"
+  },
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
