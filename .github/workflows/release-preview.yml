@@ -70,6 +70,11 @@ jobs:
         run: |
           packages=$(echo $AFFECTED_PACKAGES | jq -r '.[]' | tr '\n' ' ')
           if [ -n "$packages" ]; then
+            echo "Debug: packages to publish: $packages"
+            for pkg in $packages; do
+              echo "Debug: $pkg/package.json repository field:"
+              jq '.repository' "$pkg/package.json"
+            done
             pnpx pkg-pr-new publish --compact $packages
           else
             echo "No affected packages to publish"
