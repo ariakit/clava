@@ -1,5 +1,0 @@
----
-"clava": patch
----
-
-Initial implementation.
