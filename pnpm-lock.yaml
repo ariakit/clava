@@ -54,7 +54,7 @@ importers:
   packages/clava:
     dependencies:
       clsx:
-        specifier: 2.1.1
+        specifier: ^2.1.1
         version: 2.1.1
       csstype:
         specifier: ^3.2.3

@@ -15,7 +15,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "clsx": "2.1.1",
+    "clsx": "^2.1.1",
     "csstype": "^3.2.3"
   }
 }
