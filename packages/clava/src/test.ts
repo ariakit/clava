@@ -9,9 +9,10 @@ import type {
   Variants,
   ComputedVariants,
   Component,
+  StyleProperty,
 } from "./types.ts";
 
-import { cv as cvBase, create } from "./index.ts";
+import { cv as cvBase, create, type VariantProps } from "./index.ts";
 import {
   htmlObjStyleToStyleValue,
   htmlStyleToStyleValue,
@@ -21,6 +22,13 @@ import {
 
 const MODES = ["jsx", "html", "htmlObj"] as const;
 type Mode = (typeof MODES)[number] | null;
+
+type HTMLProperties<T extends AnyComponent> = VariantProps<T> & {
+  id?: string;
+  class?: string;
+  className?: string;
+  style?: StyleProperty;
+};
 
 type ConfigParams = NonNullable<Parameters<typeof create>[0]>;
 
@@ -93,7 +101,7 @@ function getModalComponent<
   V extends Variants = {},
   CV extends ComputedVariants = {},
   const E extends AnyComponent[] = [],
->(mode: M, component: Component<V, CV, E, ComponentResult>) {
+>(mode: M, component: Component<V, CV, E>) {
   if (!mode) return component;
   return component[mode];
 }
@@ -1285,12 +1293,20 @@ for (const config of Object.values(CONFIGS)) {
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const [variantProps, otherProps] = component.splitProps({
+      const props: HTMLProperties<typeof component> = {
         id: "test",
         size: "lg",
         style: { color: "red" },
         [classNameProp]: "extra",
-      });
+      };
+      const [variantProps, otherProps] = component.splitProps(props);
+      expectTypeOf(variantProps).branded.toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component>,
+          "size" | "style" | "class" | "className"
+        >
+      >();
+      expectTypeOf(otherProps).toEqualTypeOf<{ id?: string }>();
       expect(variantProps).toEqual({
         size: "lg",
         style: { color: "red" },
@@ -1305,56 +1321,29 @@ for (const config of Object.values(CONFIGS)) {
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const [variantProps, otherProps] = component.onlyVariants.splitProps({
+      const props: HTMLProperties<typeof component> = {
         size: "lg",
         id: "test",
         style: "color: red;",
         [classNameProp]: "extra",
-      });
+      };
+      const [variantProps, otherProps] =
+        component.onlyVariants.splitProps(props);
+      expectTypeOf(variantProps).branded.toEqualTypeOf<{
+        size?: "sm" | "lg";
+      }>();
+      expectTypeOf(otherProps).toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component>,
+          "id" | "style" | "class" | "className"
+        >
+      >();
       expect(variantProps).toEqual({ size: "lg" });
       expect(otherProps).toEqual({
         id: "test",
         style: "color: red;",
         [classNameProp]: "extra",
       });
-    });
-
-    test("splitProps result is type-safe", () => {
-      const component = getModalComponent(
-        mode,
-        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
-      );
-      const [variantProps, otherProps] = component.splitProps({
-        id: "test",
-        size: "lg",
-        style: { color: "red" },
-      });
-      expectTypeOf(variantProps).toEqualTypeOf<{
-        size: "lg";
-        style: { color: "red" };
-      }>();
-      expectTypeOf(otherProps).toEqualTypeOf<{ id: string }>();
-      expect(variantProps.size).toBe("lg");
-      expect(otherProps.id).toBe("test");
-    });
-
-    test("onlyVariants splitProps result is type-safe", () => {
-      const component = getModalComponent(
-        mode,
-        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
-      );
-      const [variantProps, otherProps] = component.onlyVariants.splitProps({
-        size: "lg",
-        id: "test",
-        style: { color: "red" },
-      });
-      expectTypeOf(variantProps).toEqualTypeOf<{ size: "lg" }>();
-      expectTypeOf(otherProps).toEqualTypeOf<{
-        id: string;
-        style: { color: string };
-      }>();
-      expect(variantProps.size).toBe("lg");
-      expect(otherProps.id).toBe("test");
     });
 
     test("onlyVariants getVariants", () => {
@@ -1373,12 +1362,635 @@ for (const config of Object.values(CONFIGS)) {
       const component = cv({
         variants: { size: { sm: "sm" }, color: { red: "red" } },
       });
-      expectTypeOf(component.onlyVariants.keys).toExtend<
+      expectTypeOf(component.onlyVariants.keys).toEqualTypeOf<
         ("size" | "color")[]
       >();
       expect(component.onlyVariants.keys).toEqual(
         expect.arrayContaining(["size", "color"]),
       );
+    });
+
+    test("splitProps includes defaultVariants", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" }, color: { red: "red" } },
+          defaultVariants: { size: "sm", color: "red" },
+        }),
+      );
+      const props: HTMLProperties<typeof component> = {
+        id: "test",
+        size: "lg",
+      };
+      const [variantProps, otherProps] = component.splitProps(props);
+      expectTypeOf(variantProps).branded.toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component>,
+          "size" | "color" | "style" | "class" | "className"
+        >
+      >();
+      expect(variantProps).toEqual({
+        size: "lg",
+        color: "red",
+      });
+      expectTypeOf(otherProps).toEqualTypeOf<{ id?: string }>();
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with key array as second parameter", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component> & { disabled?: boolean } = {
+        id: "test",
+        size: "lg",
+        style: { color: "red" },
+        [classNameProp]: "extra",
+        disabled: true,
+      };
+      const [variantProps, extraProps, otherProps] = component.splitProps(
+        props,
+        ["disabled"],
+      );
+      expectTypeOf(variantProps).branded.toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component>,
+          "size" | "style" | "class" | "className"
+        >
+      >();
+      expect(variantProps).toEqual({
+        size: "lg",
+        style: { color: "red" },
+        [classNameProp]: "extra",
+      });
+      expectTypeOf(extraProps).branded.toEqualTypeOf<{ disabled?: boolean }>();
+      expect(extraProps).toEqual({ disabled: true });
+      expectTypeOf(otherProps).toEqualTypeOf<{ id?: string }>();
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with another component as parameter", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+        color: "blue",
+        [classNameProp]: "extra",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2,
+      );
+      expectTypeOf(comp1Props).branded.toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component1>,
+          "size" | "style" | "class" | "className"
+        >
+      >();
+      expect(comp1Props).toEqual({
+        size: "lg",
+        [classNameProp]: "extra",
+      });
+      expectTypeOf(comp2Props).branded.toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component2>,
+          "color" | "style" | "class" | "className"
+        >
+      >();
+      expect(comp2Props).toEqual({
+        color: "blue",
+        [classNameProp]: "extra",
+      });
+      expectTypeOf(otherProps).toEqualTypeOf<{ id?: string }>();
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with component parameter includes component defaults", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2,
+      );
+      expect(comp1Props).toEqual({ size: "lg" });
+      expect(comp2Props).toEqual({ color: "red" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with onlyVariants component excludes class and style", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({ variants: { color: { red: "red", blue: "blue" } } }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+        color: "blue",
+        style: { backgroundColor: "yellow" },
+        [classNameProp]: "extra",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2.onlyVariants,
+      );
+      expectTypeOf(comp1Props).branded.toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component1>,
+          "size" | "style" | "class" | "className"
+        >
+      >();
+      expect(comp1Props).toEqual({
+        size: "lg",
+        style: { backgroundColor: "yellow" },
+        [classNameProp]: "extra",
+      });
+      expectTypeOf(comp2Props).branded.toEqualTypeOf<{
+        color?: "red" | "blue";
+      }>();
+      expect(comp2Props).toEqual({ color: "blue" });
+      expectTypeOf(otherProps).toEqualTypeOf<{ id?: string }>();
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with multiple parameters", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({ variants: { color: { red: "red", blue: "blue" } } }),
+      );
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> & { disabled?: boolean } = {
+        id: "test",
+        size: "lg",
+        color: "blue",
+        disabled: true,
+      };
+      const [comp1Props, extraProps, comp2Props, otherProps] =
+        component1.splitProps(props, ["disabled"], component2.onlyVariants);
+      expect(comp1Props).toEqual({ size: "lg" });
+      expect(extraProps).toEqual({ disabled: true });
+      expect(comp2Props).toEqual({ color: "blue" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with shared keys between components", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2.onlyVariants,
+      );
+      expectTypeOf(comp1Props).branded.toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component1>,
+          "size" | "style" | "class" | "className"
+        >
+      >();
+      expect(comp1Props).toEqual({ size: "lg" });
+      expectTypeOf(comp2Props).branded.toEqualTypeOf<{
+        size?: "sm" | "lg";
+      }>();
+      expect(comp2Props).toEqual({ size: "lg" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with defaultVariants from multiple components", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        { id: "test" },
+        component2.onlyVariants,
+      );
+      // Each gets its own defaults
+      expect(comp1Props).toEqual({ size: "sm" });
+      expect(comp2Props).toEqual({ color: "red" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("onlyVariants splitProps includes defaultVariants", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" }, color: { red: "red" } },
+          defaultVariants: { size: "sm", color: "red" },
+        }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component> = {
+        id: "test",
+        size: "lg",
+        [classNameProp]: "extra",
+      };
+      const [variantProps, otherProps] =
+        component.onlyVariants.splitProps(props);
+      expect(variantProps).toEqual({
+        size: "lg",
+        color: "red",
+      });
+      expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
+    });
+
+    test("onlyVariants splitProps with key array", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component> & { disabled?: boolean } = {
+        id: "test",
+        size: "lg",
+        [classNameProp]: "extra",
+        disabled: true,
+      };
+      const [variantProps, extraProps, otherProps] =
+        component.onlyVariants.splitProps(props, ["disabled"]);
+      expect(variantProps).toEqual({ size: "lg" });
+      expect(extraProps).toEqual({ disabled: true });
+      expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
+    });
+
+    test("onlyVariants splitProps with component", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+        color: "blue",
+        [classNameProp]: "extra",
+      };
+      const [comp1Props, comp2Props, otherProps] =
+        component1.onlyVariants.splitProps(props, component2.onlyVariants);
+      expect(comp1Props).toEqual({ size: "lg" });
+      expect(comp2Props).toEqual({ color: "blue" });
+      expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
+    });
+
+    test("splitProps includes defaultVariants", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" }, color: { red: "red" } },
+          defaultVariants: { size: "sm", color: "red" },
+        }),
+      );
+      const props: HTMLProperties<typeof component> = {
+        id: "test",
+        size: "lg",
+      };
+      const [variantProps, otherProps] = component.splitProps(props);
+      expectTypeOf(variantProps).branded.toEqualTypeOf<
+        Pick<
+          HTMLProperties<typeof component>,
+          "size" | "color" | "style" | "class" | "className"
+        >
+      >();
+      expect(variantProps).toEqual({ size: "lg", color: "red" });
+      expectTypeOf(otherProps).toEqualTypeOf<{ id?: string }>();
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with key array as second parameter", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component> & { disabled?: boolean } = {
+        id: "test",
+        size: "lg",
+        style: { color: "red" },
+        [classNameProp]: "extra",
+        disabled: true,
+      };
+      const [variantProps, extraProps, otherProps] = component.splitProps(
+        props,
+        ["disabled"],
+      );
+      expect(variantProps).toEqual({
+        size: "lg",
+        style: { color: "red" },
+        [classNameProp]: "extra",
+      });
+      expect(extraProps).toEqual({ disabled: true });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with another component as parameter", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+        color: "blue",
+        [classNameProp]: "extra",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2,
+      );
+      expect(comp1Props).toEqual({
+        size: "lg",
+        [classNameProp]: "extra",
+      });
+      // component2 has class/style keys too, and defaultVariants
+      expect(comp2Props).toEqual({
+        color: "blue",
+        [classNameProp]: "extra",
+      });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with component parameter includes component defaults", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2,
+      );
+      expect(comp1Props).toEqual({ size: "lg" });
+      // component2's defaults should be included
+      expect(comp2Props).toEqual({ color: "red" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with onlyVariants component excludes class and style", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({ variants: { color: { red: "red", blue: "blue" } } }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+        color: "blue",
+        style: { backgroundColor: "yellow" },
+        [classNameProp]: "extra",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2.onlyVariants,
+      );
+      expect(comp1Props).toEqual({
+        size: "lg",
+        style: { backgroundColor: "yellow" },
+        [classNameProp]: "extra",
+      });
+      // onlyVariants only gets color, not class/style
+      expect(comp2Props).toEqual({ color: "blue" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with multiple parameters", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({ variants: { color: { red: "red", blue: "blue" } } }),
+      );
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> & { disabled?: boolean } = {
+        id: "test",
+        size: "lg",
+        color: "blue",
+        disabled: true,
+      };
+      const [comp1Props, extraProps, comp2Props, otherProps] =
+        component1.splitProps(props, ["disabled"], component2.onlyVariants);
+      expect(comp1Props).toEqual({ size: "lg" });
+      expect(extraProps).toEqual({ disabled: true });
+      expect(comp2Props).toEqual({ color: "blue" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with shared keys between components", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2.onlyVariants,
+      );
+      expect(comp1Props).toEqual({ size: "lg" });
+      // size should appear in both
+      expect(comp2Props).toEqual({ size: "lg" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("splitProps with defaultVariants from multiple components", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+      };
+      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+        props,
+        component2.onlyVariants,
+      );
+      // Each gets its own defaults
+      expect(comp1Props).toEqual({ size: "sm" });
+      expect(comp2Props).toEqual({ color: "red" });
+      expect(otherProps).toEqual({ id: "test" });
+    });
+
+    test("onlyVariants splitProps includes defaultVariants", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" }, color: { red: "red" } },
+          defaultVariants: { size: "sm", color: "red" },
+        }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component> = {
+        id: "test",
+        size: "lg",
+        [classNameProp]: "extra",
+      };
+      const [variantProps, otherProps] =
+        component.onlyVariants.splitProps(props);
+      expect(variantProps).toEqual({
+        size: "lg",
+        color: "red",
+      });
+      expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
+    });
+
+    test("onlyVariants splitProps with key array", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component> & { disabled?: boolean } = {
+        id: "test",
+        size: "lg",
+        [classNameProp]: "extra",
+        disabled: true,
+      };
+      const [variantProps, extraProps, otherProps] =
+        component.onlyVariants.splitProps(props, ["disabled"]);
+      expect(variantProps).toEqual({ size: "lg" });
+      expect(extraProps).toEqual({ disabled: true });
+      expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
+    });
+
+    test("onlyVariants splitProps with component", () => {
+      const component1 = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+      const component2 = getModalComponent(
+        mode,
+        cv({
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const classNameProp = getClassPropertyName(config);
+      const props: HTMLProperties<typeof component1> &
+        HTMLProperties<typeof component2> = {
+        id: "test",
+        size: "lg",
+        color: "blue",
+        [classNameProp]: "extra",
+      };
+      const [comp1Props, comp2Props, otherProps] =
+        component1.onlyVariants.splitProps(props, component2.onlyVariants);
+      expect(comp1Props).toEqual({ size: "lg" });
+      expect(comp2Props).toEqual({ color: "blue" });
+      expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
     });
   });
 }

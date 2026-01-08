@@ -369,25 +369,90 @@ function processComputed(
 }
 
 /**
- * Splits props into variant/style props and other props.
+ * Normalizes a key source (array or component) to an object with keys and defaults.
  */
-function splitPropsImpl<T extends Record<string, unknown>>(
-  keys: string[],
-  props: T,
-): [Partial<T>, Partial<T>] {
-  const keySet = new Set(keys);
-  const variantProps: Partial<T> = {};
-  const otherProps: Partial<T> = {};
+function normalizeKeySource(source: unknown): {
+  keys: string[];
+  defaults: Record<string, unknown>;
+} {
+  if (Array.isArray(source)) {
+    return { keys: source as string[], defaults: {} };
+  }
+  // Components are functions with keys property, onlyVariants are objects with keys
+  if (
+    source &&
+    (typeof source === "object" || typeof source === "function") &&
+    "keys" in source
+  ) {
+    const keys = [...(source as { keys: string[] }).keys] as string[];
+    const defaults =
+      "getVariants" in source
+        ? (
+            source as { getVariants: () => Record<string, unknown> }
+          ).getVariants()
+        : {};
+    return { keys, defaults };
+  }
+  return { keys: [], defaults: {} };
+}
 
-  for (const [key, value] of Object.entries(props)) {
-    if (keySet.has(key)) {
-      (variantProps as Record<string, unknown>)[key] = value;
-    } else {
-      (otherProps as Record<string, unknown>)[key] = value;
+/**
+ * Splits props into multiple groups based on key sources.
+ */
+function splitPropsImpl(
+  selfKeys: string[],
+  selfDefaults: Record<string, unknown>,
+  props: Record<string, unknown>,
+  sources: Array<{ keys: string[]; defaults: Record<string, unknown> }>,
+): Record<string, unknown>[] {
+  const allUsedKeys = new Set<string>(selfKeys);
+  const results: Record<string, unknown>[] = [];
+
+  // Self result with defaults
+  const selfResult: Record<string, unknown> = {};
+  // First apply defaults
+  for (const [key, value] of Object.entries(selfDefaults)) {
+    if (selfKeys.includes(key)) {
+      selfResult[key] = value;
     }
   }
+  // Then override with props
+  for (const key of selfKeys) {
+    if (key in props) {
+      selfResult[key] = props[key];
+    }
+  }
+  results.push(selfResult);
 
-  return [variantProps, otherProps];
+  // Process each source
+  for (const source of sources) {
+    const sourceResult: Record<string, unknown> = {};
+    // First apply defaults
+    for (const [key, value] of Object.entries(source.defaults)) {
+      if (source.keys.includes(key)) {
+        sourceResult[key] = value;
+      }
+    }
+    // Then override with props
+    for (const key of source.keys) {
+      allUsedKeys.add(key);
+      if (key in props) {
+        sourceResult[key] = props[key];
+      }
+    }
+    results.push(sourceResult);
+  }
+
+  // Rest - keys not used by anyone
+  const rest: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(props)) {
+    if (!allUsedKeys.has(key)) {
+      rest[key] = value;
+    }
+  }
+  results.push(rest);
+
+  return results;
 }
 
 export function create<M extends Mode>({
@@ -503,9 +568,11 @@ export function create<M extends Mode>({
       };
     };
 
+    type Defaults = VariantValues<MergedVariants>;
+
     const createModalComponent = <R extends ComponentResult>(
       mode: Mode,
-    ): ModalComponent<MergedVariants, R> => {
+    ): ModalComponent<MergedVariants, Defaults, R> => {
       const propsKeys = getPropsKeys(mode);
 
       const component = ((props: ComponentProps<MergedVariants> = {}) => {
@@ -525,7 +592,7 @@ export function create<M extends Mode>({
           class: className,
           style: styleValueToHTMLObjStyle(style),
         } as R;
-      }) as ModalComponent<MergedVariants, R>;
+      }) as ModalComponent<MergedVariants, Defaults, R>;
 
       component.class = (props: ComponentProps<MergedVariants> = {}) => {
         return computeResult(props).className;
@@ -536,7 +603,7 @@ export function create<M extends Mode>({
         if (mode === "jsx") return styleValueToJSXStyle(style);
         if (mode === "html") return styleValueToHTMLStyle(style);
         return styleValueToHTMLObjStyle(style);
-      }) as ModalComponent<MergedVariants, R>["style"];
+      }) as ModalComponent<MergedVariants, Defaults, R>["style"];
 
       component.getVariants = (
         variants?: VariantValues<MergedVariants>,
@@ -549,9 +616,22 @@ export function create<M extends Mode>({
 
       component.keys = propsKeys as (keyof MergedVariants | keyof R)[];
 
-      component.splitProps = ((props: Record<string, unknown>) => {
-        return splitPropsImpl(propsKeys, props);
-      }) as SplitProps<MergedVariants, R>;
+      const selfDefaults = collectDefaultVariants(
+        config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+      );
+
+      component.splitProps = ((
+        props: Record<string, unknown>,
+        ...sources: unknown[]
+      ) => {
+        const normalizedSources = sources.map(normalizeKeySource);
+        return splitPropsImpl(
+          propsKeys,
+          selfDefaults,
+          props,
+          normalizedSources,
+        );
+      }) as SplitProps<MergedVariants, VariantValues<MergedVariants>, R>;
 
       component.onlyVariants = {
         getVariants: (
@@ -563,10 +643,22 @@ export function create<M extends Mode>({
           ) as VariantValues<MergedVariants>;
         },
         keys: variantKeys as (keyof MergedVariants)[],
-        splitProps: ((props: Record<string, unknown>) => {
-          return splitPropsImpl(variantKeys, props);
-        }) as OnlyVariantsSplitProps<MergedVariants>,
-      } as OnlyVariantsComponent<MergedVariants>;
+        splitProps: ((
+          props: Record<string, unknown>,
+          ...sources: unknown[]
+        ) => {
+          const normalizedSources = sources.map(normalizeKeySource);
+          return splitPropsImpl(
+            variantKeys,
+            selfDefaults,
+            props,
+            normalizedSources,
+          );
+        }) as OnlyVariantsSplitProps<
+          MergedVariants,
+          VariantValues<MergedVariants>
+        >,
+      } as OnlyVariantsComponent<MergedVariants, VariantValues<MergedVariants>>;
 
       // Compute base class (without variants) - includes extended base classes
       const extendedBaseClasses: ClassValue[] = [];
