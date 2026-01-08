@@ -51,7 +51,14 @@ importers:
         specifier: workspace:*
         version: link:../packages/clava
 
-  packages/clava: {}
+  packages/clava:
+    dependencies:
+      clsx:
+        specifier: 2.1.1
+        version: 2.1.1
+      csstype:
+        specifier: ^3.2.3
+        version: 3.2.3
 
 packages:
 
@@ -911,6 +918,10 @@ packages:
     resolution: {integrity: sha512-SroPvNHxUnk+vIW/dOSfNqdy1sPEFkrTk6TUtqLCnBlo3N7TNYYkzzN7uSD6+jVjrdO4+p8nH7JzH6cIvUem6A==}
     engines: {node: '>=20'}
 
+  clsx@2.1.1:
+    resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
+    engines: {node: '>=6'}
+
   colorette@2.0.20:
     resolution: {integrity: sha512-IfEDxwoWIjkeXL1eXcDiow4UbKjhLdq6/EuSVR9GMN7KVH3r9gQ83e73hsz1Nd1T3ijd5xv1wcWRYO+D6kCI2w==}
 
@@ -929,6 +940,9 @@ packages:
   cssstyle@5.3.6:
     resolution: {integrity: sha512-legscpSpgSAeGEe0TNcai97DKt9Vd9AsAdOL7Uoetb52Ar/8eJm3LIa39qpv8wWzLFlNG4vVvppQM+teaMPj3A==}
     engines: {node: '>=20'}
+
+  csstype@3.2.3:
+    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
   data-urls@6.0.0:
     resolution: {integrity: sha512-BnBS08aLUM+DKamupXs3w2tJJoqU+AkaE/+6vQxi/G/DPmIZFJJp9Dkb1kM03AZx8ADehDUZgsNxju3mPXZYIA==}
@@ -2469,6 +2483,8 @@ snapshots:
       slice-ansi: 7.1.2
       string-width: 8.1.0
 
+  clsx@2.1.1: {}
+
   colorette@2.0.20: {}
 
   commander@14.0.2: {}
@@ -2492,6 +2508,8 @@ snapshots:
       css-tree: 3.1.0
       lru-cache: 11.2.4
     optional: true
+
+  csstype@3.2.3: {}
 
   data-urls@6.0.0:
     dependencies:

@@ -13,5 +13,9 @@
   "scripts": {
     "build": "rolldown -c",
     "test": "vitest"
+  },
+  "dependencies": {
+    "clsx": "2.1.1",
+    "csstype": "^3.2.3"
   }
 }
