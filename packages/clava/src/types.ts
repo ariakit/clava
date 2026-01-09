@@ -69,9 +69,7 @@ type SourceVariantKeys<S> = S extends readonly (infer K)[]
   ? K
   : S extends { variantKeys: readonly (infer K)[] }
     ? K
-    : S extends { keys: readonly (infer K)[] }
-      ? K
-      : never;
+    : never;
 
 // Extract defaults from a source (components have defaults, arrays don't)
 type SourceDefaults<S> = S extends { getVariants: () => infer Defaults }
