@@ -20,8 +20,7 @@ import type {
   HTMLObjProps,
   OnlyVariantsComponent,
   ComponentProps,
-  SplitProps,
-  OnlyVariantsSplitProps,
+  SplitPropsFunction,
 } from "./types.ts";
 
 import {
@@ -455,6 +454,35 @@ function splitPropsImpl(
   return results;
 }
 
+/**
+ * Splits props into multiple groups based on key sources.
+ * Each source gets its own result object containing all its matching keys.
+ * The last element is always the "rest" containing keys not claimed by any source.
+ *
+ * @example
+ * ```ts
+ * const [buttonProps, inputProps, rest] = splitProps(
+ *   props,
+ *   buttonComponent,
+ *   inputComponent.onlyVariants,
+ * );
+ * ```
+ */
+export const splitProps: SplitPropsFunction = ((
+  props: Record<string, unknown>,
+  source1: unknown,
+  ...sources: unknown[]
+) => {
+  const normalizedSource1 = normalizeKeySource(source1);
+  const normalizedSources = sources.map(normalizeKeySource);
+  return splitPropsImpl(
+    normalizedSource1.keys,
+    normalizedSource1.defaults,
+    props,
+    normalizedSources,
+  );
+}) as SplitPropsFunction;
+
 export function create<M extends Mode>({
   defaultMode = "jsx" as M,
   transformClass = (className) => className,
@@ -568,11 +596,9 @@ export function create<M extends Mode>({
       };
     };
 
-    type Defaults = VariantValues<MergedVariants>;
-
     const createModalComponent = <R extends ComponentResult>(
       mode: Mode,
-    ): ModalComponent<MergedVariants, Defaults, R> => {
+    ): ModalComponent<MergedVariants, R> => {
       const propsKeys = getPropsKeys(mode);
 
       const component = ((props: ComponentProps<MergedVariants> = {}) => {
@@ -592,7 +618,7 @@ export function create<M extends Mode>({
           class: className,
           style: styleValueToHTMLObjStyle(style),
         } as R;
-      }) as ModalComponent<MergedVariants, Defaults, R>;
+      }) as ModalComponent<MergedVariants, R>;
 
       component.class = (props: ComponentProps<MergedVariants> = {}) => {
         return computeResult(props).className;
@@ -603,7 +629,7 @@ export function create<M extends Mode>({
         if (mode === "jsx") return styleValueToJSXStyle(style);
         if (mode === "html") return styleValueToHTMLStyle(style);
         return styleValueToHTMLObjStyle(style);
-      }) as ModalComponent<MergedVariants, Defaults, R>["style"];
+      }) as ModalComponent<MergedVariants, R>["style"];
 
       component.getVariants = (
         variants?: VariantValues<MergedVariants>,
@@ -616,23 +642,6 @@ export function create<M extends Mode>({
 
       component.keys = propsKeys as (keyof MergedVariants | keyof R)[];
 
-      const selfDefaults = collectDefaultVariants(
-        config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-      );
-
-      component.splitProps = ((
-        props: Record<string, unknown>,
-        ...sources: unknown[]
-      ) => {
-        const normalizedSources = sources.map(normalizeKeySource);
-        return splitPropsImpl(
-          propsKeys,
-          selfDefaults,
-          props,
-          normalizedSources,
-        );
-      }) as SplitProps<MergedVariants, VariantValues<MergedVariants>, R>;
-
       component.onlyVariants = {
         getVariants: (
           variants?: VariantValues<MergedVariants>,
@@ -643,22 +652,7 @@ export function create<M extends Mode>({
           ) as VariantValues<MergedVariants>;
         },
         keys: variantKeys as (keyof MergedVariants)[],
-        splitProps: ((
-          props: Record<string, unknown>,
-          ...sources: unknown[]
-        ) => {
-          const normalizedSources = sources.map(normalizeKeySource);
-          return splitPropsImpl(
-            variantKeys,
-            selfDefaults,
-            props,
-            normalizedSources,
-          );
-        }) as OnlyVariantsSplitProps<
-          MergedVariants,
-          VariantValues<MergedVariants>
-        >,
-      } as OnlyVariantsComponent<MergedVariants, VariantValues<MergedVariants>>;
+      } as OnlyVariantsComponent<MergedVariants>;
 
       // Compute base class (without variants) - includes extended base classes
       const extendedBaseClasses: ClassValue[] = [];

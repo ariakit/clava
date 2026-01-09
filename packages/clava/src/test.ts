@@ -12,7 +12,12 @@ import type {
   StyleProperty,
 } from "./types.ts";
 
-import { cv as cvBase, create, type VariantProps } from "./index.ts";
+import {
+  cv as cvBase,
+  create,
+  splitProps,
+  type VariantProps,
+} from "./index.ts";
 import {
   htmlObjStyleToStyleValue,
   htmlStyleToStyleValue,
@@ -1299,7 +1304,7 @@ for (const config of Object.values(CONFIGS)) {
         style: { color: "red" },
         [classNameProp]: "extra",
       };
-      const [variantProps, otherProps] = component.splitProps(props);
+      const [variantProps, otherProps] = splitProps(props, component);
       expectTypeOf(variantProps).branded.toEqualTypeOf<
         Pick<
           HTMLProperties<typeof component>,
@@ -1327,8 +1332,10 @@ for (const config of Object.values(CONFIGS)) {
         style: "color: red;",
         [classNameProp]: "extra",
       };
-      const [variantProps, otherProps] =
-        component.onlyVariants.splitProps(props);
+      const [variantProps, otherProps] = splitProps(
+        props,
+        component.onlyVariants,
+      );
       expectTypeOf(variantProps).branded.toEqualTypeOf<{
         size?: "sm" | "lg";
       }>();
@@ -1382,7 +1389,7 @@ for (const config of Object.values(CONFIGS)) {
         id: "test",
         size: "lg",
       };
-      const [variantProps, otherProps] = component.splitProps(props);
+      const [variantProps, otherProps] = splitProps(props, component);
       expectTypeOf(variantProps).branded.toEqualTypeOf<
         Pick<
           HTMLProperties<typeof component>,
@@ -1410,8 +1417,9 @@ for (const config of Object.values(CONFIGS)) {
         [classNameProp]: "extra",
         disabled: true,
       };
-      const [variantProps, extraProps, otherProps] = component.splitProps(
+      const [variantProps, extraProps, otherProps] = splitProps(
         props,
+        component,
         ["disabled"],
       );
       expectTypeOf(variantProps).branded.toEqualTypeOf<
@@ -1451,8 +1459,9 @@ for (const config of Object.values(CONFIGS)) {
         color: "blue",
         [classNameProp]: "extra",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2,
       );
       expectTypeOf(comp1Props).branded.toEqualTypeOf<
@@ -1496,8 +1505,9 @@ for (const config of Object.values(CONFIGS)) {
         id: "test",
         size: "lg",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2,
       );
       expect(comp1Props).toEqual({ size: "lg" });
@@ -1523,8 +1533,9 @@ for (const config of Object.values(CONFIGS)) {
         style: { backgroundColor: "yellow" },
         [classNameProp]: "extra",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2.onlyVariants,
       );
       expectTypeOf(comp1Props).branded.toEqualTypeOf<
@@ -1562,8 +1573,12 @@ for (const config of Object.values(CONFIGS)) {
         color: "blue",
         disabled: true,
       };
-      const [comp1Props, extraProps, comp2Props, otherProps] =
-        component1.splitProps(props, ["disabled"], component2.onlyVariants);
+      const [comp1Props, extraProps, comp2Props, otherProps] = splitProps(
+        props,
+        component1,
+        ["disabled"],
+        component2.onlyVariants,
+      );
       expect(comp1Props).toEqual({ size: "lg" });
       expect(extraProps).toEqual({ disabled: true });
       expect(comp2Props).toEqual({ color: "blue" });
@@ -1584,8 +1599,9 @@ for (const config of Object.values(CONFIGS)) {
         id: "test",
         size: "lg",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2.onlyVariants,
       );
       expectTypeOf(comp1Props).branded.toEqualTypeOf<
@@ -1617,8 +1633,9 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { color: "red" },
         }),
       );
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         { id: "test" },
+        component1,
         component2.onlyVariants,
       );
       // Each gets its own defaults
@@ -1641,8 +1658,10 @@ for (const config of Object.values(CONFIGS)) {
         size: "lg",
         [classNameProp]: "extra",
       };
-      const [variantProps, otherProps] =
-        component.onlyVariants.splitProps(props);
+      const [variantProps, otherProps] = splitProps(
+        props,
+        component.onlyVariants,
+      );
       expect(variantProps).toEqual({
         size: "lg",
         color: "red",
@@ -1662,8 +1681,11 @@ for (const config of Object.values(CONFIGS)) {
         [classNameProp]: "extra",
         disabled: true,
       };
-      const [variantProps, extraProps, otherProps] =
-        component.onlyVariants.splitProps(props, ["disabled"]);
+      const [variantProps, extraProps, otherProps] = splitProps(
+        props,
+        component.onlyVariants,
+        ["disabled"],
+      );
       expect(variantProps).toEqual({ size: "lg" });
       expect(extraProps).toEqual({ disabled: true });
       expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
@@ -1692,8 +1714,11 @@ for (const config of Object.values(CONFIGS)) {
         color: "blue",
         [classNameProp]: "extra",
       };
-      const [comp1Props, comp2Props, otherProps] =
-        component1.onlyVariants.splitProps(props, component2.onlyVariants);
+      const [comp1Props, comp2Props, otherProps] = splitProps(
+        props,
+        component1.onlyVariants,
+        component2.onlyVariants,
+      );
       expect(comp1Props).toEqual({ size: "lg" });
       expect(comp2Props).toEqual({ color: "blue" });
       expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
@@ -1711,7 +1736,7 @@ for (const config of Object.values(CONFIGS)) {
         id: "test",
         size: "lg",
       };
-      const [variantProps, otherProps] = component.splitProps(props);
+      const [variantProps, otherProps] = splitProps(props, component);
       expectTypeOf(variantProps).branded.toEqualTypeOf<
         Pick<
           HTMLProperties<typeof component>,
@@ -1736,8 +1761,9 @@ for (const config of Object.values(CONFIGS)) {
         [classNameProp]: "extra",
         disabled: true,
       };
-      const [variantProps, extraProps, otherProps] = component.splitProps(
+      const [variantProps, extraProps, otherProps] = splitProps(
         props,
+        component,
         ["disabled"],
       );
       expect(variantProps).toEqual({
@@ -1769,8 +1795,9 @@ for (const config of Object.values(CONFIGS)) {
         color: "blue",
         [classNameProp]: "extra",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2,
       );
       expect(comp1Props).toEqual({
@@ -1802,8 +1829,9 @@ for (const config of Object.values(CONFIGS)) {
         id: "test",
         size: "lg",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2,
       );
       expect(comp1Props).toEqual({ size: "lg" });
@@ -1830,8 +1858,9 @@ for (const config of Object.values(CONFIGS)) {
         style: { backgroundColor: "yellow" },
         [classNameProp]: "extra",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2.onlyVariants,
       );
       expect(comp1Props).toEqual({
@@ -1860,8 +1889,12 @@ for (const config of Object.values(CONFIGS)) {
         color: "blue",
         disabled: true,
       };
-      const [comp1Props, extraProps, comp2Props, otherProps] =
-        component1.splitProps(props, ["disabled"], component2.onlyVariants);
+      const [comp1Props, extraProps, comp2Props, otherProps] = splitProps(
+        props,
+        component1,
+        ["disabled"],
+        component2.onlyVariants,
+      );
       expect(comp1Props).toEqual({ size: "lg" });
       expect(extraProps).toEqual({ disabled: true });
       expect(comp2Props).toEqual({ color: "blue" });
@@ -1882,8 +1915,9 @@ for (const config of Object.values(CONFIGS)) {
         id: "test",
         size: "lg",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2.onlyVariants,
       );
       expect(comp1Props).toEqual({ size: "lg" });
@@ -1911,8 +1945,9 @@ for (const config of Object.values(CONFIGS)) {
         HTMLProperties<typeof component2> = {
         id: "test",
       };
-      const [comp1Props, comp2Props, otherProps] = component1.splitProps(
+      const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
+        component1,
         component2.onlyVariants,
       );
       // Each gets its own defaults
@@ -1935,8 +1970,10 @@ for (const config of Object.values(CONFIGS)) {
         size: "lg",
         [classNameProp]: "extra",
       };
-      const [variantProps, otherProps] =
-        component.onlyVariants.splitProps(props);
+      const [variantProps, otherProps] = splitProps(
+        props,
+        component.onlyVariants,
+      );
       expect(variantProps).toEqual({
         size: "lg",
         color: "red",
@@ -1956,8 +1993,11 @@ for (const config of Object.values(CONFIGS)) {
         [classNameProp]: "extra",
         disabled: true,
       };
-      const [variantProps, extraProps, otherProps] =
-        component.onlyVariants.splitProps(props, ["disabled"]);
+      const [variantProps, extraProps, otherProps] = splitProps(
+        props,
+        component.onlyVariants,
+        ["disabled"],
+      );
       expect(variantProps).toEqual({ size: "lg" });
       expect(extraProps).toEqual({ disabled: true });
       expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
@@ -1986,8 +2026,11 @@ for (const config of Object.values(CONFIGS)) {
         color: "blue",
         [classNameProp]: "extra",
       };
-      const [comp1Props, comp2Props, otherProps] =
-        component1.onlyVariants.splitProps(props, component2.onlyVariants);
+      const [comp1Props, comp2Props, otherProps] = splitProps(
+        props,
+        component1.onlyVariants,
+        component2.onlyVariants,
+      );
       expect(comp1Props).toEqual({ size: "lg" });
       expect(comp2Props).toEqual({ color: "blue" });
       expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });

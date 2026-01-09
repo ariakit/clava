@@ -69,151 +69,137 @@ type SourceDefaults<S> = S extends { getVariants: () => infer Defaults }
 type SourceResult<T, S> = Pick<T, Extract<keyof T, SourceKeys<S>>> &
   Omit<SourceDefaults<S>, keyof T>;
 
-// Self result with defaults
-type SelfResult<T, Keys, Defaults> = Pick<T, Extract<keyof T, Keys>> &
-  Omit<Defaults, keyof T>;
+// Standalone splitProps function type - first source is required
+export type SplitPropsFunction = <
+  const T extends Record<string, unknown>,
+  const S1 extends KeySource,
+  const Sources extends readonly KeySource[],
+>(
+  props: T,
+  source1: S1,
+  ...sources: Sources
+) => SplitPropsFunctionResult<T, S1, Sources>;
 
-// All possible keys from ComponentResult (class, className, style)
-type ComponentResultKeys =
-  | keyof JSXProps
-  | keyof HTMLProps
-  | keyof HTMLObjProps;
-
-// Build result tuple based on number of sources
-type SplitPropsResult<
+// Result type for standalone splitProps function
+type SplitPropsFunctionResult<
   T,
-  V,
-  D,
+  S1 extends KeySource,
   Sources extends readonly KeySource[],
 > = Sources extends readonly []
-  ? [
-      SelfResult<T, keyof V | ComponentResultKeys, D>,
-      Omit<T, keyof V | ComponentResultKeys>,
-    ]
-  : Sources extends readonly [infer S1 extends KeySource]
+  ? [SourceResult<T, S1>, Omit<T, SourceKeys<S1>>]
+  : Sources extends readonly [infer S2 extends KeySource]
     ? [
-        SelfResult<T, keyof V | ComponentResultKeys, D>,
         SourceResult<T, S1>,
-        Omit<T, keyof V | ComponentResultKeys | SourceKeys<S1>>,
+        SourceResult<T, S2>,
+        Omit<T, SourceKeys<S1> | SourceKeys<S2>>,
       ]
     : Sources extends readonly [
-          infer S1 extends KeySource,
           infer S2 extends KeySource,
+          infer S3 extends KeySource,
         ]
       ? [
-          SelfResult<T, keyof V | ComponentResultKeys, D>,
           SourceResult<T, S1>,
           SourceResult<T, S2>,
-          Omit<
-            T,
-            keyof V | ComponentResultKeys | SourceKeys<S1> | SourceKeys<S2>
-          >,
+          SourceResult<T, S3>,
+          Omit<T, SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3>>,
         ]
       : Sources extends readonly [
-            infer S1 extends KeySource,
             infer S2 extends KeySource,
             infer S3 extends KeySource,
+            infer S4 extends KeySource,
           ]
         ? [
-            SelfResult<T, keyof V | ComponentResultKeys, D>,
             SourceResult<T, S1>,
             SourceResult<T, S2>,
             SourceResult<T, S3>,
+            SourceResult<T, S4>,
             Omit<
               T,
-              | keyof V
-              | ComponentResultKeys
-              | SourceKeys<S1>
-              | SourceKeys<S2>
-              | SourceKeys<S3>
+              SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3> | SourceKeys<S4>
             >,
           ]
         : Sources extends readonly [
-              infer S1 extends KeySource,
               infer S2 extends KeySource,
               infer S3 extends KeySource,
               infer S4 extends KeySource,
+              infer S5 extends KeySource,
             ]
           ? [
-              SelfResult<T, keyof V | ComponentResultKeys, D>,
               SourceResult<T, S1>,
               SourceResult<T, S2>,
               SourceResult<T, S3>,
               SourceResult<T, S4>,
+              SourceResult<T, S5>,
               Omit<
                 T,
-                | keyof V
-                | ComponentResultKeys
                 | SourceKeys<S1>
                 | SourceKeys<S2>
                 | SourceKeys<S3>
                 | SourceKeys<S4>
+                | SourceKeys<S5>
               >,
             ]
           : Sources extends readonly [
-                infer S1 extends KeySource,
                 infer S2 extends KeySource,
                 infer S3 extends KeySource,
                 infer S4 extends KeySource,
                 infer S5 extends KeySource,
+                infer S6 extends KeySource,
               ]
             ? [
-                SelfResult<T, keyof V | ComponentResultKeys, D>,
                 SourceResult<T, S1>,
                 SourceResult<T, S2>,
                 SourceResult<T, S3>,
                 SourceResult<T, S4>,
                 SourceResult<T, S5>,
+                SourceResult<T, S6>,
                 Omit<
                   T,
-                  | keyof V
-                  | ComponentResultKeys
                   | SourceKeys<S1>
                   | SourceKeys<S2>
                   | SourceKeys<S3>
                   | SourceKeys<S4>
                   | SourceKeys<S5>
+                  | SourceKeys<S6>
                 >,
               ]
             : Sources extends readonly [
-                  infer S1 extends KeySource,
                   infer S2 extends KeySource,
                   infer S3 extends KeySource,
                   infer S4 extends KeySource,
                   infer S5 extends KeySource,
                   infer S6 extends KeySource,
+                  infer S7 extends KeySource,
                 ]
               ? [
-                  SelfResult<T, keyof V | ComponentResultKeys, D>,
                   SourceResult<T, S1>,
                   SourceResult<T, S2>,
                   SourceResult<T, S3>,
                   SourceResult<T, S4>,
                   SourceResult<T, S5>,
                   SourceResult<T, S6>,
+                  SourceResult<T, S7>,
                   Omit<
                     T,
-                    | keyof V
-                    | ComponentResultKeys
                     | SourceKeys<S1>
                     | SourceKeys<S2>
                     | SourceKeys<S3>
                     | SourceKeys<S4>
                     | SourceKeys<S5>
                     | SourceKeys<S6>
+                    | SourceKeys<S7>
                   >,
                 ]
               : Sources extends readonly [
-                    infer S1 extends KeySource,
                     infer S2 extends KeySource,
                     infer S3 extends KeySource,
                     infer S4 extends KeySource,
                     infer S5 extends KeySource,
                     infer S6 extends KeySource,
                     infer S7 extends KeySource,
+                    infer S8 extends KeySource,
                   ]
                 ? [
-                    SelfResult<T, keyof V | ComponentResultKeys, D>,
                     SourceResult<T, S1>,
                     SourceResult<T, S2>,
                     SourceResult<T, S3>,
@@ -221,10 +207,9 @@ type SplitPropsResult<
                     SourceResult<T, S5>,
                     SourceResult<T, S6>,
                     SourceResult<T, S7>,
+                    SourceResult<T, S8>,
                     Omit<
                       T,
-                      | keyof V
-                      | ComponentResultKeys
                       | SourceKeys<S1>
                       | SourceKeys<S2>
                       | SourceKeys<S3>
@@ -232,249 +217,23 @@ type SplitPropsResult<
                       | SourceKeys<S5>
                       | SourceKeys<S6>
                       | SourceKeys<S7>
+                      | SourceKeys<S8>
                     >,
                   ]
-                : Sources extends readonly [
-                      infer S1 extends KeySource,
-                      infer S2 extends KeySource,
-                      infer S3 extends KeySource,
-                      infer S4 extends KeySource,
-                      infer S5 extends KeySource,
-                      infer S6 extends KeySource,
-                      infer S7 extends KeySource,
-                      infer S8 extends KeySource,
-                    ]
-                  ? [
-                      SelfResult<T, keyof V | ComponentResultKeys, D>,
-                      SourceResult<T, S1>,
-                      SourceResult<T, S2>,
-                      SourceResult<T, S3>,
-                      SourceResult<T, S4>,
-                      SourceResult<T, S5>,
-                      SourceResult<T, S6>,
-                      SourceResult<T, S7>,
-                      SourceResult<T, S8>,
-                      Omit<
-                        T,
-                        | keyof V
-                        | ComponentResultKeys
-                        | SourceKeys<S1>
-                        | SourceKeys<S2>
-                        | SourceKeys<S3>
-                        | SourceKeys<S4>
-                        | SourceKeys<S5>
-                        | SourceKeys<S6>
-                        | SourceKeys<S7>
-                        | SourceKeys<S8>
-                      >,
-                    ]
-                  : unknown[];
+                : unknown[];
 
-// SplitProps as a single generic function type
-export type SplitProps<V, D, _R extends ComponentResult> = <
-  const T extends Record<string, unknown>,
-  const Sources extends readonly KeySource[],
->(
-  props: T,
-  ...sources: Sources
-) => SplitPropsResult<T, V, D, Sources>;
-
-// Build result tuple for OnlyVariants based on number of sources
-type OnlyVariantsSplitPropsResult<
-  T,
-  V,
-  D,
-  Sources extends readonly KeySource[],
-> = Sources extends readonly []
-  ? [SelfResult<T, keyof V, D>, Omit<T, keyof V>]
-  : Sources extends readonly [infer S1 extends KeySource]
-    ? [
-        SelfResult<T, keyof V, D>,
-        SourceResult<T, S1>,
-        Omit<T, keyof V | SourceKeys<S1>>,
-      ]
-    : Sources extends readonly [
-          infer S1 extends KeySource,
-          infer S2 extends KeySource,
-        ]
-      ? [
-          SelfResult<T, keyof V, D>,
-          SourceResult<T, S1>,
-          SourceResult<T, S2>,
-          Omit<T, keyof V | SourceKeys<S1> | SourceKeys<S2>>,
-        ]
-      : Sources extends readonly [
-            infer S1 extends KeySource,
-            infer S2 extends KeySource,
-            infer S3 extends KeySource,
-          ]
-        ? [
-            SelfResult<T, keyof V, D>,
-            SourceResult<T, S1>,
-            SourceResult<T, S2>,
-            SourceResult<T, S3>,
-            Omit<T, keyof V | SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3>>,
-          ]
-        : Sources extends readonly [
-              infer S1 extends KeySource,
-              infer S2 extends KeySource,
-              infer S3 extends KeySource,
-              infer S4 extends KeySource,
-            ]
-          ? [
-              SelfResult<T, keyof V, D>,
-              SourceResult<T, S1>,
-              SourceResult<T, S2>,
-              SourceResult<T, S3>,
-              SourceResult<T, S4>,
-              Omit<
-                T,
-                | keyof V
-                | SourceKeys<S1>
-                | SourceKeys<S2>
-                | SourceKeys<S3>
-                | SourceKeys<S4>
-              >,
-            ]
-          : Sources extends readonly [
-                infer S1 extends KeySource,
-                infer S2 extends KeySource,
-                infer S3 extends KeySource,
-                infer S4 extends KeySource,
-                infer S5 extends KeySource,
-              ]
-            ? [
-                SelfResult<T, keyof V, D>,
-                SourceResult<T, S1>,
-                SourceResult<T, S2>,
-                SourceResult<T, S3>,
-                SourceResult<T, S4>,
-                SourceResult<T, S5>,
-                Omit<
-                  T,
-                  | keyof V
-                  | SourceKeys<S1>
-                  | SourceKeys<S2>
-                  | SourceKeys<S3>
-                  | SourceKeys<S4>
-                  | SourceKeys<S5>
-                >,
-              ]
-            : Sources extends readonly [
-                  infer S1 extends KeySource,
-                  infer S2 extends KeySource,
-                  infer S3 extends KeySource,
-                  infer S4 extends KeySource,
-                  infer S5 extends KeySource,
-                  infer S6 extends KeySource,
-                ]
-              ? [
-                  SelfResult<T, keyof V, D>,
-                  SourceResult<T, S1>,
-                  SourceResult<T, S2>,
-                  SourceResult<T, S3>,
-                  SourceResult<T, S4>,
-                  SourceResult<T, S5>,
-                  SourceResult<T, S6>,
-                  Omit<
-                    T,
-                    | keyof V
-                    | SourceKeys<S1>
-                    | SourceKeys<S2>
-                    | SourceKeys<S3>
-                    | SourceKeys<S4>
-                    | SourceKeys<S5>
-                    | SourceKeys<S6>
-                  >,
-                ]
-              : Sources extends readonly [
-                    infer S1 extends KeySource,
-                    infer S2 extends KeySource,
-                    infer S3 extends KeySource,
-                    infer S4 extends KeySource,
-                    infer S5 extends KeySource,
-                    infer S6 extends KeySource,
-                    infer S7 extends KeySource,
-                  ]
-                ? [
-                    SelfResult<T, keyof V, D>,
-                    SourceResult<T, S1>,
-                    SourceResult<T, S2>,
-                    SourceResult<T, S3>,
-                    SourceResult<T, S4>,
-                    SourceResult<T, S5>,
-                    SourceResult<T, S6>,
-                    SourceResult<T, S7>,
-                    Omit<
-                      T,
-                      | keyof V
-                      | SourceKeys<S1>
-                      | SourceKeys<S2>
-                      | SourceKeys<S3>
-                      | SourceKeys<S4>
-                      | SourceKeys<S5>
-                      | SourceKeys<S6>
-                      | SourceKeys<S7>
-                    >,
-                  ]
-                : Sources extends readonly [
-                      infer S1 extends KeySource,
-                      infer S2 extends KeySource,
-                      infer S3 extends KeySource,
-                      infer S4 extends KeySource,
-                      infer S5 extends KeySource,
-                      infer S6 extends KeySource,
-                      infer S7 extends KeySource,
-                      infer S8 extends KeySource,
-                    ]
-                  ? [
-                      SelfResult<T, keyof V, D>,
-                      SourceResult<T, S1>,
-                      SourceResult<T, S2>,
-                      SourceResult<T, S3>,
-                      SourceResult<T, S4>,
-                      SourceResult<T, S5>,
-                      SourceResult<T, S6>,
-                      SourceResult<T, S7>,
-                      SourceResult<T, S8>,
-                      Omit<
-                        T,
-                        | keyof V
-                        | SourceKeys<S1>
-                        | SourceKeys<S2>
-                        | SourceKeys<S3>
-                        | SourceKeys<S4>
-                        | SourceKeys<S5>
-                        | SourceKeys<S6>
-                        | SourceKeys<S7>
-                        | SourceKeys<S8>
-                      >,
-                    ]
-                  : unknown[];
-
-// OnlyVariantsSplitProps as a single generic function type
-export type OnlyVariantsSplitProps<V, D> = <
-  const T extends Record<string, unknown>,
-  const Sources extends readonly KeySource[],
->(
-  props: T,
-  ...sources: Sources
-) => OnlyVariantsSplitPropsResult<T, V, D, Sources>;
-
-export interface OnlyVariantsComponent<V, D> {
-  splitProps: OnlyVariantsSplitProps<V, D>;
+export interface OnlyVariantsComponent<V> {
   getVariants: GetVariants<V>;
   keys: (keyof V)[];
 }
 
-export interface ModalComponent<V, D, R extends ComponentResult> {
+export interface ModalComponent<V, R extends ComponentResult> {
   (props?: ComponentProps<V>): R;
   class: (props?: ComponentProps<V>) => string;
   style: (props?: ComponentProps<V>) => R["style"];
-  splitProps: SplitProps<V, D, R>;
   getVariants: GetVariants<V>;
   keys: (keyof V | keyof R)[];
-  onlyVariants: OnlyVariantsComponent<V, D>;
+  onlyVariants: OnlyVariantsComponent<V>;
   /** @internal Base class without variants */
   _baseClass: string;
 }
@@ -484,16 +243,15 @@ export interface Component<
   CV extends ComputedVariants = {},
   E extends AnyComponent[] = [],
   R extends ComponentResult = ComponentResult,
-  D = VariantValues<MergeVariants<V, CV, E>>,
-> extends ModalComponent<MergeVariants<V, CV, E>, D, R> {
-  jsx: ModalComponent<MergeVariants<V, CV, E>, D, JSXProps>;
-  html: ModalComponent<MergeVariants<V, CV, E>, D, HTMLProps>;
-  htmlObj: ModalComponent<MergeVariants<V, CV, E>, D, HTMLObjProps>;
+> extends ModalComponent<MergeVariants<V, CV, E>, R> {
+  jsx: ModalComponent<MergeVariants<V, CV, E>, JSXProps>;
+  html: ModalComponent<MergeVariants<V, CV, E>, HTMLProps>;
+  htmlObj: ModalComponent<MergeVariants<V, CV, E>, HTMLObjProps>;
 }
 
 export type AnyComponent =
-  | Component<any, any, any, any, any>
-  | ModalComponent<any, any, any>;
+  | Component<any, any, any, any>
+  | ModalComponent<any, any>;
 
 type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
   ? ExtractVariants<First> & MergeExtendedVariants<Rest>
