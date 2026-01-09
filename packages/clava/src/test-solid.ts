@@ -14,7 +14,7 @@ test("splitProps", () => {
 
   const [variantProps, rest] = splitProps(props, component);
   expectTypeOf(variantProps.style).toEqualTypeOf<
-    JSX.CSSProperties | undefined
+    string | JSX.CSSProperties | undefined
   >();
   expectTypeOf(variantProps.class).toEqualTypeOf<string | undefined>();
   expect(variantProps.class).toBe("custom");
