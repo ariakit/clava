@@ -14,6 +14,9 @@ importers:
       '@types/node':
         specifier: 25.0.3
         version: 25.0.3
+      '@types/react':
+        specifier: 19.2.7
+        version: 19.2.7
       husky:
         specifier: 9.1.7
         version: 9.1.7
@@ -35,6 +38,9 @@ importers:
       rolldown-plugin-dts:
         specifier: 0.20.0
         version: 0.20.0(rolldown@1.0.0-beta.59)(typescript@5.9.3)
+      solid-js:
+        specifier: 1.9.10
+        version: 1.9.10
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -814,6 +820,9 @@ packages:
   '@types/node@25.0.3':
     resolution: {integrity: sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA==}
 
+  '@types/react@19.2.7':
+    resolution: {integrity: sha512-MWtvHrGZLFttgeEj28VXHxpmwYbor/ATPYbBfSFZEIRK0ecCFLl2Qo55z52Hss+UV9CRN7trSeq1zbgx7YDWWg==}
+
   '@vitest/expect@4.0.16':
     resolution: {integrity: sha512-eshqULT2It7McaJkQGLkPjPjNph+uevROGuIMJdG3V+0BSR2w9u6J9Lwu+E8cK5TETlfou8GRijhafIMhXsimA==}
 
@@ -1513,6 +1522,16 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  seroval-plugins@1.3.3:
+    resolution: {integrity: sha512-16OL3NnUBw8JG1jBLUoZJsLnQq0n5Ua6aHalhJK4fMQkz1lqR7Osz1sA30trBtd9VUDc2NgkuRCn8+/pBwqZ+w==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      seroval: ^1.0
+
+  seroval@1.3.2:
+    resolution: {integrity: sha512-RbcPH1n5cfwKrru7v7+zrZvjLurgHhGyso3HTyGtRivGWgYjbOmGuivCQaORNELjNONoK35nj28EoWul9sb1zQ==}
+    engines: {node: '>=10'}
+
   shebang-command@2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
     engines: {node: '>=8'}
@@ -1535,6 +1554,9 @@ packages:
   slice-ansi@7.1.2:
     resolution: {integrity: sha512-iOBWFgUX7caIZiuutICxVgX1SdxwAVFFKwt1EvMYYec/NWO5meOJ6K5uQxhrYBdQJne4KxiqZc+KptFOWFSI9w==}
     engines: {node: '>=18'}
+
+  solid-js@1.9.10:
+    resolution: {integrity: sha512-Coz956cos/EPDlhs6+jsdTxKuJDPT7B5SVIWgABwROyxjY7Xbr8wkzD68Et+NxnV7DLJ3nJdAC2r9InuV/4Jew==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -2384,6 +2406,10 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@types/react@19.2.7':
+    dependencies:
+      csstype: 3.2.3
+
   '@vitest/expect@4.0.16':
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -3094,6 +3120,12 @@ snapshots:
 
   semver@7.7.3: {}
 
+  seroval-plugins@1.3.3(seroval@1.3.2):
+    dependencies:
+      seroval: 1.3.2
+
+  seroval@1.3.2: {}
+
   shebang-command@2.0.0:
     dependencies:
       shebang-regex: 3.0.0
@@ -3110,6 +3142,12 @@ snapshots:
     dependencies:
       ansi-styles: 6.2.3
       is-fullwidth-code-point: 5.1.0
+
+  solid-js@1.9.10:
+    dependencies:
+      csstype: 3.2.3
+      seroval: 1.3.2
+      seroval-plugins: 1.3.3(seroval@1.3.2)
 
   source-map-js@1.2.1: {}
 

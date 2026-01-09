@@ -71,7 +71,7 @@ type SourceResult<T, S> = Pick<T, Extract<keyof T, SourceKeys<S>>> &
 
 // Standalone splitProps function type - first source is required
 export type SplitPropsFunction = <
-  const T extends Record<string, unknown>,
+  T,
   const S1 extends KeySource,
   const Sources extends readonly KeySource[],
 >(

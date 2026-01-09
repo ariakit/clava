@@ -1,5 +1,4 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
-
 import type {
   Variants,
   ComputedVariants,
@@ -22,7 +21,6 @@ import type {
   ComponentProps,
   SplitPropsFunction,
 } from "./types.ts";
-
 import {
   htmlObjStyleToStyleValue,
   htmlStyleToStyleValue,
@@ -483,7 +481,7 @@ export const splitProps: SplitPropsFunction = ((
   );
 }) as SplitPropsFunction;
 
-export function create<M extends Mode>({
+export function create<M extends Mode = "jsx">({
   defaultMode = "jsx" as M,
   transformClass = (className) => className,
 }: CreateParams<M> = {}) {

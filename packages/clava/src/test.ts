@@ -1,5 +1,4 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
-
 import type {
   AnyComponent,
   ComponentResult,
@@ -11,7 +10,6 @@ import type {
   Component,
   StyleProperty,
 } from "./types.ts";
-
 import {
   cv as cvBase,
   create,
@@ -88,17 +86,19 @@ function getConfigDescription(config: Config) {
   return "custom";
 }
 
-function createCVFromConfig<T extends Config>(config: T) {
+function createCVFromConfig<T extends Config>(
+  config: T,
+): T["defaultMode"] & T["transformClass"] extends never
+  ? typeof cvBase
+  : ReturnType<typeof create>["cv"] {
   const defaultMode = getConfigDefaultMode(config);
   const transformClass = getConfigTransformClass(config);
   const hasTransform = "transformClass" in config && config.transformClass;
   if (!defaultMode && !hasTransform) {
     return cvBase;
   }
-  return create({
-    defaultMode: defaultMode ?? undefined,
-    transformClass,
-  }).cv;
+  const { cv } = create({ defaultMode: defaultMode ?? "jsx", transformClass });
+  return cv as any;
 }
 
 function getModalComponent<
