@@ -13,7 +13,6 @@ import type {
   JSXProps,
   MergeVariants,
   ModalComponent,
-  OnlyVariantsComponent,
   SplitPropsFunction,
   StyleClassValue,
   StyleProps,
@@ -121,7 +120,7 @@ function collectVariantKeys(
   // Collect from extended components
   if (config.extend) {
     for (const ext of config.extend) {
-      for (const key of ext.onlyVariants.keys) {
+      for (const key of ext.variantKeys) {
         keys.add(key as string);
       }
     }
@@ -365,45 +364,66 @@ function processComputed(
   return { classes, style, updatedVariants };
 }
 
-/**
- * Normalizes a key source (array or component) to an object with keys and defaults.
- */
-function normalizeKeySource(source: unknown): {
+interface NormalizedSource {
   keys: string[];
+  variantKeys: string[];
   defaults: Record<string, unknown>;
-} {
+  isComponent: boolean;
+}
+
+/**
+ * Normalizes a key source (array or component) to an object with keys, variantKeys, defaults, and isComponent flag.
+ */
+function normalizeKeySource(source: unknown): NormalizedSource {
   if (Array.isArray(source)) {
-    return { keys: source as string[], defaults: {} };
+    return {
+      keys: source as string[],
+      variantKeys: source as string[],
+      defaults: {},
+      isComponent: false,
+    };
   }
-  // Components are functions with keys property, onlyVariants are objects with keys
+  // Components are functions with keys and variantKeys properties
   if (
     source &&
     (typeof source === "object" || typeof source === "function") &&
-    "keys" in source
+    "keys" in source &&
+    "variantKeys" in source
   ) {
     const keys = [...(source as { keys: string[] }).keys] as string[];
+    const variantKeys = [
+      ...(source as { variantKeys: string[] }).variantKeys,
+    ] as string[];
     const defaults =
       "getVariants" in source
         ? (
             source as { getVariants: () => Record<string, unknown> }
           ).getVariants()
         : {};
-    return { keys, defaults };
+    return { keys, variantKeys, defaults, isComponent: true };
   }
-  return { keys: [], defaults: {} };
+  return { keys: [], variantKeys: [], defaults: {}, isComponent: false };
 }
 
 /**
  * Splits props into multiple groups based on key sources.
+ * Only the first component claims styling props (class/className/style).
+ * Subsequent components only receive variant props.
+ * Arrays always receive their listed keys but don't claim styling props.
  */
 function splitPropsImpl(
   selfKeys: string[],
+  selfVariantKeys: string[],
   selfDefaults: Record<string, unknown>,
+  selfIsComponent: boolean,
   props: Record<string, unknown>,
-  sources: Array<{ keys: string[]; defaults: Record<string, unknown> }>,
+  sources: NormalizedSource[],
 ): Record<string, unknown>[] {
   const allUsedKeys = new Set<string>(selfKeys);
   const results: Record<string, unknown>[] = [];
+
+  // Track if styling has been claimed by a component
+  let stylingClaimed = selfIsComponent;
 
   // Self result with defaults
   const selfResult: Record<string, unknown> = {};
@@ -424,20 +444,33 @@ function splitPropsImpl(
   // Process each source
   for (const source of sources) {
     const sourceResult: Record<string, unknown> = {};
-    // First apply defaults
+
+    // Determine which keys this source should use
+    // Components use variantKeys if styling has already been claimed
+    // Arrays always use their listed keys
+    const effectiveKeys =
+      source.isComponent && stylingClaimed ? source.variantKeys : source.keys;
+
+    // First apply defaults (only for variant keys if component and styling claimed)
     for (const [key, value] of Object.entries(source.defaults)) {
-      if (source.keys.includes(key)) {
+      if (effectiveKeys.includes(key)) {
         sourceResult[key] = value;
       }
     }
+
     // Then override with props
-    for (const key of source.keys) {
+    for (const key of effectiveKeys) {
       allUsedKeys.add(key);
       if (key in props) {
         sourceResult[key] = props[key];
       }
     }
     results.push(sourceResult);
+
+    // If this is a component that hasn't claimed styling yet, mark styling as claimed
+    if (source.isComponent && !stylingClaimed) {
+      stylingClaimed = true;
+    }
   }
 
   // Rest - keys not used by anyone
@@ -455,6 +488,9 @@ function splitPropsImpl(
 /**
  * Splits props into multiple groups based on key sources.
  * Each source gets its own result object containing all its matching keys.
+ * The first component source claims styling props (class/className/style).
+ * Subsequent components only receive variant props.
+ * Arrays receive their listed keys but don't claim styling props.
  * The last element is always the "rest" containing keys not claimed by any source.
  *
  * @example
@@ -462,8 +498,10 @@ function splitPropsImpl(
  * const [buttonProps, inputProps, rest] = splitProps(
  *   props,
  *   buttonComponent,
- *   inputComponent.onlyVariants,
+ *   inputComponent,
  * );
+ * // buttonProps has class/style + button variants
+ * // inputProps has only input variants (no class/style)
  * ```
  */
 export const splitProps: SplitPropsFunction = ((
@@ -475,7 +513,9 @@ export const splitProps: SplitPropsFunction = ((
   const normalizedSources = sources.map(normalizeKeySource);
   return splitPropsImpl(
     normalizedSource1.keys,
+    normalizedSource1.variantKeys,
     normalizedSource1.defaults,
+    normalizedSource1.isComponent,
     props,
     normalizedSources,
   );
@@ -638,17 +678,9 @@ export function create<M extends Mode = "jsx">({
 
       component.keys = propsKeys as (keyof MergedVariants | keyof R)[];
 
-      component.onlyVariants = {
-        getVariants: (
-          variants?: VariantValues<MergedVariants>,
-        ): VariantValues<MergedVariants> => {
-          return resolveVariants(
-            config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-            variants as VariantValues<Record<string, unknown>>,
-          ) as VariantValues<MergedVariants>;
-        },
-        keys: variantKeys as (keyof MergedVariants)[],
-      } as OnlyVariantsComponent<MergedVariants>;
+      component.variantKeys = variantKeys as (keyof MergedVariants)[];
+
+      component.propKeys = propsKeys as (keyof MergedVariants | keyof R)[];
 
       // Compute base class (without variants) - includes extended base classes
       const extendedBaseClasses: ClassValue[] = [];
