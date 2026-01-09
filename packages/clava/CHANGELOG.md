@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.2
+
+### Patch Changes
+
+- e7a2ebe: Removed `onlyVariants` property in favor of `variantKeys`.
+
 ## 0.1.1
 
 ### Patch Changes
