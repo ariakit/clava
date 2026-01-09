@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.1
+
+### Patch Changes
+
+- c06f0ec: Fixed `context.setDefaultVariants()` not overriding `defaultVariants`.
+
 ## 0.1.0
 
 ### Minor Changes
