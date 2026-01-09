@@ -1,27 +1,29 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
 import type {
-  Variants,
-  ComputedVariants,
   AnyComponent,
-  Component,
-  StyleProps,
   ClassValue,
-  StyleValue,
-  StyleClassValue,
-  VariantValues,
+  Component,
+  ComponentProps,
+  ComponentResult,
   Computed,
+  ComputedVariants,
   ExtendableVariants,
+  HTMLObjProps,
+  HTMLProps,
+  JSXProps,
   MergeVariants,
   ModalComponent,
-  ComponentResult,
-  JSXProps,
-  HTMLProps,
-  HTMLObjProps,
   OnlyVariantsComponent,
-  ComponentProps,
   SplitPropsFunction,
+  StyleClassValue,
+  StyleProps,
+  StyleValue,
+  VariantValues,
+  Variants,
 } from "./types.ts";
 import {
+  type Mode,
+  getClassPropertyName,
   htmlObjStyleToStyleValue,
   htmlStyleToStyleValue,
   isHTMLObjStyle,
@@ -30,9 +32,6 @@ import {
   styleValueToHTMLStyle,
   styleValueToJSXStyle,
 } from "./utils.ts";
-
-const MODES = ["jsx", "html", "htmlObj"] as const;
-type Mode = (typeof MODES)[number];
 
 export type { ClassValue, StyleValue, StyleClassValue };
 
@@ -500,9 +499,6 @@ export function create<M extends Mode = "jsx">({
     const variantKeys = collectVariantKeys(
       config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
     );
-
-    const getClassPropertyName = (mode: Mode) =>
-      mode === "jsx" ? "className" : "class";
 
     const getPropsKeys = (mode: Mode) => [
       getClassPropertyName(mode),

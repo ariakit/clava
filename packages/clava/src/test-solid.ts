@@ -1,6 +1,6 @@
 import type { ComponentProps, JSX } from "solid-js";
 import { expect, expectTypeOf, test } from "vitest";
-import { create, splitProps, type VariantProps } from "./index.ts";
+import { type VariantProps, create, splitProps } from "./index.ts";
 import { type HTMLObjProps } from "./types.ts";
 
 const { cv } = create({ defaultMode: "htmlObj" });
