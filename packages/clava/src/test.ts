@@ -1,20 +1,20 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
 import type {
   AnyComponent,
+  Component,
   ComponentResult,
-  StyleClassValue,
+  ComputedVariants,
   HTMLCSSProperties,
   JSXCSSProperties,
-  Variants,
-  ComputedVariants,
-  Component,
+  StyleClassValue,
   StyleProperty,
+  Variants,
 } from "./types.ts";
 import {
-  cv as cvBase,
-  create,
-  splitProps,
   type VariantProps,
+  create,
+  cv as cvBase,
+  splitProps,
 } from "./index.ts";
 import {
   htmlObjStyleToStyleValue,

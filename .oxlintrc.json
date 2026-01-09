@@ -1,14 +1,16 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "categories": {
-    "correctness": "warn"
+    "correctness": "error",
+    "suspicious": "error"
   },
   "rules": {
     "typescript/consistent-type-imports": [
       "error",
       { "fixStyle": "separate-type-imports", "prefer": "type-imports" }
     ],
+    "typescript/no-unsafe-type-assertion": "off",
     "eslint/no-unused-vars": "error",
-    "eslint/sort-imports": "error"
+    "eslint/sort-imports": ["error", { "ignoreDeclarationSort": true }]
   }
 }

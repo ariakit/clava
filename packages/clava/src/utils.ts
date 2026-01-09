@@ -1,9 +1,22 @@
 import type * as CSS from "csstype";
 import type {
-  StyleValue,
-  JSXCSSProperties,
   HTMLCSSProperties,
+  JSXCSSProperties,
+  StyleValue,
 } from "./types.ts";
+
+export const MODES = ["jsx", "html", "htmlObj"] as const;
+export type Mode = (typeof MODES)[number];
+
+/**
+ * Returns the appropriate class property name based on the mode.
+ * @example
+ * getClassPropertyName("jsx") // "className"
+ * getClassPropertyName("html") // "class"
+ */
+export function getClassPropertyName(mode: Mode) {
+  return mode === "jsx" ? "className" : "class";
+}
 
 /**
  * Converts a hyphenated CSS property name to camelCase.

@@ -1,14 +1,18 @@
 {
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.preferences.preferTypeOnlyAutoImports": true,
-  "tailwindCSS.classFunctions": ["clsx", "cx", "clava"],
+  "tailwindCSS.classFunctions": ["clsx", "cx", "cv"],
+  "oxc.typeAware": true,
   "editor.snippetSuggestions": "bottom",
   "editor.formatOnSave": true,
+  "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
   },
-  "editor.defaultFormatter": "oxc.oxc-vscode",
   "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[jsonc]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[astro]": {
