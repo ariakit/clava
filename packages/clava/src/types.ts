@@ -54,14 +54,17 @@ export type KeySourceComponent = {
 };
 export type KeySource = KeySourceArray | KeySourceComponent;
 
-// Extract keys from a source (for first source - includes class/style)
+// Check if source is a component (has getVariants)
+type IsComponent<S> = S extends { getVariants: () => unknown } ? true : false;
+
+// Extract keys from a source (includes class/style for components)
 type SourceKeys<S> = S extends readonly (infer K)[]
   ? K
   : S extends { keys: readonly (infer K)[] }
     ? K
     : never;
 
-// Extract variant keys from a source (for non-first sources - only variant keys, no class/style)
+// Extract variant keys from a source (only variant keys, no class/style)
 type SourceVariantKeys<S> = S extends readonly (infer K)[]
   ? K
   : S extends { variantKeys: readonly (infer K)[] }
@@ -75,16 +78,29 @@ type SourceDefaults<S> = S extends { getVariants: () => infer Defaults }
   ? Defaults
   : {};
 
-// Result type for first source - pick keys from T and add defaults
-type SourceResult<T, S> = Pick<T, Extract<keyof T, SourceKeys<S>>> &
+// Result type for a source when styling is NOT yet claimed
+// - Arrays: use listed keys (no defaults)
+// - Components: use full keys including class/style (with defaults)
+type SourceResultWithStyling<T, S> = Pick<T, Extract<keyof T, SourceKeys<S>>> &
   Omit<SourceDefaults<S>, keyof T>;
 
-// Result type for non-first source - pick only variant keys from T (no class/style)
-type SourceVariantResult<T, S> = Pick<
-  T,
-  Extract<keyof T, SourceVariantKeys<S>>
-> &
-  Omit<SourceDefaults<S>, keyof T>;
+// Result type for a source when styling IS already claimed
+// - Arrays: use listed keys (no defaults)
+// - Components: use only variant keys (with defaults)
+type SourceResultWithoutStyling<T, S> =
+  IsComponent<S> extends true
+    ? Pick<T, Extract<keyof T, SourceVariantKeys<S>>> &
+        Omit<SourceDefaults<S>, keyof T>
+    : Pick<T, Extract<keyof T, SourceKeys<S>>>;
+
+// Check if any source in a tuple is a component (to track if styling is claimed)
+type HasComponent<Sources> = Sources extends readonly []
+  ? false
+  : Sources extends readonly [infer First, ...infer Rest]
+    ? IsComponent<First> extends true
+      ? true
+      : HasComponent<Rest>
+    : false;
 
 // Standalone splitProps function type - first source is required
 export type SplitPropsFunction = <
@@ -98,32 +114,35 @@ export type SplitPropsFunction = <
 ) => SplitPropsFunctionResult<T, S1, Sources>;
 
 // Result type for standalone splitProps function
-// First source uses SourceResult (full keys including class/style for components)
-// Subsequent sources use SourceVariantResult (only variant keys for components)
+// S1: First source - uses SourceResultWithStyling (either array or first component gets styling)
+// S2+: Subsequent sources - use SourceResultWithStyling if no prior component, else SourceResultWithoutStyling
 type SplitPropsFunctionResult<
   T,
   S1 extends KeySource,
   Sources extends readonly KeySource[],
 > = Sources extends readonly []
-  ? [SourceResult<T, S1>, Omit<T, SourceKeys<S1>>]
+  ? [SourceResultWithStyling<T, S1>, Omit<T, SourceKeys<S1>>]
   : Sources extends readonly [infer S2 extends KeySource]
     ? [
-        SourceResult<T, S1>,
-        SourceVariantResult<T, S2>,
-        Omit<T, SourceKeys<S1> | SourceVariantKeys<S2>>,
+        SourceResultWithStyling<T, S1>,
+        IsComponent<S1> extends true
+          ? SourceResultWithoutStyling<T, S2>
+          : SourceResultWithStyling<T, S2>,
+        Omit<T, SourceKeys<S1> | SourceKeys<S2>>,
       ]
     : Sources extends readonly [
           infer S2 extends KeySource,
           infer S3 extends KeySource,
         ]
       ? [
-          SourceResult<T, S1>,
-          SourceVariantResult<T, S2>,
-          SourceVariantResult<T, S3>,
-          Omit<
-            T,
-            SourceKeys<S1> | SourceVariantKeys<S2> | SourceVariantKeys<S3>
-          >,
+          SourceResultWithStyling<T, S1>,
+          IsComponent<S1> extends true
+            ? SourceResultWithoutStyling<T, S2>
+            : SourceResultWithStyling<T, S2>,
+          HasComponent<[S1, S2]> extends true
+            ? SourceResultWithoutStyling<T, S3>
+            : SourceResultWithStyling<T, S3>,
+          Omit<T, SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3>>,
         ]
       : Sources extends readonly [
             infer S2 extends KeySource,
@@ -131,16 +150,19 @@ type SplitPropsFunctionResult<
             infer S4 extends KeySource,
           ]
         ? [
-            SourceResult<T, S1>,
-            SourceVariantResult<T, S2>,
-            SourceVariantResult<T, S3>,
-            SourceVariantResult<T, S4>,
+            SourceResultWithStyling<T, S1>,
+            IsComponent<S1> extends true
+              ? SourceResultWithoutStyling<T, S2>
+              : SourceResultWithStyling<T, S2>,
+            HasComponent<[S1, S2]> extends true
+              ? SourceResultWithoutStyling<T, S3>
+              : SourceResultWithStyling<T, S3>,
+            HasComponent<[S1, S2, S3]> extends true
+              ? SourceResultWithoutStyling<T, S4>
+              : SourceResultWithStyling<T, S4>,
             Omit<
               T,
-              | SourceKeys<S1>
-              | SourceVariantKeys<S2>
-              | SourceVariantKeys<S3>
-              | SourceVariantKeys<S4>
+              SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3> | SourceKeys<S4>
             >,
           ]
         : Sources extends readonly [
@@ -150,18 +172,26 @@ type SplitPropsFunctionResult<
               infer S5 extends KeySource,
             ]
           ? [
-              SourceResult<T, S1>,
-              SourceVariantResult<T, S2>,
-              SourceVariantResult<T, S3>,
-              SourceVariantResult<T, S4>,
-              SourceVariantResult<T, S5>,
+              SourceResultWithStyling<T, S1>,
+              IsComponent<S1> extends true
+                ? SourceResultWithoutStyling<T, S2>
+                : SourceResultWithStyling<T, S2>,
+              HasComponent<[S1, S2]> extends true
+                ? SourceResultWithoutStyling<T, S3>
+                : SourceResultWithStyling<T, S3>,
+              HasComponent<[S1, S2, S3]> extends true
+                ? SourceResultWithoutStyling<T, S4>
+                : SourceResultWithStyling<T, S4>,
+              HasComponent<[S1, S2, S3, S4]> extends true
+                ? SourceResultWithoutStyling<T, S5>
+                : SourceResultWithStyling<T, S5>,
               Omit<
                 T,
                 | SourceKeys<S1>
-                | SourceVariantKeys<S2>
-                | SourceVariantKeys<S3>
-                | SourceVariantKeys<S4>
-                | SourceVariantKeys<S5>
+                | SourceKeys<S2>
+                | SourceKeys<S3>
+                | SourceKeys<S4>
+                | SourceKeys<S5>
               >,
             ]
           : Sources extends readonly [
@@ -172,20 +202,30 @@ type SplitPropsFunctionResult<
                 infer S6 extends KeySource,
               ]
             ? [
-                SourceResult<T, S1>,
-                SourceVariantResult<T, S2>,
-                SourceVariantResult<T, S3>,
-                SourceVariantResult<T, S4>,
-                SourceVariantResult<T, S5>,
-                SourceVariantResult<T, S6>,
+                SourceResultWithStyling<T, S1>,
+                IsComponent<S1> extends true
+                  ? SourceResultWithoutStyling<T, S2>
+                  : SourceResultWithStyling<T, S2>,
+                HasComponent<[S1, S2]> extends true
+                  ? SourceResultWithoutStyling<T, S3>
+                  : SourceResultWithStyling<T, S3>,
+                HasComponent<[S1, S2, S3]> extends true
+                  ? SourceResultWithoutStyling<T, S4>
+                  : SourceResultWithStyling<T, S4>,
+                HasComponent<[S1, S2, S3, S4]> extends true
+                  ? SourceResultWithoutStyling<T, S5>
+                  : SourceResultWithStyling<T, S5>,
+                HasComponent<[S1, S2, S3, S4, S5]> extends true
+                  ? SourceResultWithoutStyling<T, S6>
+                  : SourceResultWithStyling<T, S6>,
                 Omit<
                   T,
                   | SourceKeys<S1>
-                  | SourceVariantKeys<S2>
-                  | SourceVariantKeys<S3>
-                  | SourceVariantKeys<S4>
-                  | SourceVariantKeys<S5>
-                  | SourceVariantKeys<S6>
+                  | SourceKeys<S2>
+                  | SourceKeys<S3>
+                  | SourceKeys<S4>
+                  | SourceKeys<S5>
+                  | SourceKeys<S6>
                 >,
               ]
             : Sources extends readonly [
@@ -197,22 +237,34 @@ type SplitPropsFunctionResult<
                   infer S7 extends KeySource,
                 ]
               ? [
-                  SourceResult<T, S1>,
-                  SourceVariantResult<T, S2>,
-                  SourceVariantResult<T, S3>,
-                  SourceVariantResult<T, S4>,
-                  SourceVariantResult<T, S5>,
-                  SourceVariantResult<T, S6>,
-                  SourceVariantResult<T, S7>,
+                  SourceResultWithStyling<T, S1>,
+                  IsComponent<S1> extends true
+                    ? SourceResultWithoutStyling<T, S2>
+                    : SourceResultWithStyling<T, S2>,
+                  HasComponent<[S1, S2]> extends true
+                    ? SourceResultWithoutStyling<T, S3>
+                    : SourceResultWithStyling<T, S3>,
+                  HasComponent<[S1, S2, S3]> extends true
+                    ? SourceResultWithoutStyling<T, S4>
+                    : SourceResultWithStyling<T, S4>,
+                  HasComponent<[S1, S2, S3, S4]> extends true
+                    ? SourceResultWithoutStyling<T, S5>
+                    : SourceResultWithStyling<T, S5>,
+                  HasComponent<[S1, S2, S3, S4, S5]> extends true
+                    ? SourceResultWithoutStyling<T, S6>
+                    : SourceResultWithStyling<T, S6>,
+                  HasComponent<[S1, S2, S3, S4, S5, S6]> extends true
+                    ? SourceResultWithoutStyling<T, S7>
+                    : SourceResultWithStyling<T, S7>,
                   Omit<
                     T,
                     | SourceKeys<S1>
-                    | SourceVariantKeys<S2>
-                    | SourceVariantKeys<S3>
-                    | SourceVariantKeys<S4>
-                    | SourceVariantKeys<S5>
-                    | SourceVariantKeys<S6>
-                    | SourceVariantKeys<S7>
+                    | SourceKeys<S2>
+                    | SourceKeys<S3>
+                    | SourceKeys<S4>
+                    | SourceKeys<S5>
+                    | SourceKeys<S6>
+                    | SourceKeys<S7>
                   >,
                 ]
               : Sources extends readonly [
@@ -225,24 +277,38 @@ type SplitPropsFunctionResult<
                     infer S8 extends KeySource,
                   ]
                 ? [
-                    SourceResult<T, S1>,
-                    SourceVariantResult<T, S2>,
-                    SourceVariantResult<T, S3>,
-                    SourceVariantResult<T, S4>,
-                    SourceVariantResult<T, S5>,
-                    SourceVariantResult<T, S6>,
-                    SourceVariantResult<T, S7>,
-                    SourceVariantResult<T, S8>,
+                    SourceResultWithStyling<T, S1>,
+                    IsComponent<S1> extends true
+                      ? SourceResultWithoutStyling<T, S2>
+                      : SourceResultWithStyling<T, S2>,
+                    HasComponent<[S1, S2]> extends true
+                      ? SourceResultWithoutStyling<T, S3>
+                      : SourceResultWithStyling<T, S3>,
+                    HasComponent<[S1, S2, S3]> extends true
+                      ? SourceResultWithoutStyling<T, S4>
+                      : SourceResultWithStyling<T, S4>,
+                    HasComponent<[S1, S2, S3, S4]> extends true
+                      ? SourceResultWithoutStyling<T, S5>
+                      : SourceResultWithStyling<T, S5>,
+                    HasComponent<[S1, S2, S3, S4, S5]> extends true
+                      ? SourceResultWithoutStyling<T, S6>
+                      : SourceResultWithStyling<T, S6>,
+                    HasComponent<[S1, S2, S3, S4, S5, S6]> extends true
+                      ? SourceResultWithoutStyling<T, S7>
+                      : SourceResultWithStyling<T, S7>,
+                    HasComponent<[S1, S2, S3, S4, S5, S6, S7]> extends true
+                      ? SourceResultWithoutStyling<T, S8>
+                      : SourceResultWithStyling<T, S8>,
                     Omit<
                       T,
                       | SourceKeys<S1>
-                      | SourceVariantKeys<S2>
-                      | SourceVariantKeys<S3>
-                      | SourceVariantKeys<S4>
-                      | SourceVariantKeys<S5>
-                      | SourceVariantKeys<S6>
-                      | SourceVariantKeys<S7>
-                      | SourceVariantKeys<S8>
+                      | SourceKeys<S2>
+                      | SourceKeys<S3>
+                      | SourceKeys<S4>
+                      | SourceKeys<S5>
+                      | SourceKeys<S6>
+                      | SourceKeys<S7>
+                      | SourceKeys<S8>
                     >,
                   ]
                 : unknown[];
