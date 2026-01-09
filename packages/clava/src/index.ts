@@ -327,6 +327,7 @@ function processVariants(
 function processComputed(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   resolvedVariants: Record<string, unknown>,
+  propsVariants: Record<string, unknown>,
 ): {
   classes: ClassValue[];
   style: StyleValue;
@@ -345,9 +346,9 @@ function processComputed(
       setDefaultVariants: (
         newDefaults: VariantValues<Record<string, unknown>>,
       ) => {
-        // Only apply defaults for variants not already set
+        // Only apply defaults for variants not explicitly set in props
         for (const [key, value] of Object.entries(newDefaults)) {
-          if (resolvedVariants[key] === undefined) {
+          if (propsVariants[key] === undefined) {
             updatedVariants[key] = value;
           }
         }
@@ -533,6 +534,7 @@ export function create<M extends Mode = "jsx">({
       const computedResult = processComputed(
         config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
         resolvedVariants,
+        variantProps,
       );
       resolvedVariants = computedResult.updatedVariants;
 

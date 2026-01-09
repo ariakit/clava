@@ -1038,6 +1038,63 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg blue") });
     });
 
+    test("computed setDefaultVariants overrides defaultVariants", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          defaultVariants: { size: "sm", color: "red" },
+          computed: ({ setDefaultVariants }) => {
+            setDefaultVariants({ color: "blue" });
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("sm blue") });
+    });
+
+    test("computed setDefaultVariants overrides extended defaultVariants", () => {
+      const base = cv({
+        variants: { color: { red: "red", blue: "blue" } },
+        defaultVariants: { color: "red" },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ setDefaultVariants }) => {
+            setDefaultVariants({ color: "blue" });
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("blue sm") });
+    });
+
+    test("computed setDefaultVariants overrides child defaultVariants", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { size: "sm", color: "red" },
+          computed: ({ setDefaultVariants }) => {
+            setDefaultVariants({ size: "lg" });
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
+    });
+
     test("computed with defaultVariants", () => {
       const component = getModalComponent(
         mode,
