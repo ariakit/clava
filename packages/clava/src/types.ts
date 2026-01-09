@@ -49,24 +49,41 @@ export type GetVariants<V> = (variants?: VariantValues<V>) => VariantValues<V>;
 export type KeySourceArray = readonly string[];
 export type KeySourceComponent = {
   keys: readonly (string | number | symbol)[];
+  variantKeys: readonly (string | number | symbol)[];
   getVariants: () => Record<string, unknown>;
 };
 export type KeySource = KeySourceArray | KeySourceComponent;
 
-// Extract keys from a source
+// Extract keys from a source (for first source - includes class/style)
 type SourceKeys<S> = S extends readonly (infer K)[]
   ? K
   : S extends { keys: readonly (infer K)[] }
     ? K
     : never;
 
+// Extract variant keys from a source (for non-first sources - only variant keys, no class/style)
+type SourceVariantKeys<S> = S extends readonly (infer K)[]
+  ? K
+  : S extends { variantKeys: readonly (infer K)[] }
+    ? K
+    : S extends { keys: readonly (infer K)[] }
+      ? K
+      : never;
+
 // Extract defaults from a source (components have defaults, arrays don't)
 type SourceDefaults<S> = S extends { getVariants: () => infer Defaults }
   ? Defaults
   : {};
 
-// Result type for one source - pick keys from T and add defaults
+// Result type for first source - pick keys from T and add defaults
 type SourceResult<T, S> = Pick<T, Extract<keyof T, SourceKeys<S>>> &
+  Omit<SourceDefaults<S>, keyof T>;
+
+// Result type for non-first source - pick only variant keys from T (no class/style)
+type SourceVariantResult<T, S> = Pick<
+  T,
+  Extract<keyof T, SourceVariantKeys<S>>
+> &
   Omit<SourceDefaults<S>, keyof T>;
 
 // Standalone splitProps function type - first source is required
@@ -81,6 +98,8 @@ export type SplitPropsFunction = <
 ) => SplitPropsFunctionResult<T, S1, Sources>;
 
 // Result type for standalone splitProps function
+// First source uses SourceResult (full keys including class/style for components)
+// Subsequent sources use SourceVariantResult (only variant keys for components)
 type SplitPropsFunctionResult<
   T,
   S1 extends KeySource,
@@ -90,8 +109,8 @@ type SplitPropsFunctionResult<
   : Sources extends readonly [infer S2 extends KeySource]
     ? [
         SourceResult<T, S1>,
-        SourceResult<T, S2>,
-        Omit<T, SourceKeys<S1> | SourceKeys<S2>>,
+        SourceVariantResult<T, S2>,
+        Omit<T, SourceKeys<S1> | SourceVariantKeys<S2>>,
       ]
     : Sources extends readonly [
           infer S2 extends KeySource,
@@ -99,9 +118,12 @@ type SplitPropsFunctionResult<
         ]
       ? [
           SourceResult<T, S1>,
-          SourceResult<T, S2>,
-          SourceResult<T, S3>,
-          Omit<T, SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3>>,
+          SourceVariantResult<T, S2>,
+          SourceVariantResult<T, S3>,
+          Omit<
+            T,
+            SourceKeys<S1> | SourceVariantKeys<S2> | SourceVariantKeys<S3>
+          >,
         ]
       : Sources extends readonly [
             infer S2 extends KeySource,
@@ -110,12 +132,15 @@ type SplitPropsFunctionResult<
           ]
         ? [
             SourceResult<T, S1>,
-            SourceResult<T, S2>,
-            SourceResult<T, S3>,
-            SourceResult<T, S4>,
+            SourceVariantResult<T, S2>,
+            SourceVariantResult<T, S3>,
+            SourceVariantResult<T, S4>,
             Omit<
               T,
-              SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3> | SourceKeys<S4>
+              | SourceKeys<S1>
+              | SourceVariantKeys<S2>
+              | SourceVariantKeys<S3>
+              | SourceVariantKeys<S4>
             >,
           ]
         : Sources extends readonly [
@@ -126,17 +151,17 @@ type SplitPropsFunctionResult<
             ]
           ? [
               SourceResult<T, S1>,
-              SourceResult<T, S2>,
-              SourceResult<T, S3>,
-              SourceResult<T, S4>,
-              SourceResult<T, S5>,
+              SourceVariantResult<T, S2>,
+              SourceVariantResult<T, S3>,
+              SourceVariantResult<T, S4>,
+              SourceVariantResult<T, S5>,
               Omit<
                 T,
                 | SourceKeys<S1>
-                | SourceKeys<S2>
-                | SourceKeys<S3>
-                | SourceKeys<S4>
-                | SourceKeys<S5>
+                | SourceVariantKeys<S2>
+                | SourceVariantKeys<S3>
+                | SourceVariantKeys<S4>
+                | SourceVariantKeys<S5>
               >,
             ]
           : Sources extends readonly [
@@ -148,19 +173,19 @@ type SplitPropsFunctionResult<
               ]
             ? [
                 SourceResult<T, S1>,
-                SourceResult<T, S2>,
-                SourceResult<T, S3>,
-                SourceResult<T, S4>,
-                SourceResult<T, S5>,
-                SourceResult<T, S6>,
+                SourceVariantResult<T, S2>,
+                SourceVariantResult<T, S3>,
+                SourceVariantResult<T, S4>,
+                SourceVariantResult<T, S5>,
+                SourceVariantResult<T, S6>,
                 Omit<
                   T,
                   | SourceKeys<S1>
-                  | SourceKeys<S2>
-                  | SourceKeys<S3>
-                  | SourceKeys<S4>
-                  | SourceKeys<S5>
-                  | SourceKeys<S6>
+                  | SourceVariantKeys<S2>
+                  | SourceVariantKeys<S3>
+                  | SourceVariantKeys<S4>
+                  | SourceVariantKeys<S5>
+                  | SourceVariantKeys<S6>
                 >,
               ]
             : Sources extends readonly [
@@ -173,21 +198,21 @@ type SplitPropsFunctionResult<
                 ]
               ? [
                   SourceResult<T, S1>,
-                  SourceResult<T, S2>,
-                  SourceResult<T, S3>,
-                  SourceResult<T, S4>,
-                  SourceResult<T, S5>,
-                  SourceResult<T, S6>,
-                  SourceResult<T, S7>,
+                  SourceVariantResult<T, S2>,
+                  SourceVariantResult<T, S3>,
+                  SourceVariantResult<T, S4>,
+                  SourceVariantResult<T, S5>,
+                  SourceVariantResult<T, S6>,
+                  SourceVariantResult<T, S7>,
                   Omit<
                     T,
                     | SourceKeys<S1>
-                    | SourceKeys<S2>
-                    | SourceKeys<S3>
-                    | SourceKeys<S4>
-                    | SourceKeys<S5>
-                    | SourceKeys<S6>
-                    | SourceKeys<S7>
+                    | SourceVariantKeys<S2>
+                    | SourceVariantKeys<S3>
+                    | SourceVariantKeys<S4>
+                    | SourceVariantKeys<S5>
+                    | SourceVariantKeys<S6>
+                    | SourceVariantKeys<S7>
                   >,
                 ]
               : Sources extends readonly [
@@ -201,31 +226,26 @@ type SplitPropsFunctionResult<
                   ]
                 ? [
                     SourceResult<T, S1>,
-                    SourceResult<T, S2>,
-                    SourceResult<T, S3>,
-                    SourceResult<T, S4>,
-                    SourceResult<T, S5>,
-                    SourceResult<T, S6>,
-                    SourceResult<T, S7>,
-                    SourceResult<T, S8>,
+                    SourceVariantResult<T, S2>,
+                    SourceVariantResult<T, S3>,
+                    SourceVariantResult<T, S4>,
+                    SourceVariantResult<T, S5>,
+                    SourceVariantResult<T, S6>,
+                    SourceVariantResult<T, S7>,
+                    SourceVariantResult<T, S8>,
                     Omit<
                       T,
                       | SourceKeys<S1>
-                      | SourceKeys<S2>
-                      | SourceKeys<S3>
-                      | SourceKeys<S4>
-                      | SourceKeys<S5>
-                      | SourceKeys<S6>
-                      | SourceKeys<S7>
-                      | SourceKeys<S8>
+                      | SourceVariantKeys<S2>
+                      | SourceVariantKeys<S3>
+                      | SourceVariantKeys<S4>
+                      | SourceVariantKeys<S5>
+                      | SourceVariantKeys<S6>
+                      | SourceVariantKeys<S7>
+                      | SourceVariantKeys<S8>
                     >,
                   ]
                 : unknown[];
-
-export interface OnlyVariantsComponent<V> {
-  getVariants: GetVariants<V>;
-  keys: (keyof V)[];
-}
 
 export interface ModalComponent<V, R extends ComponentResult> {
   (props?: ComponentProps<V>): R;
@@ -233,7 +253,8 @@ export interface ModalComponent<V, R extends ComponentResult> {
   style: (props?: ComponentProps<V>) => R["style"];
   getVariants: GetVariants<V>;
   keys: (keyof V | keyof R)[];
-  onlyVariants: OnlyVariantsComponent<V>;
+  variantKeys: (keyof V)[];
+  propKeys: (keyof V | keyof R)[];
   /** @internal Base class without variants */
   _baseClass: string;
 }
