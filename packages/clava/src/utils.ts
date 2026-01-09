@@ -1,5 +1,4 @@
 import type * as CSS from "csstype";
-
 import type {
   StyleValue,
   JSXCSSProperties,
