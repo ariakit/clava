@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
 import type {
   AnyComponent,
-  Component,
+  CVComponent,
   ComponentResult,
   ComputedVariants,
   HTMLCSSProperties,
@@ -106,7 +106,7 @@ function getModalComponent<
   V extends Variants = {},
   CV extends ComputedVariants = {},
   const E extends AnyComponent[] = [],
->(mode: M, component: Component<V, CV, E>) {
+>(mode: M, component: CVComponent<V, CV, E>) {
   if (!mode) return component;
   return component[mode];
 }

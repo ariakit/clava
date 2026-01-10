@@ -1,8 +1,8 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
 import type {
   AnyComponent,
+  CVComponent,
   ClassValue,
-  Component,
   ComponentProps,
   ComponentResult,
   Computed,
@@ -32,7 +32,15 @@ import {
   styleValueToJSXStyle,
 } from "./utils.ts";
 
-export type { ClassValue, StyleValue, StyleClassValue };
+export type {
+  ClassValue,
+  StyleValue,
+  StyleClassValue,
+  JSXProps,
+  HTMLProps,
+  HTMLObjProps,
+  CVComponent,
+};
 
 export type VariantProps<T extends Pick<AnyComponent, "getVariants">> =
   ReturnType<T["getVariants"]>;
@@ -533,7 +541,7 @@ export function create<M extends Mode = "jsx">({
     const E extends AnyComponent[] = [],
   >(
     config: CVConfig<V, CV, E> = {},
-  ): Component<V, CV, E, StyleProps[M]> => {
+  ): CVComponent<V, CV, E, StyleProps[M]> => {
     type MergedVariants = MergeVariants<V, CV, E>;
 
     const variantKeys = collectVariantKeys(
@@ -706,7 +714,7 @@ export function create<M extends Mode = "jsx">({
     const htmlObjComponent = createModalComponent<HTMLObjProps>("htmlObj");
 
     // Build the final component
-    const component = defaultComponent as Component<V, CV, E, StyleProps[M]>;
+    const component = defaultComponent as CVComponent<V, CV, E, StyleProps[M]>;
     component.jsx = jsxComponent;
     component.html = htmlComponent;
     component.htmlObj = htmlObjComponent;
