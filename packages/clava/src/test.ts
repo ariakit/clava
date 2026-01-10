@@ -770,6 +770,30 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
+    test("defaultVariants when explicitly passing undefined", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+      const props = component({ size: undefined });
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
+    test("defaultVariants boolean when explicitly passing undefined", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { disabled: { true: "disabled", false: "enabled" } },
+          defaultVariants: { disabled: true },
+        }),
+      );
+      const props = component({ disabled: undefined });
+      expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
+    });
+
     test("computedVariants", () => {
       const component = getModalComponent(
         mode,
@@ -1116,6 +1140,23 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
+    });
+
+    test("computed setDefaultVariants when explicitly passing undefined", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ setDefaultVariants }) => {
+            setDefaultVariants({ color: "red" });
+          },
+        }),
+      );
+      const props = component({ size: "lg", color: undefined });
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 

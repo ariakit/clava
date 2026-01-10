@@ -191,14 +191,30 @@ function collectDefaultVariants(
 }
 
 /**
+ * Filters out keys with undefined values from an object.
+ */
+function filterUndefined(
+  obj: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
  * Resolves variant values by merging defaults with provided props.
+ * Props with undefined values are filtered out so they don't override defaults.
  */
 function resolveVariants(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   props: Record<string, unknown> = {},
 ): Record<string, unknown> {
   const defaults = collectDefaultVariants(config);
-  return { ...defaults, ...props };
+  return { ...defaults, ...filterUndefined(props) };
 }
 
 /**
