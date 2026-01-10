@@ -1,5 +1,12 @@
 # clava-app
 
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [9a232c0]
+  - clava@0.1.7
+
 ## 0.0.8
 
 ### Patch Changes
