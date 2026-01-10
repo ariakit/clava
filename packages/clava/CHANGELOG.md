@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.6
+
+### Patch Changes
+
+- b62c04b: To guarantee consistency, `splitProps` does not assign default variants anymore.
+
 ## 0.1.5
 
 ### Patch Changes
