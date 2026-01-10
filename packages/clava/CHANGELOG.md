@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.5
+
+### Patch Changes
+
+- 6dd40e9: Fixed `undefined` props overriding default variant values.
+
 ## 0.1.4
 
 ### Patch Changes
