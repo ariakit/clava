@@ -40,8 +40,24 @@ export interface StyleProps {
 
 export type ComponentResult = JSXProps | HTMLProps | HTMLObjProps;
 
-export type ComponentProps<V = {}> = VariantValues<V> &
-  Partial<ComponentResult>;
+type AllComponentResultKeys =
+  | keyof JSXProps
+  | keyof HTMLProps
+  | keyof HTMLObjProps;
+
+type ComponentResultValue<K extends AllComponentResultKeys> = K extends "style"
+  ? StyleProperty
+  : K extends "className"
+    ? string
+    : K extends "class"
+      ? string
+      : never;
+
+export type NullableComponentResult = {
+  [K in AllComponentResultKeys]?: ComponentResultValue<K> | null;
+};
+
+export type ComponentProps<V = {}> = VariantValues<V> & NullableComponentResult;
 
 export type GetVariants<V> = (variants?: VariantValues<V>) => VariantValues<V>;
 
