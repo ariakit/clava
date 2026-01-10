@@ -323,7 +323,7 @@ export interface ModalComponent<V, R extends ComponentResult> {
   _baseClass: string;
 }
 
-export interface Component<
+export interface CVComponent<
   V extends Variants = {},
   CV extends ComputedVariants = {},
   E extends AnyComponent[] = [],
@@ -335,7 +335,7 @@ export interface Component<
 }
 
 export type AnyComponent =
-  | Component<any, any, any, any>
+  | CVComponent<any, any, any, any>
   | ModalComponent<any, any>;
 
 type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
@@ -350,12 +350,12 @@ type MergeExtendedComputedVariants<T> = T extends readonly [
   : {};
 
 type ExtractVariants<T> =
-  T extends Component<infer V, any, infer E, any>
+  T extends CVComponent<infer V, any, infer E, any>
     ? V & MergeExtendedVariants<E>
     : {};
 
 type ExtractComputedVariants<T> =
-  T extends Component<any, infer CV, infer E, any>
+  T extends CVComponent<any, infer CV, infer E, any>
     ? CV & Omit<MergeExtendedComputedVariants<E>, keyof CV>
     : {};
 
