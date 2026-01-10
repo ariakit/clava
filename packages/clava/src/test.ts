@@ -1143,6 +1143,52 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
+    test("computed setDefaultVariants from parent overrides child defaultVariants", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ size: "lg" });
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { size: "sm", color: "red" },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
+    });
+
+    test("child computed setDefaultVariants overrides parent computed setDefaultVariants", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ size: "lg" });
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { size: "sm", color: "red" },
+          computed: ({ setDefaultVariants }) => {
+            setDefaultVariants({ size: "sm" });
+          },
+        }),
+      );
+      const props = component();
+      // Order: parent defaultVariants (sm) -> child defaultVariants (sm)
+      //     -> parent computed.setDefaultVariants (lg)
+      //     -> child computed.setDefaultVariants (sm)
+      expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
+    });
+
     test("computed setDefaultVariants when explicitly passing undefined", () => {
       const component = getModalComponent(
         mode,

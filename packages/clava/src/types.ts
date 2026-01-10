@@ -337,6 +337,13 @@ export interface ModalComponent<V, R extends ComponentResult> {
   propKeys: (keyof V | keyof R)[];
   /** @internal Base class without variants */
   _baseClass: string;
+  /**
+   * @internal Returns resolved variants after running the computed function.
+   * Used by child components to get parent's setDefaultVariants effects.
+   */
+  _resolveDefaults: (
+    propsVariants: Record<string, unknown>,
+  ) => Record<string, unknown>;
 }
 
 export interface CVComponent<
