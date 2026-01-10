@@ -1506,7 +1506,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(component.propKeys).toEqual([classNameProp, "style", "size"]);
     });
 
-    test("splitProps includes defaultVariants", () => {
+    test("splitProps does not include defaultVariants", () => {
       const component = getModalComponent(
         mode,
         cv({
@@ -1524,7 +1524,6 @@ for (const config of Object.values(CONFIGS)) {
       >();
       expect(variantProps).toEqual({
         size: "lg",
-        color: "red",
       });
       expectTypeOf(otherProps).toEqualTypeOf<{ id?: string }>();
       expect(otherProps).toEqual({ id: "test" });
@@ -1606,7 +1605,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps with component parameter includes component defaults", () => {
+    test("splitProps with component parameter does not include component defaults", () => {
       const component1 = getModalComponent(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
@@ -1630,9 +1629,8 @@ for (const config of Object.values(CONFIGS)) {
       );
       // First component gets variant props
       expect(comp1Props).toEqual({ size: "lg" });
-      // Second component only gets its own variant defaults (no class/style
-      // since first claimed them)
-      expect(comp2Props).toEqual({ color: "red" });
+      // Second component gets empty object (no defaults applied)
+      expect(comp2Props).toEqual({});
       expect(otherProps).toEqual({ id: "test" });
     });
 
@@ -1745,7 +1743,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps with defaultVariants from multiple components", () => {
+    test("splitProps with defaultVariants from multiple components does not include defaults", () => {
       const component1 = getModalComponent(
         mode,
         cv({
@@ -1765,18 +1763,18 @@ for (const config of Object.values(CONFIGS)) {
         component1,
         component2,
       );
-      // Each gets its own defaults
+      // Neither gets defaults - only props that are actually in the input
       expectTypeOf(comp1Props).branded.toEqualTypeOf<{ size?: "sm" | "lg" }>();
-      expect(comp1Props).toEqual({ size: "sm" });
+      expect(comp1Props).toEqual({});
       expectTypeOf(comp2Props).branded.toEqualTypeOf<{
         color?: "red" | "blue";
       }>();
-      expect(comp2Props).toEqual({ color: "red" });
+      expect(comp2Props).toEqual({});
       expectTypeOf(otherProps).toEqualTypeOf<{ id: string }>();
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("variantKeys splitProps includes defaultVariants", () => {
+    test("variantKeys splitProps does not include defaultVariants", () => {
       const component = getModalComponent(
         mode,
         cv({

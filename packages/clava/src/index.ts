@@ -449,15 +449,8 @@ function splitPropsImpl(
   // Track if styling has been claimed by a component
   let stylingClaimed = selfIsComponent;
 
-  // Self result with defaults
+  // Self result
   const selfResult: Record<string, unknown> = {};
-  // First apply defaults
-  for (const [key, value] of Object.entries(selfDefaults)) {
-    if (selfKeys.includes(key)) {
-      selfResult[key] = value;
-    }
-  }
-  // Then override with props
   for (const key of selfKeys) {
     if (key in props) {
       selfResult[key] = props[key];
@@ -475,14 +468,6 @@ function splitPropsImpl(
     const effectiveKeys =
       source.isComponent && stylingClaimed ? source.variantKeys : source.keys;
 
-    // First apply defaults (only for variant keys if component and styling claimed)
-    for (const [key, value] of Object.entries(source.defaults)) {
-      if (effectiveKeys.includes(key)) {
-        sourceResult[key] = value;
-      }
-    }
-
-    // Then override with props
     for (const key of effectiveKeys) {
       allUsedKeys.add(key);
       if (key in props) {
