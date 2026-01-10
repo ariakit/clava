@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.3
+
+### Patch Changes
+
+- 87b7934: Exported internal types to fix TS errors on consumer code.
+
 ## 0.1.2
 
 ### Patch Changes
