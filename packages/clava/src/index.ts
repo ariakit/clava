@@ -207,13 +207,18 @@ function collectDefaultVariants(
 
   // Apply computed defaults from extended components
   // Parent's setDefaultVariants should override child's static defaults
-  // Pass propsVariants so parent's computed can access user-provided props
+  // Pass child's static defaults so parent's computed can see them in `variants`
+  // Pass user props separately so setDefaultVariants only checks against user props
   if (config.extend) {
     for (const ext of config.extend) {
       // _resolveDefaults returns the computed defaults after running the
       // parent's computed function, including setDefaultVariants effects
       if (ext._resolveDefaults) {
-        const extComputedDefaults = ext._resolveDefaults(propsVariants);
+        const childStaticDefaults = config.defaultVariants || {};
+        const extComputedDefaults = ext._resolveDefaults(
+          childStaticDefaults,
+          propsVariants,
+        );
         defaults = { ...defaults, ...extComputedDefaults };
       }
     }
@@ -737,18 +742,23 @@ export function create<M extends Mode = "jsx">({
 
       // Returns only the variants set via setDefaultVariants in the computed
       // function. Used by child components to get parent's computed defaults.
+      // @param childDefaults - Child's static defaults (merged into variants)
+      // @param userProps - Actual user props (for setDefaultVariants check)
       component._resolveDefaults = (
-        propsVariants: Record<string, unknown>,
+        childDefaults: Record<string, unknown>,
+        userProps: Record<string, unknown> = {},
       ): Record<string, unknown> => {
         // Get static defaults (including from extended components)
         const staticDefaults = collectStaticDefaults(
           config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
         );
 
-        // Merge with provided props
+        // Merge: parent static < child static < user props
+        // This is what parent's computed will see in `variants`
         const resolvedVariants = {
           ...staticDefaults,
-          ...filterUndefined(propsVariants),
+          ...filterUndefined(childDefaults),
+          ...filterUndefined(userProps),
         };
 
         // Track which keys are set via setDefaultVariants
@@ -761,9 +771,10 @@ export function create<M extends Mode = "jsx">({
               // Not relevant for collecting defaults
             },
             setDefaultVariants: (newDefaults) => {
-              // Only apply defaults for variants not explicitly set in props
+              // Only apply defaults for variants not explicitly set by user
+              // (child's static defaults should not block setDefaultVariants)
               for (const [key, value] of Object.entries(newDefaults)) {
-                if (propsVariants[key] === undefined) {
+                if (userProps[key] === undefined) {
                   computedDefaults[key] = value;
                 }
               }
