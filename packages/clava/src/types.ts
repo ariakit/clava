@@ -338,11 +338,15 @@ export interface ModalComponent<V, R extends ComponentResult> {
   /** @internal Base class without variants */
   _baseClass: string;
   /**
-   * @internal Returns resolved variants after running the computed function.
-   * Used by child components to get parent's setDefaultVariants effects.
+   * @internal Returns only the variants set via setDefaultVariants in the
+   * computed function. Used by child components to get parent's computed
+   * defaults.
+   * @param childDefaults - Child's static defaults (merged into variants)
+   * @param userProps - Actual user props (for setDefaultVariants check)
    */
   _resolveDefaults: (
-    propsVariants: Record<string, unknown>,
+    childDefaults: Record<string, unknown>,
+    userProps?: Record<string, unknown>,
   ) => Record<string, unknown>;
 }
 

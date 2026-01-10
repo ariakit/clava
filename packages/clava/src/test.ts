@@ -1184,6 +1184,28 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
+    test("computed receives default variants from child", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" }, large: "" },
+        defaultVariants: { size: "sm" },
+        computed: ({ variants, setDefaultVariants }) => {
+          if (variants.large) {
+            setDefaultVariants({ size: "lg" });
+          }
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { size: "sm", color: "red", large: true },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
+    });
+
     test("child computed setDefaultVariants overrides parent computed setDefaultVariants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
@@ -1207,6 +1229,30 @@ for (const config of Object.values(CONFIGS)) {
       // Order: parent defaultVariants (sm) -> child defaultVariants (sm)
       //     -> parent computed.setDefaultVariants (lg)
       //     -> child computed.setDefaultVariants (sm)
+      expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
+    });
+
+    test("child setDefaultVariants receives computed variants from parent", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" }, small: "" },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ small: true });
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { size: "lg", color: "red" },
+          computed: ({ variants, setDefaultVariants }) => {
+            if (variants.small) {
+              setDefaultVariants({ size: "sm" });
+            }
+          },
+        }),
+      );
+      const props = component();
       expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
     });
 
