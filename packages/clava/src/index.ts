@@ -200,18 +200,20 @@ function collectStaticDefaults(
  */
 function collectDefaultVariants(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  propsVariants: Record<string, unknown> = {},
 ): Record<string, unknown> {
   // Start with static defaults (parent static < child static)
   let defaults = collectStaticDefaults(config);
 
   // Apply computed defaults from extended components
   // Parent's setDefaultVariants should override child's static defaults
+  // Pass propsVariants so parent's computed can access user-provided props
   if (config.extend) {
     for (const ext of config.extend) {
-      // _resolveDefaults returns the resolved variants after running the
+      // _resolveDefaults returns the computed defaults after running the
       // parent's computed function, including setDefaultVariants effects
       if (ext._resolveDefaults) {
-        const extComputedDefaults = ext._resolveDefaults({});
+        const extComputedDefaults = ext._resolveDefaults(propsVariants);
         defaults = { ...defaults, ...extComputedDefaults };
       }
     }
@@ -243,7 +245,7 @@ function resolveVariants(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   props: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  const defaults = collectDefaultVariants(config);
+  const defaults = collectDefaultVariants(config, props);
   return { ...defaults, ...filterUndefined(props) };
 }
 
