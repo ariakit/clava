@@ -6,6 +6,7 @@ import type {
   ComponentProps,
   ComponentResult,
   Computed,
+  ComputedContext,
   ComputedVariants,
   ExtendableVariants,
   HTMLObjProps,
@@ -152,15 +153,16 @@ function collectVariantKeys(
 }
 
 /**
- * Collects default variants from extended components and the current config.
- * Also handles implicit boolean defaults (when only `false` key exists).
+ * Collects static default variants from extended components and the current
+ * config. Also handles implicit boolean defaults (when only `false` key
+ * exists).
  */
-function collectDefaultVariants(
+function collectStaticDefaults(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
 ): Record<string, unknown> {
   let defaults: Record<string, unknown> = {};
 
-  // Collect from extended components
+  // Collect static defaults from extended components
   if (config.extend) {
     for (const ext of config.extend) {
       const extDefaults = ext.getVariants();
@@ -182,9 +184,37 @@ function collectDefaultVariants(
     }
   }
 
-  // Override with current config's defaults
+  // Override with current config's static defaults
   if (config.defaultVariants) {
     defaults = { ...defaults, ...config.defaultVariants };
+  }
+
+  return defaults;
+}
+
+/**
+ * Collects default variants from extended components and the current config.
+ * This includes both static defaults and computed defaults (from
+ * setDefaultVariants in extended components' computed functions).
+ * Priority: parent static < child static < parent computed < child computed.
+ */
+function collectDefaultVariants(
+  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+): Record<string, unknown> {
+  // Start with static defaults (parent static < child static)
+  let defaults = collectStaticDefaults(config);
+
+  // Apply computed defaults from extended components
+  // Parent's setDefaultVariants should override child's static defaults
+  if (config.extend) {
+    for (const ext of config.extend) {
+      // _resolveDefaults returns the resolved variants after running the
+      // parent's computed function, including setDefaultVariants effects
+      if (ext._resolveDefaults) {
+        const extComputedDefaults = ext._resolveDefaults({});
+        defaults = { ...defaults, ...extComputedDefaults };
+      }
+    }
   }
 
   return defaults;
@@ -702,6 +732,46 @@ export function create<M extends Mode = "jsx">({
         ...(extendedBaseClasses as ClsxClassValue[]),
         config.class as ClsxClassValue,
       );
+
+      // Returns only the variants set via setDefaultVariants in the computed
+      // function. Used by child components to get parent's computed defaults.
+      component._resolveDefaults = (
+        propsVariants: Record<string, unknown>,
+      ): Record<string, unknown> => {
+        // Get static defaults (including from extended components)
+        const staticDefaults = collectStaticDefaults(
+          config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+        );
+
+        // Merge with provided props
+        const resolvedVariants = {
+          ...staticDefaults,
+          ...filterUndefined(propsVariants),
+        };
+
+        // Track which keys are set via setDefaultVariants
+        const computedDefaults: Record<string, unknown> = {};
+
+        if (config.computed) {
+          const context: ComputedContext<MergedVariants> = {
+            variants: resolvedVariants as VariantValues<MergedVariants>,
+            setVariants: () => {
+              // Not relevant for collecting defaults
+            },
+            setDefaultVariants: (newDefaults) => {
+              // Only apply defaults for variants not explicitly set in props
+              for (const [key, value] of Object.entries(newDefaults)) {
+                if (propsVariants[key] === undefined) {
+                  computedDefaults[key] = value;
+                }
+              }
+            },
+          };
+          config.computed(context);
+        }
+
+        return computedDefaults;
+      };
 
       return component;
     };
