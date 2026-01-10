@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.8
+
+### Patch Changes
+
+- fd89999: Fixed `computed` not receiving component updated props.
+
 ## 0.1.7
 
 ### Patch Changes
