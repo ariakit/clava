@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.9
+
+### Patch Changes
+
+- f1654df: Fixed `computed` not receiving default variants from child components.
+
 ## 0.1.8
 
 ### Patch Changes
