@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.7
+
+### Patch Changes
+
+- 9a232c0: Fixed computed default variants not overriding static default variants from child components.
+
 ## 0.1.6
 
 ### Patch Changes
