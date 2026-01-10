@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.4
+
+### Patch Changes
+
+- 6d821f2: Updated component props to support `null` as `class`, `className`, and `style` values.
+
 ## 0.1.3
 
 ### Patch Changes
