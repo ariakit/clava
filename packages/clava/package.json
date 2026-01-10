@@ -40,7 +40,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "clsx": "^2.1.1",
-    "csstype": "^3.2.3"
+    "clsx": "^2.0.0",
+    "csstype": "^3.0.0"
   }
 }

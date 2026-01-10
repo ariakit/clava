@@ -336,6 +336,18 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
+    test("merge null class from props", () => {
+      const component = getModalComponent(mode, cv({ class: "foo bar" }));
+      const props = component({ class: null });
+      expect(getStyleClass(props)).toEqual({ class: cls("foo bar") });
+    });
+
+    test("merge null className from props", () => {
+      const component = getModalComponent(mode, cv({ class: "foo bar" }));
+      const props = component({ className: null });
+      expect(getStyleClass(props)).toEqual({ class: cls("foo bar") });
+    });
+
     test("empty style", () => {
       const component = getModalComponent(mode, cv({ style: {} }));
       const props = component();
@@ -436,6 +448,18 @@ for (const config of Object.values(CONFIGS)) {
         class: "",
         backgroundColor: "red",
         fontSize: "16px",
+      });
+    });
+
+    test("merge null style from props", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ style: { backgroundColor: "red" } }),
+      );
+      const props = component({ style: null });
+      expect(getStyleClass(props)).toEqual({
+        class: "",
+        backgroundColor: "red",
       });
     });
 
