@@ -36,8 +36,8 @@ importers:
         specifier: 1.0.0-beta.59
         version: 1.0.0-beta.59
       rolldown-plugin-dts:
-        specifier: 0.20.0
-        version: 0.20.0(rolldown@1.0.0-beta.59)(typescript@5.9.3)
+        specifier: 0.21.0
+        version: 0.21.0(rolldown@1.0.0-beta.59)(typescript@5.9.3)
       solid-js:
         specifier: 1.9.10
         version: 1.9.10
@@ -1433,8 +1433,8 @@ packages:
   rfdc@1.4.1:
     resolution: {integrity: sha512-q1b3N5QkRUWUl7iyylaaj3kOpIT0N2i9MqIEQXP73GVsN9cw3fdx8X63cEmWhJGi2PPCF23Ijp7ktmd39rawIA==}
 
-  rolldown-plugin-dts@0.20.0:
-    resolution: {integrity: sha512-cLAY1kN2ilTYMfZcFlGWbXnu6Nb+8uwUBsi+Mjbh4uIx7IN8uMOmJ7RxrrRgPsO4H7eSz3E+JwGoL1gyugiyUA==}
+  rolldown-plugin-dts@0.21.0:
+    resolution: {integrity: sha512-t/KiDGti8cXD69phhBGWG4mjIlN1BX5auS8iNPrRvkCII6FKccjR+E0lmP5fCwuEvH3lJPaF5iu/CMGUn6nuoQ==}
     engines: {node: '>=20.19.0'}
     peerDependencies:
       '@ts-macro/tsc': ^0.3.6
@@ -3010,7 +3010,7 @@ snapshots:
 
   rfdc@1.4.1: {}
 
-  rolldown-plugin-dts@0.20.0(rolldown@1.0.0-beta.59)(typescript@5.9.3):
+  rolldown-plugin-dts@0.21.0(rolldown@1.0.0-beta.59)(typescript@5.9.3):
     dependencies:
       '@babel/generator': 7.28.5
       '@babel/parser': 7.28.5
