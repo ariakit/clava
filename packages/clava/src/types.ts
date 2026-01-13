@@ -107,14 +107,30 @@ type SourceResultWithoutStyling<T, S> =
         Omit<SourceDefaults<S>, keyof T>
     : Pick<T, Extract<keyof T, SourceKeys<S>>>;
 
-// Check if any source in a tuple is a component (to track if styling is claimed)
-type HasComponent<Sources> = Sources extends readonly []
-  ? false
-  : Sources extends readonly [infer First, ...infer Rest]
-    ? IsComponent<First> extends true
-      ? true
-      : HasComponent<Rest>
-    : false;
+// Recursive helper to build the result tuple for sources after S1
+// StylingClaimed: whether a component has already claimed styling
+// UsedKeys: accumulator for all keys used so far (for the rest object)
+type BuildSourceResults<
+  T,
+  Sources extends readonly KeySource[],
+  StylingClaimed extends boolean,
+  UsedKeys,
+> = Sources extends readonly [
+  infer Current extends KeySource,
+  ...infer Rest extends readonly KeySource[],
+]
+  ? [
+      StylingClaimed extends true
+        ? SourceResultWithoutStyling<T, Current>
+        : SourceResultWithStyling<T, Current>,
+      ...BuildSourceResults<
+        T,
+        Rest,
+        StylingClaimed extends true ? true : IsComponent<Current>,
+        UsedKeys | SourceKeys<Current>
+      >,
+    ]
+  : [Omit<T, UsedKeys & (string | number | symbol)>];
 
 // Standalone splitProps function type - first source is required
 export type SplitPropsFunction = <
@@ -129,203 +145,15 @@ export type SplitPropsFunction = <
 
 // Result type for standalone splitProps function
 // S1: First source - uses SourceResultWithStyling (either array or first component gets styling)
-// S2+: Subsequent sources - use SourceResultWithStyling if no prior component, else SourceResultWithoutStyling
+// Sources: Subsequent sources - use SourceResultWithStyling if no prior component, else SourceResultWithoutStyling
 type SplitPropsFunctionResult<
   T,
   S1 extends KeySource,
   Sources extends readonly KeySource[],
-> = Sources extends readonly []
-  ? [SourceResultWithStyling<T, S1>, Omit<T, SourceKeys<S1>>]
-  : Sources extends readonly [infer S2 extends KeySource]
-    ? [
-        SourceResultWithStyling<T, S1>,
-        IsComponent<S1> extends true
-          ? SourceResultWithoutStyling<T, S2>
-          : SourceResultWithStyling<T, S2>,
-        Omit<T, SourceKeys<S1> | SourceKeys<S2>>,
-      ]
-    : Sources extends readonly [
-          infer S2 extends KeySource,
-          infer S3 extends KeySource,
-        ]
-      ? [
-          SourceResultWithStyling<T, S1>,
-          IsComponent<S1> extends true
-            ? SourceResultWithoutStyling<T, S2>
-            : SourceResultWithStyling<T, S2>,
-          HasComponent<[S1, S2]> extends true
-            ? SourceResultWithoutStyling<T, S3>
-            : SourceResultWithStyling<T, S3>,
-          Omit<T, SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3>>,
-        ]
-      : Sources extends readonly [
-            infer S2 extends KeySource,
-            infer S3 extends KeySource,
-            infer S4 extends KeySource,
-          ]
-        ? [
-            SourceResultWithStyling<T, S1>,
-            IsComponent<S1> extends true
-              ? SourceResultWithoutStyling<T, S2>
-              : SourceResultWithStyling<T, S2>,
-            HasComponent<[S1, S2]> extends true
-              ? SourceResultWithoutStyling<T, S3>
-              : SourceResultWithStyling<T, S3>,
-            HasComponent<[S1, S2, S3]> extends true
-              ? SourceResultWithoutStyling<T, S4>
-              : SourceResultWithStyling<T, S4>,
-            Omit<
-              T,
-              SourceKeys<S1> | SourceKeys<S2> | SourceKeys<S3> | SourceKeys<S4>
-            >,
-          ]
-        : Sources extends readonly [
-              infer S2 extends KeySource,
-              infer S3 extends KeySource,
-              infer S4 extends KeySource,
-              infer S5 extends KeySource,
-            ]
-          ? [
-              SourceResultWithStyling<T, S1>,
-              IsComponent<S1> extends true
-                ? SourceResultWithoutStyling<T, S2>
-                : SourceResultWithStyling<T, S2>,
-              HasComponent<[S1, S2]> extends true
-                ? SourceResultWithoutStyling<T, S3>
-                : SourceResultWithStyling<T, S3>,
-              HasComponent<[S1, S2, S3]> extends true
-                ? SourceResultWithoutStyling<T, S4>
-                : SourceResultWithStyling<T, S4>,
-              HasComponent<[S1, S2, S3, S4]> extends true
-                ? SourceResultWithoutStyling<T, S5>
-                : SourceResultWithStyling<T, S5>,
-              Omit<
-                T,
-                | SourceKeys<S1>
-                | SourceKeys<S2>
-                | SourceKeys<S3>
-                | SourceKeys<S4>
-                | SourceKeys<S5>
-              >,
-            ]
-          : Sources extends readonly [
-                infer S2 extends KeySource,
-                infer S3 extends KeySource,
-                infer S4 extends KeySource,
-                infer S5 extends KeySource,
-                infer S6 extends KeySource,
-              ]
-            ? [
-                SourceResultWithStyling<T, S1>,
-                IsComponent<S1> extends true
-                  ? SourceResultWithoutStyling<T, S2>
-                  : SourceResultWithStyling<T, S2>,
-                HasComponent<[S1, S2]> extends true
-                  ? SourceResultWithoutStyling<T, S3>
-                  : SourceResultWithStyling<T, S3>,
-                HasComponent<[S1, S2, S3]> extends true
-                  ? SourceResultWithoutStyling<T, S4>
-                  : SourceResultWithStyling<T, S4>,
-                HasComponent<[S1, S2, S3, S4]> extends true
-                  ? SourceResultWithoutStyling<T, S5>
-                  : SourceResultWithStyling<T, S5>,
-                HasComponent<[S1, S2, S3, S4, S5]> extends true
-                  ? SourceResultWithoutStyling<T, S6>
-                  : SourceResultWithStyling<T, S6>,
-                Omit<
-                  T,
-                  | SourceKeys<S1>
-                  | SourceKeys<S2>
-                  | SourceKeys<S3>
-                  | SourceKeys<S4>
-                  | SourceKeys<S5>
-                  | SourceKeys<S6>
-                >,
-              ]
-            : Sources extends readonly [
-                  infer S2 extends KeySource,
-                  infer S3 extends KeySource,
-                  infer S4 extends KeySource,
-                  infer S5 extends KeySource,
-                  infer S6 extends KeySource,
-                  infer S7 extends KeySource,
-                ]
-              ? [
-                  SourceResultWithStyling<T, S1>,
-                  IsComponent<S1> extends true
-                    ? SourceResultWithoutStyling<T, S2>
-                    : SourceResultWithStyling<T, S2>,
-                  HasComponent<[S1, S2]> extends true
-                    ? SourceResultWithoutStyling<T, S3>
-                    : SourceResultWithStyling<T, S3>,
-                  HasComponent<[S1, S2, S3]> extends true
-                    ? SourceResultWithoutStyling<T, S4>
-                    : SourceResultWithStyling<T, S4>,
-                  HasComponent<[S1, S2, S3, S4]> extends true
-                    ? SourceResultWithoutStyling<T, S5>
-                    : SourceResultWithStyling<T, S5>,
-                  HasComponent<[S1, S2, S3, S4, S5]> extends true
-                    ? SourceResultWithoutStyling<T, S6>
-                    : SourceResultWithStyling<T, S6>,
-                  HasComponent<[S1, S2, S3, S4, S5, S6]> extends true
-                    ? SourceResultWithoutStyling<T, S7>
-                    : SourceResultWithStyling<T, S7>,
-                  Omit<
-                    T,
-                    | SourceKeys<S1>
-                    | SourceKeys<S2>
-                    | SourceKeys<S3>
-                    | SourceKeys<S4>
-                    | SourceKeys<S5>
-                    | SourceKeys<S6>
-                    | SourceKeys<S7>
-                  >,
-                ]
-              : Sources extends readonly [
-                    infer S2 extends KeySource,
-                    infer S3 extends KeySource,
-                    infer S4 extends KeySource,
-                    infer S5 extends KeySource,
-                    infer S6 extends KeySource,
-                    infer S7 extends KeySource,
-                    infer S8 extends KeySource,
-                  ]
-                ? [
-                    SourceResultWithStyling<T, S1>,
-                    IsComponent<S1> extends true
-                      ? SourceResultWithoutStyling<T, S2>
-                      : SourceResultWithStyling<T, S2>,
-                    HasComponent<[S1, S2]> extends true
-                      ? SourceResultWithoutStyling<T, S3>
-                      : SourceResultWithStyling<T, S3>,
-                    HasComponent<[S1, S2, S3]> extends true
-                      ? SourceResultWithoutStyling<T, S4>
-                      : SourceResultWithStyling<T, S4>,
-                    HasComponent<[S1, S2, S3, S4]> extends true
-                      ? SourceResultWithoutStyling<T, S5>
-                      : SourceResultWithStyling<T, S5>,
-                    HasComponent<[S1, S2, S3, S4, S5]> extends true
-                      ? SourceResultWithoutStyling<T, S6>
-                      : SourceResultWithStyling<T, S6>,
-                    HasComponent<[S1, S2, S3, S4, S5, S6]> extends true
-                      ? SourceResultWithoutStyling<T, S7>
-                      : SourceResultWithStyling<T, S7>,
-                    HasComponent<[S1, S2, S3, S4, S5, S6, S7]> extends true
-                      ? SourceResultWithoutStyling<T, S8>
-                      : SourceResultWithStyling<T, S8>,
-                    Omit<
-                      T,
-                      | SourceKeys<S1>
-                      | SourceKeys<S2>
-                      | SourceKeys<S3>
-                      | SourceKeys<S4>
-                      | SourceKeys<S5>
-                      | SourceKeys<S6>
-                      | SourceKeys<S7>
-                      | SourceKeys<S8>
-                    >,
-                  ]
-                : unknown[];
+> = [
+  SourceResultWithStyling<T, S1>,
+  ...BuildSourceResults<T, Sources, IsComponent<S1>, SourceKeys<S1>>,
+];
 
 export interface ModalComponent<V, R extends ComponentResult> {
   (props?: ComponentProps<V>): R;
@@ -335,19 +163,6 @@ export interface ModalComponent<V, R extends ComponentResult> {
   keys: (keyof V | keyof R)[];
   variantKeys: (keyof V)[];
   propKeys: (keyof V | keyof R)[];
-  /** @internal Base class without variants */
-  _baseClass: string;
-  /**
-   * @internal Returns only the variants set via setDefaultVariants in the
-   * computed function. Used by child components to get parent's computed
-   * defaults.
-   * @param childDefaults - Child's static defaults (merged into variants)
-   * @param userProps - Actual user props (for setDefaultVariants check)
-   */
-  _resolveDefaults: (
-    childDefaults: Record<string, unknown>,
-    userProps?: Record<string, unknown>,
-  ) => Record<string, unknown>;
 }
 
 export interface CVComponent<
