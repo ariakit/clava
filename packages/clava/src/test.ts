@@ -1363,11 +1363,11 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg computed-lg") });
     });
 
-    test("computed from parent receives default boolean value from overridden variant in child", () => {
+    test("computed from parent receives boolean default value from overridden variant in child", () => {
       const base = cv({
         variants: {
           size: { sm: "sm", lg: "lg" },
-          border: { default: "default", false: "" },
+          border: { default: "default", true: "border", false: "" },
         },
         defaultVariants: { size: "lg" },
         computed: ({ variants, setVariants }) => {
@@ -1391,11 +1391,40 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
-    test("computed from parent receives props boolean value from overridden variant in child", () => {
+    test("computed from parent receives boolean default value from overridden variant in grandchild", () => {
       const base = cv({
         variants: {
           size: { sm: "sm", lg: "lg" },
-          border: { default: "default", false: "" },
+          border: { default: "default", true: "border", false: "" },
+        },
+        defaultVariants: { size: "lg" },
+        computed: ({ variants, setVariants }) => {
+          expect(variants.border).toBe(false);
+          if (!variants.border) {
+            setVariants({ size: "sm" });
+          }
+        },
+      });
+      const base2 = cv({ extend: [base] });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base2],
+          computedVariants: {
+            border: (_: boolean) => {},
+          },
+          defaultVariants: { border: false },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
+    test("computed from parent receives false prop from overridden variant in child", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          border: { default: "default", true: "border", false: "" },
         },
         defaultVariants: { size: "lg" },
         computed: ({ variants, setVariants }) => {
@@ -1415,6 +1444,61 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       const props = component({ border: false });
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
+    test("computed from parent receives true prop from overridden variant in child", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          border: { default: "default", true: "border", false: "" },
+        },
+        defaultVariants: { size: "lg" },
+        computed: ({ variants, setVariants }) => {
+          expect(variants.border).toBe(true);
+          if (variants.border) {
+            setVariants({ size: "sm" });
+          }
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computedVariants: {
+            border: (_: boolean) => {},
+          },
+        }),
+      );
+      const props = component({ border: true });
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
+    test("computed from parent receives true prop from overridden variant in grandchild", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          border: { default: "default", true: "border", false: "" },
+        },
+        defaultVariants: { size: "lg" },
+        computed: ({ variants, setVariants }) => {
+          expect(variants.border).toBe(true);
+          if (variants.border) {
+            setVariants({ size: "sm" });
+          }
+        },
+      });
+      const base2 = cv({ extend: [base] });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base2],
+          computedVariants: {
+            border: (_: boolean) => {},
+          },
+        }),
+      );
+      const props = component({ border: true });
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 

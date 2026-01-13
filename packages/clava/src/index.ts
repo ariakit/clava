@@ -35,6 +35,7 @@ import {
 // Internal metadata stored on components but hidden from public types
 interface ComponentMeta {
   baseClass: string;
+  staticDefaults: Record<string, unknown>;
   resolveDefaults: (
     childDefaults: Record<string, unknown>,
     userProps?: Record<string, unknown>,
@@ -43,10 +44,10 @@ interface ComponentMeta {
 
 const META_KEY = "__meta";
 
-// Sentinel value used to signal "skip this variant" when a child's
-// computedVariants overrides a parent's variant. Using a Symbol ensures it
-// can't conflict with any user-provided value (including null).
-const SKIP_VARIANT = Symbol("skipVariant");
+// Symbol property used to pass skip keys through the props object without
+// polluting the actual variant values. This allows the computed function to
+// see actual variant values while still skipping styling for overridden keys.
+const SKIP_STYLE_KEYS = Symbol("skipStyleKeys");
 
 // Dynamic property access on function requires cast through unknown
 function getComponentMeta(component: AnyComponent): ComponentMeta | undefined {
@@ -194,17 +195,22 @@ function collectVariantKeys(
 /**
  * Collects static default variants from extended components and the current
  * config. Also handles implicit boolean defaults (when only `false` key
- * exists).
+ * exists). This does NOT trigger computed functions - use collectDefaultVariants
+ * for that.
  */
 function collectStaticDefaults(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
 ): Record<string, unknown> {
   const defaults: Record<string, unknown> = {};
 
-  // Collect static defaults from extended components
+  // Collect static defaults from extended components (via metadata to avoid
+  // triggering computed functions)
   if (config.extend) {
     for (const ext of config.extend) {
-      Object.assign(defaults, ext.getVariants());
+      const meta = getComponentMeta(ext);
+      if (meta) {
+        Object.assign(defaults, meta.staticDefaults);
+      }
     }
   }
 
@@ -347,15 +353,17 @@ function computeExtendedStyles(
   if (!config.extend) return { baseClasses, variantClasses, style };
 
   for (const ext of config.extend) {
-    // Filter out variant keys that are being overridden by computedVariants
-    // Set to SKIP_VARIANT sentinel (not delete) to prevent the parent from
-    // applying its implicit boolean default
-    const filteredVariants = { ...resolvedVariants };
-    for (const key of overrideVariantKeys) {
-      filteredVariants[key] = SKIP_VARIANT;
+    // Pass actual variant values but mark which keys should skip styling.
+    // Using a Symbol property keeps variant values clean for computed functions
+    // while still allowing us to skip styling for overridden keys.
+    const propsForExt: Record<string | symbol, unknown> = {
+      ...resolvedVariants,
+    };
+    if (overrideVariantKeys.size > 0) {
+      propsForExt[SKIP_STYLE_KEYS] = overrideVariantKeys;
     }
 
-    const extResult = ext(filteredVariants);
+    const extResult = ext(propsForExt);
     assign(style, normalizeStyle(extResult.style));
 
     // Get base class from internal metadata (no variants)
@@ -382,7 +390,8 @@ function computeExtendedStyles(
  */
 function computeVariantStyles(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-  resolvedVariants: Record<string, unknown>,
+  resolvedVariants: Record<string | symbol, unknown>,
+  skipStyleKeys: Set<string> = new Set(),
 ): { classes: ClassValue[]; style: StyleValue } {
   const classes: ClassValue[] = [];
   const style: StyleValue = {};
@@ -390,6 +399,9 @@ function computeVariantStyles(
   // Process current component's variants
   if (config.variants) {
     for (const [variantName, variantDef] of Object.entries(config.variants)) {
+      // Skip styling for variants that are overridden by child's computedVariants
+      if (skipStyleKeys.has(variantName)) continue;
+
       const selectedValue = resolvedVariants[variantName];
       if (selectedValue === undefined) continue;
 
@@ -404,11 +416,11 @@ function computeVariantStyles(
     for (const [variantName, computeFn] of Object.entries(
       config.computedVariants,
     )) {
+      // Skip styling for variants that are overridden by child's computedVariants
+      if (skipStyleKeys.has(variantName)) continue;
+
       const selectedValue = resolvedVariants[variantName];
       if (selectedValue === undefined) continue;
-      // Skip SKIP_VARIANT sentinel (used when a child's computedVariants
-      // overrides a parent's variant)
-      if (selectedValue === SKIP_VARIANT) continue;
 
       const computedResult = computeFn(selectedValue);
       const result = extractClassAndStyle(computedResult);
@@ -441,20 +453,8 @@ function runComputedFunction(
     return { classes, style, updatedVariants };
   }
 
-  // For the computed function, replace SKIP_VARIANT with default values.
-  // SKIP_VARIANT is used to prevent parent's variant styling when a child has
-  // computedVariants that override the parent's variant, but the computed
-  // function should still see valid values (the component's defaults).
-  const variantsForComputed = { ...resolvedVariants };
-  const defaults = collectStaticDefaults(config);
-  for (const [key, value] of Object.entries(variantsForComputed)) {
-    if (value === SKIP_VARIANT) {
-      variantsForComputed[key] = defaults[key];
-    }
-  }
-
   const context = {
-    variants: variantsForComputed,
+    variants: resolvedVariants,
     setVariants: (newVariants: VariantValues<Record<string, unknown>>) => {
       Object.assign(updatedVariants, newVariants);
     },
@@ -717,6 +717,12 @@ export function create<M extends Mode = "jsx">({
       const allClasses: ClassValue[] = [];
       const allStyle: StyleValue = {};
 
+      // Extract skip style keys from props (set by child's computedVariants)
+      const skipStyleKeys =
+        ((props as Record<symbol, unknown>)[SKIP_STYLE_KEYS] as
+          | Set<string>
+          | undefined) ?? new Set<string>();
+
       // Extract variant props from input
       const variantProps: Record<string, unknown> = {};
       for (const key of variantKeys) {
@@ -739,10 +745,14 @@ export function create<M extends Mode = "jsx">({
       );
       resolvedVariants = computedResult.updatedVariants;
 
-      // Collect computedVariants keys that will override extended variants
-      const computedVariantKeys = new Set<string>(
-        config.computedVariants ? Object.keys(config.computedVariants) : [],
-      );
+      // Collect computedVariants keys that will override extended variants.
+      // Combine with incoming skip keys to propagate through the extend chain.
+      const computedVariantKeys = new Set<string>(skipStyleKeys);
+      if (config.computedVariants) {
+        for (const key of Object.keys(config.computedVariants)) {
+          computedVariantKeys.add(key);
+        }
+      }
 
       // Process extended components (separates base and variant classes)
       const extendedResult = computeExtendedStyles(
@@ -766,10 +776,11 @@ export function create<M extends Mode = "jsx">({
       // 4. Extended variant classes
       allClasses.push(...extendedResult.variantClasses);
 
-      // 5. Current component's variants
+      // 5. Current component's variants (skip keys that are overridden)
       const variantsResult = computeVariantStyles(
         config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
         resolvedVariants,
+        skipStyleKeys,
       );
       allClasses.push(...variantsResult.classes);
       assign(allStyle, variantsResult.style);
@@ -860,9 +871,16 @@ export function create<M extends Mode = "jsx">({
         config.class as ClsxClassValue,
       );
 
+      // Compute static defaults once at creation time (without triggering
+      // computed functions)
+      const staticDefaults = collectStaticDefaults(
+        config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+      );
+
       // Store internal metadata hidden from public types
       setComponentMeta(component, {
         baseClass,
+        staticDefaults,
         resolveDefaults: createResolveDefaults(
           config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
         ),
