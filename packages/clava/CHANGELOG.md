@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.11
+
+### Patch Changes
+
+- dfd5a3a: Variants that accept `false` as a value now work when the value is undefined.
+
 ## 0.1.10
 
 ### Patch Changes
