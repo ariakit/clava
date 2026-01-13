@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.12
+
+### Patch Changes
+
+- e4da426: Fixed `computed` method receiving variant values with internal symbol.
+
 ## 0.1.11
 
 ### Patch Changes
