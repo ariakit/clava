@@ -762,7 +762,24 @@ export function create<M extends Mode = "jsx">({
         };
 
         // Track which keys are set via setDefaultVariants
-        const computedDefaults: Record<string, unknown> = {};
+        let computedDefaults: Record<string, unknown> = {};
+
+        // Propagate to extended components so their computed functions can run
+        // This allows grandparent computed functions to see grandchild defaults
+        if (config.extend) {
+          for (const ext of config.extend) {
+            if (ext._resolveDefaults) {
+              const extComputedDefaults = ext._resolveDefaults(
+                childDefaults,
+                userProps,
+              );
+              computedDefaults = {
+                ...computedDefaults,
+                ...extComputedDefaults,
+              };
+            }
+          }
+        }
 
         if (config.computed) {
           const context: ComputedContext<MergedVariants> = {
