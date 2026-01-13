@@ -441,8 +441,20 @@ function runComputedFunction(
     return { classes, style, updatedVariants };
   }
 
+  // For the computed function, replace SKIP_VARIANT with default values.
+  // SKIP_VARIANT is used to prevent parent's variant styling when a child has
+  // computedVariants that override the parent's variant, but the computed
+  // function should still see valid values (the component's defaults).
+  const variantsForComputed = { ...resolvedVariants };
+  const defaults = collectStaticDefaults(config);
+  for (const [key, value] of Object.entries(variantsForComputed)) {
+    if (value === SKIP_VARIANT) {
+      variantsForComputed[key] = defaults[key];
+    }
+  }
+
   const context = {
-    variants: resolvedVariants,
+    variants: variantsForComputed,
     setVariants: (newVariants: VariantValues<Record<string, unknown>>) => {
       Object.assign(updatedVariants, newVariants);
     },
