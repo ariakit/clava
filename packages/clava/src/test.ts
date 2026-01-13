@@ -1363,6 +1363,61 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg computed-lg") });
     });
 
+    test("computed from parent receives default boolean value from overridden variant in child", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          border: { default: "default", false: "" },
+        },
+        defaultVariants: { size: "lg" },
+        computed: ({ variants, setVariants }) => {
+          expect(variants.border).toBe(false);
+          if (!variants.border) {
+            setVariants({ size: "sm" });
+          }
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computedVariants: {
+            border: (_: boolean) => {},
+          },
+          defaultVariants: { border: false },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
+    test("computed from parent receives props boolean value from overridden variant in child", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          border: { default: "default", false: "" },
+        },
+        defaultVariants: { size: "lg" },
+        computed: ({ variants, setVariants }) => {
+          expect(variants.border).toBe(false);
+          if (!variants.border) {
+            setVariants({ size: "sm" });
+          }
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          computedVariants: {
+            border: (_: boolean) => {},
+          },
+        }),
+      );
+      const props = component({ border: false });
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
     test("computed with style", () => {
       const component = getModalComponent(
         mode,
