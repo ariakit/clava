@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.10
+
+### Patch Changes
+
+- 28f8155: Fixed default variants passed to `computed` method when extending multiple levels of components.
+
 ## 0.1.9
 
 ### Patch Changes
