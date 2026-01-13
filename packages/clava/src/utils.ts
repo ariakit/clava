@@ -81,8 +81,8 @@ export function htmlStyleToStyleValue(styleString: string) {
     if (!property) continue;
     if (!value) continue;
 
-    const camelProperty = hyphenToCamel(property) as any;
-    result[camelProperty] = value;
+    // CSS property names and values are dynamic - cast required for index access
+    (result as Record<string, string>)[hyphenToCamel(property)] = value;
   }
 
   return result;
@@ -98,8 +98,9 @@ export function htmlObjStyleToStyleValue(style: HTMLCSSProperties) {
   const result: StyleValue = {};
   for (const [key, value] of Object.entries(style)) {
     if (value == null) continue;
-    const property = hyphenToCamel(key) as any;
-    result[property] = parseLengthValue(value);
+    // CSS property names and values are dynamic - cast required for index access
+    (result as Record<string, string>)[hyphenToCamel(key)] =
+      parseLengthValue(value);
   }
   return result;
 }
@@ -114,7 +115,8 @@ export function jsxStyleToStyleValue(style: JSXCSSProperties) {
   const result: StyleValue = {};
   for (const [key, value] of Object.entries(style)) {
     if (value == null) continue;
-    result[key as any] = parseLengthValue(value);
+    // CSS property names and values are dynamic - cast required for index access
+    (result as Record<string, string>)[key] = parseLengthValue(value);
   }
   return result;
 }
