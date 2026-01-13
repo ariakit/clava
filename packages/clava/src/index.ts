@@ -43,6 +43,11 @@ interface ComponentMeta {
 
 const META_KEY = "__meta";
 
+// Sentinel value used to signal "skip this variant" when a child's
+// computedVariants overrides a parent's variant. Using a Symbol ensures it
+// can't conflict with any user-provided value (including null).
+const SKIP_VARIANT = Symbol("skipVariant");
+
 // Dynamic property access on function requires cast through unknown
 function getComponentMeta(component: AnyComponent): ComponentMeta | undefined {
   return (component as unknown as Record<string, unknown>)[META_KEY] as
@@ -204,13 +209,13 @@ function collectStaticDefaults(
   }
 
   // Handle implicit boolean defaults from variants
-  // If a variant only has a `false` key and no `true` key, default to false
+  // If a variant has a `false` key, default to false when no value is provided
   if (config.variants) {
     for (const [variantName, variantDef] of Object.entries(config.variants)) {
       if (!isStyleClassValue(variantDef)) continue;
       const keys = Object.keys(variantDef);
-      const hasFalseOnly = keys.includes("false") && !keys.includes("true");
-      if (hasFalseOnly && defaults[variantName] === undefined) {
+      const hasFalse = keys.includes("false");
+      if (hasFalse && !defaults[variantName]) {
         defaults[variantName] = false;
       }
     }
@@ -343,9 +348,11 @@ function computeExtendedStyles(
 
   for (const ext of config.extend) {
     // Filter out variant keys that are being overridden by computedVariants
+    // Set to SKIP_VARIANT sentinel (not delete) to prevent the parent from
+    // applying its implicit boolean default
     const filteredVariants = { ...resolvedVariants };
     for (const key of overrideVariantKeys) {
-      delete filteredVariants[key];
+      filteredVariants[key] = SKIP_VARIANT;
     }
 
     const extResult = ext(filteredVariants);
@@ -399,6 +406,9 @@ function computeVariantStyles(
     )) {
       const selectedValue = resolvedVariants[variantName];
       if (selectedValue === undefined) continue;
+      // Skip SKIP_VARIANT sentinel (used when a child's computedVariants
+      // overrides a parent's variant)
+      if (selectedValue === SKIP_VARIANT) continue;
 
       const computedResult = computeFn(selectedValue);
       const result = extractClassAndStyle(computedResult);

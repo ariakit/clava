@@ -587,6 +587,15 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
     });
 
+    test("boolean variant no value applies false", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ variants: { disabled: { true: "disabled", false: "enabled" } } }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("enabled") });
+    });
+
     test("boolean variant false only", () => {
       const component = getModalComponent(
         mode,
@@ -988,6 +997,30 @@ for (const config of Object.values(CONFIGS)) {
         "--gap": "16px",
         "--padding-x": "16px",
         "--padding-y": "8px",
+      });
+    });
+
+    test("computedVariants with nullable type", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          computedVariants: {
+            color: (value: string | null) => ({
+              class: value ? `color-${value}` : "color-default",
+              "--color": value ?? "inherit",
+            }),
+          },
+        }),
+      );
+      const propsWithValue = component({ color: "red" });
+      expect(getStyleClass(propsWithValue)).toEqual({
+        class: cls("color-red"),
+        "--color": "red",
+      });
+      const propsWithNull = component({ color: null });
+      expect(getStyleClass(propsWithNull)).toEqual({
+        class: cls("color-default"),
+        "--color": "inherit",
       });
     });
 
