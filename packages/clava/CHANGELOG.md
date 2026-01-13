@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.13
+
+### Patch Changes
+
+- 5955334: Fixed `computed` method receiving updated variants when extending multiple levels of components.
+
 ## 0.1.12
 
 ### Patch Changes
