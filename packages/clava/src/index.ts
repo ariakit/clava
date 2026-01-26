@@ -252,14 +252,12 @@ function collectDefaultVariants(
   // Parent's setDefaultVariants should override child's static defaults
   if (!config.extend) return defaults;
 
-  const childStaticDefaults = config.defaultVariants || {};
+  // Pass full static defaults (not just this config's defaultVariants)
+  // so that intermediate components' defaults are visible to ancestors
   for (const ext of config.extend) {
     const meta = getComponentMeta(ext);
     if (!meta) continue;
-    Object.assign(
-      defaults,
-      meta.resolveDefaults(childStaticDefaults, propsVariants),
-    );
+    Object.assign(defaults, meta.resolveDefaults(defaults, propsVariants));
   }
 
   return defaults;
