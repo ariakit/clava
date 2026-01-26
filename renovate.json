@@ -9,6 +9,7 @@
     },
     {
       "matchPackageNames": [
+        "pnpm",
         "/^@types//",
         "/^oxlint/",
         "/^oxfmt/",
