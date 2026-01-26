@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.14
+
+### Patch Changes
+
+- fee9f84: Fixed `computed` method not receiving default variants set by an intermediate component.
+
 ## 0.1.13
 
 ### Patch Changes
