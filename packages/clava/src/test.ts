@@ -1262,6 +1262,21 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
+    test("computed receives default variants from intermediate component", () => {
+      const parent = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        computed: ({ variants, setDefaultVariants }) => {
+          if (!variants.size) {
+            setDefaultVariants({ size: "lg" });
+          }
+        },
+      });
+      const child = cv({ extend: [parent], defaultVariants: { size: "sm" } });
+      const component = getModalComponent(mode, cv({ extend: [child] }));
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
     test("child computed setDefaultVariants overrides parent computed setDefaultVariants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
