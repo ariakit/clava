@@ -30,7 +30,7 @@
     "lint-staged": "16.2.7",
     "oxfmt": "0.27.0",
     "oxlint": "1.42.0",
-    "oxlint-tsgolint": "0.11.2",
+    "oxlint-tsgolint": "0.11.3",
     "rolldown": "1.0.0-rc.2",
     "rolldown-plugin-dts": "0.21.7",
     "solid-js": "1.9.11",
