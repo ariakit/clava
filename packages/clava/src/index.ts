@@ -466,6 +466,12 @@ function runComputedFunction(
         }
       }
     },
+    addClass: (className: ClassValue) => {
+      classes.push(className);
+    },
+    addStyle: (newStyle: StyleValue) => {
+      assign(style, newStyle);
+    },
   };
 
   const computedResult = config.computed(context);
@@ -673,6 +679,12 @@ function createResolveDefaults(
               computedDefaults[key] = value;
             }
           }
+        },
+        addClass: () => {
+          // Not relevant for collecting defaults
+        },
+        addStyle: () => {
+          // Not relevant for collecting defaults
         },
       });
     }

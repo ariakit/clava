@@ -232,6 +232,8 @@ export interface ComputedContext<V> {
   variants: VariantValues<V>;
   setVariants: (variants: VariantValues<V>) => void;
   setDefaultVariants: (variants: VariantValues<V>) => void;
+  addClass: (className: ClassValue) => void;
+  addStyle: (style: StyleValue) => void;
 }
 
 export type Computed<V> = (context: ComputedContext<V>) => VariantValue;
