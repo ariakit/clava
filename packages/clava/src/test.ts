@@ -1608,6 +1608,226 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
+    test("computed addClass with string", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addClass }) => {
+            if (variants.size === "lg") {
+              addClass("added-lg");
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({ class: cls("lg added-lg") });
+    });
+
+    test("computed addClass with array", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addClass }) => {
+            if (variants.size === "lg") {
+              addClass(["added-lg", "extra-class"]);
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg added-lg extra-class"),
+      });
+    });
+
+    test("computed addStyle", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addStyle }) => {
+            if (variants.size === "lg") {
+              addStyle({ fontSize: "20px" });
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg"),
+        fontSize: "20px",
+      });
+    });
+
+    test("computed addClass combined with return value", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addClass }) => {
+            if (variants.size === "lg") {
+              addClass("added-class");
+            }
+            return "returned-class";
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg added-class returned-class"),
+      });
+    });
+
+    test("computed addStyle combined with return value", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addStyle }) => {
+            if (variants.size === "lg") {
+              addStyle({ fontSize: "20px" });
+            }
+            return { backgroundColor: "red" };
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg"),
+        fontSize: "20px",
+        backgroundColor: "red",
+      });
+    });
+
+    test("computed addClass and addStyle together", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addClass, addStyle }) => {
+            if (variants.size === "lg") {
+              addClass("added-lg");
+              addStyle({ fontSize: "20px" });
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg added-lg"),
+        fontSize: "20px",
+      });
+    });
+
+    test("computed addClass and addStyle with return value", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addClass, addStyle }) => {
+            if (variants.size === "lg") {
+              addClass("added-lg");
+              addStyle({ fontSize: "20px" });
+            }
+            return { class: "returned-class", backgroundColor: "red" };
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg added-lg returned-class"),
+        fontSize: "20px",
+        backgroundColor: "red",
+      });
+    });
+
+    test("computed addClass multiple calls", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addClass }) => {
+            if (variants.size === "lg") {
+              addClass("first");
+              addClass("second");
+              addClass("third");
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg first second third"),
+      });
+    });
+
+    test("computed addStyle multiple calls merges styles", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addStyle }) => {
+            if (variants.size === "lg") {
+              addStyle({ fontSize: "20px" });
+              addStyle({ backgroundColor: "red" });
+              addStyle({ color: "blue" });
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg"),
+        fontSize: "20px",
+        backgroundColor: "red",
+        color: "blue",
+      });
+    });
+
+    test("computed addStyle later call overrides earlier", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addStyle }) => {
+            if (variants.size === "lg") {
+              addStyle({ fontSize: "16px" });
+              addStyle({ fontSize: "20px" });
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg"),
+        fontSize: "20px",
+      });
+    });
+
+    test("computed addStyle does not accept numbers", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          computed: ({ variants, addStyle }) => {
+            if (variants.size === "lg") {
+              addStyle({
+                // @ts-expect-error
+                fontSize: 20,
+              });
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg"),
+        fontSize: expect.toBeOneOf(["20", "20px"]),
+      });
+    });
+
     test("extend single component", () => {
       const base = cv({ class: "base", variants: { size: { sm: "sm" } } });
       const component = getModalComponent(
