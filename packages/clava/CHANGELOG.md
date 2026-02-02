@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.15
+
+### Patch Changes
+
+- c15884d: Added `addClass` and `addStyle` methods to the `computed` parameters.
+
 ## 0.1.14
 
 ### Patch Changes
