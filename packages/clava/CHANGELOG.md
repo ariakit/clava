@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.16
+
+### Patch Changes
+
+- 6c7704c: The `component.getVariants(props)` method now returns variants set by the `computed` function.
+
 ## 0.1.15
 
 ### Patch Changes
