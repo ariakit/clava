@@ -675,9 +675,8 @@ function createResolveDefaults(
           // Only apply defaults for variants not explicitly set by user
           // (child's static defaults should not block setDefaultVariants)
           for (const [key, value] of Object.entries(newDefaults)) {
-            if (userProps[key] === undefined) {
-              computedDefaults[key] = value;
-            }
+            if (userProps[key] !== undefined) continue;
+            computedDefaults[key] = value;
           }
         },
         addClass: () => {
@@ -711,9 +710,7 @@ export function create<M extends Mode = "jsx">({
   ): CVComponent<V, CV, E, StyleProps[M]> => {
     type MergedVariants = MergeVariants<V, CV, E>;
 
-    const variantKeys = collectVariantKeys(
-      config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-    );
+    const variantKeys = collectVariantKeys(config);
 
     const getPropsKeys = (mode: Mode) => [
       getClassPropertyName(mode),
@@ -737,19 +734,14 @@ export function create<M extends Mode = "jsx">({
       const variantProps: Record<string, unknown> = {};
       for (const key of variantKeys) {
         if (key in props) {
-          variantProps[key] = (props as Record<string, unknown>)[key];
+          variantProps[key] = props[key];
         }
       }
-
       // Resolve variants with defaults
-      let resolvedVariants = resolveVariants(
-        config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-        variantProps,
-      );
-
+      let resolvedVariants = resolveVariants(config, variantProps);
       // Process computed first to potentially update variants
       const computedResult = runComputedFunction(
-        config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+        config,
         resolvedVariants,
         variantProps,
       );
@@ -766,7 +758,7 @@ export function create<M extends Mode = "jsx">({
 
       // Process extended components (separates base and variant classes)
       const extendedResult = computeExtendedStyles(
-        config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+        config,
         resolvedVariants,
         computedVariantKeys,
       );
@@ -788,7 +780,7 @@ export function create<M extends Mode = "jsx">({
 
       // 5. Current component's variants (skip keys that are overridden)
       const variantsResult = computeVariantStyles(
-        config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+        config,
         resolvedVariants,
         skipStyleKeys,
       );
@@ -827,31 +819,25 @@ export function create<M extends Mode = "jsx">({
         const { className, style } = computeResult(props);
 
         if (mode === "jsx") {
-          return { className, style: styleValueToJSXStyle(style) } as R;
+          return { className, style: styleValueToJSXStyle(style) };
         }
         if (mode === "html") {
-          return {
-            class: className,
-            style: styleValueToHTMLStyle(style),
-          } as R;
+          return { class: className, style: styleValueToHTMLStyle(style) };
         }
         // htmlObj
-        return {
-          class: className,
-          style: styleValueToHTMLObjStyle(style),
-        } as R;
+        return { class: className, style: styleValueToHTMLObjStyle(style) };
       }) as ModalComponent<MergedVariants, R>;
 
       component.class = (props: ComponentProps<MergedVariants> = {}) => {
         return computeResult(props).className;
       };
 
-      component.style = ((props: ComponentProps<MergedVariants> = {}) => {
+      component.style = (props: ComponentProps<MergedVariants> = {}) => {
         const { style } = computeResult(props);
         if (mode === "jsx") return styleValueToJSXStyle(style);
         if (mode === "html") return styleValueToHTMLStyle(style);
         return styleValueToHTMLObjStyle(style);
-      }) as ModalComponent<MergedVariants, R>["style"];
+      };
 
       component.getVariants = (variants?: VariantValues<MergedVariants>) => {
         const variantProps = variants ?? {};
@@ -866,11 +852,9 @@ export function create<M extends Mode = "jsx">({
         return updatedVariants as VariantValues<MergedVariants>;
       };
 
-      component.keys = propsKeys as (keyof MergedVariants | keyof R)[];
-
-      component.variantKeys = variantKeys as (keyof MergedVariants)[];
-
-      component.propKeys = propsKeys as (keyof MergedVariants | keyof R)[];
+      component.keys = propsKeys;
+      component.variantKeys = variantKeys;
+      component.propKeys = propsKeys;
 
       // Compute base class (without variants) - includes extended base classes
       const extendedBaseClasses: ClassValue[] = [];
@@ -887,17 +871,13 @@ export function create<M extends Mode = "jsx">({
 
       // Compute static defaults once at creation time (without triggering
       // computed functions)
-      const staticDefaults = collectStaticDefaults(
-        config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-      );
+      const staticDefaults = collectStaticDefaults(config);
 
       // Store internal metadata hidden from public types
       setComponentMeta(component, {
         baseClass,
         staticDefaults,
-        resolveDefaults: createResolveDefaults(
-          config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-        ),
+        resolveDefaults: createResolveDefaults(config),
       });
 
       return component;
