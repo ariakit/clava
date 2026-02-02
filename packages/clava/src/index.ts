@@ -853,13 +853,17 @@ export function create<M extends Mode = "jsx">({
         return styleValueToHTMLObjStyle(style);
       }) as ModalComponent<MergedVariants, R>["style"];
 
-      component.getVariants = (
-        variants?: VariantValues<MergedVariants>,
-      ): VariantValues<MergedVariants> => {
-        return resolveVariants(
-          config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-          variants as VariantValues<Record<string, unknown>>,
-        ) as VariantValues<MergedVariants>;
+      component.getVariants = (variants?: VariantValues<MergedVariants>) => {
+        const variantProps = variants ?? {};
+        const resolvedVariants = resolveVariants(config, variantProps);
+        // Run computed function to get variants set via setVariants and
+        // setDefaultVariants
+        const { updatedVariants } = runComputedFunction(
+          config,
+          resolvedVariants,
+          variantProps,
+        );
+        return updatedVariants as VariantValues<MergedVariants>;
       };
 
       component.keys = propsKeys as (keyof MergedVariants | keyof R)[];

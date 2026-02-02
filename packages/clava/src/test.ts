@@ -1941,6 +1941,78 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "sm" });
     });
 
+    test("getVariants returns variants set by computed setVariants", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ variants, setVariants }) => {
+            if (variants.size === "lg") {
+              setVariants({ color: "red" });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants({ size: "lg" });
+      expect(variants).toEqual({ size: "lg", color: "red" });
+    });
+
+    test("getVariants returns variants set by computed setDefaultVariants", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ variants, setDefaultVariants }) => {
+            if (variants.size === "lg") {
+              setDefaultVariants({ color: "blue" });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants({ size: "lg" });
+      expect(variants).toEqual({ size: "lg", color: "blue" });
+    });
+
+    test("getVariants setDefaultVariants does not override props", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ setDefaultVariants }) => {
+            setDefaultVariants({ color: "blue" });
+          },
+        }),
+      );
+      const variants = component.getVariants({ color: "red" });
+      expect(variants).toEqual({ color: "red" });
+    });
+
+    test("getVariants setVariants overrides props", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ setVariants }) => {
+            setVariants({ color: "blue" });
+          },
+        }),
+      );
+      const variants = component.getVariants({ color: "red" });
+      expect(variants).toEqual({ color: "blue" });
+    });
+
     test("keys returns props keys", () => {
       const component = getModalComponent(
         mode,
