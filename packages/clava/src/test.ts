@@ -1,4 +1,10 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
+import {
+  type VariantProps,
+  create,
+  cv as cvBase,
+  splitProps,
+} from "./index.ts";
 import type {
   AnyComponent,
   CVComponent,
@@ -10,12 +16,6 @@ import type {
   StyleProperty,
   Variants,
 } from "./types.ts";
-import {
-  type VariantProps,
-  create,
-  cv as cvBase,
-  splitProps,
-} from "./index.ts";
 import {
   htmlObjStyleToStyleValue,
   htmlStyleToStyleValue,
