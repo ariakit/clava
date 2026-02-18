@@ -66,7 +66,8 @@ function setComponentMeta(component: AnyComponent, meta: ComponentMeta): void {
  * overhead in hot paths where we're building up a result object.
  */
 function assign<T extends object>(target: T, source: T): void {
-  for (const key of Object.keys(source)) {
+  for (const key in source) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
     (target as Record<string, unknown>)[key] = (
       source as Record<string, unknown>
     )[key];
@@ -464,6 +465,9 @@ function computeExtendedStyles(
   const style: StyleValue = {};
 
   if (!config.extend) return { baseClasses, variantClasses, style };
+  const hasOverrideVariantKeys = overrideVariantKeys.size > 0;
+  const hasOverrideVariantValues =
+    Object.keys(overrideVariantValues).length > 0;
 
   for (const ext of config.extend) {
     // Pass actual variant values but mark which keys should skip styling.
@@ -472,10 +476,10 @@ function computeExtendedStyles(
     const propsForExt: Record<string | symbol, unknown> = {
       ...resolvedVariants,
     };
-    if (overrideVariantKeys.size > 0) {
+    if (hasOverrideVariantKeys) {
       propsForExt[SKIP_STYLE_KEYS] = overrideVariantKeys;
     }
-    if (Object.keys(overrideVariantValues).length > 0) {
+    if (hasOverrideVariantValues) {
       propsForExt[SKIP_STYLE_VARIANT_VALUES] = overrideVariantValues;
     }
 
