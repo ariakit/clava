@@ -14,6 +14,24 @@ description: Workflow instructions for this repository. Always use when planning
 
 - Always write tests for the behavior you add or change.
 - Also write tests for invalid usage using `// @ts-expect-error` and runtime test assertions.
+- When adding `// @ts-expect-error`, isolate the offending code as much as possible. For example, if the error is only on `"sm"`, put it on its own line with the comment directly above it.
+
+    Instead of:
+    ```ts
+    // @ts-expect-error
+    const props = component({ size: "sm" });
+    ```
+
+    Do:
+    ```ts
+    const props = component({
+      size:
+        // @ts-expect-error
+        "sm",
+    });
+    ```
+
+    `oxfmt` will handle the rest of the formatting. Just make sure the error is as isolated as possible.
 
 ## Skills
 
