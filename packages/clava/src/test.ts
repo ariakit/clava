@@ -175,6 +175,20 @@ function getStyleClass(props: ComponentResult): Record<string, unknown> {
   };
 }
 
+function protectedStateVariant(value: "on" | "off") {
+  return {
+    access: "protected" as const,
+    class: value === "on" ? "on" : "off",
+  };
+}
+
+function privateStateVariant(value: "on" | "off") {
+  return {
+    access: "private" as const,
+    class: value === "on" ? "on" : "off",
+  };
+}
+
 for (const config of [CONFIGS.default, CONFIGS.jsx, CONFIGS.uppercase]) {
   const mode = getConfigMode(config);
   const cv = createCVFromConfig(config);
@@ -2083,18 +2097,29 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("private variant from extended component cannot be set by child", () => {
-      const base = cv<{ size: { access: "private"; sm: "sm"; lg: "lg" } }>({
-        variants: { size: { access: "private", sm: "sm", lg: "lg" } },
+      const base = cv({
+        variants: {
+          size: { access: "private" as const, sm: "sm", lg: "lg" },
+        } as const,
         defaultVariants: { size: "sm" },
       });
       const component = getModalComponent(
         mode,
-        cv<{}, {}, [typeof base]>({
+        cv({
           extend: [base],
-          defaultVariants: { size: "lg" },
+          defaultVariants: {
+            // @ts-expect-error private variant cannot be set by extending component
+            size: "lg" satisfies never,
+          },
           computed: ({ setVariants, setDefaultVariants }) => {
-            setVariants({ size: "lg" });
-            setDefaultVariants({ size: "lg" });
+            setVariants({
+              // @ts-expect-error private variant cannot be set by extending component
+              size: "lg" satisfies never,
+            });
+            setDefaultVariants({
+              // @ts-expect-error private variant cannot be set by extending component
+              size: "lg" satisfies never,
+            });
           },
         }),
       );
@@ -2119,7 +2144,9 @@ for (const config of Object.values(CONFIGS)) {
             if (variants.mode === "dark") {
               addClass("mode-dark");
             }
+            // @ts-expect-error inherited private variants cannot be read
             privateSizeIsUndefined = variants.size === undefined;
+            // @ts-expect-error inherited private variants cannot be read
             if (variants.size === "sm") {
               addClass("private-size");
             }
@@ -2177,23 +2204,26 @@ for (const config of Object.values(CONFIGS)) {
 
     test("extended component cannot make access less strict", () => {
       const base = cv({
-        variants: { size: { access: "protected", sm: "sm", lg: "lg" } },
+        variants: {
+          size: { access: "protected" as const, sm: "sm", lg: "lg" },
+        } as const,
         defaultVariants: { size: "sm" },
       });
       getModalComponent(
         mode,
-        cv<{}, {}, [typeof base]>({
+        cv({
           extend: [base],
           variants: {
             size: {
-              access: "public",
+              // @ts-expect-error access can only be tightened when extending
+              access: "public" satisfies never,
             },
           },
         }),
       );
       const component = getModalComponent(
         mode,
-        cv<{}, {}, [typeof base]>({
+        cv({
           extend: [base],
         }),
       );
@@ -2204,11 +2234,14 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
-    test("computedVariants support protected access control", () => {
+    test("computedVariants override inherited variant access", () => {
+      const base = cv({
+        variants: { state: { access: "protected", on: "on", off: "off" } },
+      });
       const component = getModalComponent(
         mode,
         cv({
-          variants: { state: { access: "protected" } },
+          extend: [base],
           computedVariants: {
             state: (value: "on" | "off") => (value === "on" ? "on" : "off"),
           },
@@ -2216,7 +2249,25 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       const externalAttempt = component({
-        state: "off",
+        // @ts-expect-error protected computed variant cannot be set externally
+        state: "off" satisfies never,
+      });
+      expect(getStyleClass(externalAttempt)).toEqual({ class: cls("off") });
+    });
+
+    test("computedVariants support protected access control", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          computedVariants: {
+            state: protectedStateVariant,
+          },
+          defaultVariants: { state: "on" },
+        }),
+      );
+      const externalAttempt = component({
+        // @ts-expect-error protected computed variant cannot be set externally
+        state: "off" satisfies never,
       });
       expect(getStyleClass(externalAttempt)).toEqual({ class: cls("on") });
       const internal = getModalComponent(
@@ -2233,29 +2284,26 @@ for (const config of Object.values(CONFIGS)) {
 
     test("extend can tighten computedVariants access to private", () => {
       const base = cv({
-        variants: { state: { access: "protected" } },
         computedVariants: {
-          state: (value: "on" | "off") => (value === "on" ? "on" : "off"),
+          state: protectedStateVariant,
         },
         defaultVariants: { state: "on" },
       });
       const component = getModalComponent(
         mode,
-        cv<{}, { state: (value: "on" | "off") => "on" | "off" }, [typeof base]>(
-          {
-            extend: [base],
-            variants: { state: { access: "private" } },
-            computedVariants: {
-              state: (value: "on" | "off") => (value === "on" ? "on" : "off"),
-            },
-            computed: ({ setVariants }) => {
-              setVariants({ state: "off" });
-            },
+        cv({
+          extend: [base],
+          computedVariants: {
+            state: privateStateVariant,
           },
-        ),
+          computed: ({ setVariants }) => {
+            setVariants({ state: "off" });
+          },
+        }),
       );
       expect(getStyleClass(component())).toEqual({ class: cls("off") });
       const externalAttempt = component({
+        // @ts-expect-error private computed variant cannot be set externally
         state: "off",
       });
       expect(getStyleClass(externalAttempt)).toEqual({ class: cls("off") });

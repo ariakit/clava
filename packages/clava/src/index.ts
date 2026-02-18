@@ -14,6 +14,7 @@ import type {
   JSXProps,
   MergeVariants,
   ModalComponent,
+  SettableVariants,
   SplitPropsFunction,
   StyleClassValue,
   StyleProps,
@@ -187,8 +188,8 @@ export interface CVConfig<
   style?: StyleValue;
   variants?: ExtendableVariants<V, E>;
   computedVariants?: CV;
-  defaultVariants?: VariantValues<MergeVariants<V, CV, E>, "internal">;
-  computed?: Computed<MergeVariants<V, CV, E>>;
+  defaultVariants?: VariantValues<SettableVariants<V, CV, E>, "internal">;
+  computed?: Computed<SettableVariants<V, CV, E>>;
 }
 
 interface CreateParams<M extends Mode> {
@@ -368,15 +369,32 @@ function filterRestrictedVariants(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   accessState: AccessState,
   variants: Record<string, unknown>,
-  owner: unknown,
+  callerOwner: unknown,
+  componentOwner: unknown,
   external: boolean,
 ): Record<string, unknown> {
   const filtered: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(variants)) {
     if (isVariantDisabled(config, key)) continue;
     if (isVariantValueDisabled(config, key, value)) continue;
-    if (!canSetVariant(accessState, key, owner, external)) continue;
-    if (!canSetVariantValue(accessState, key, value, owner, external)) continue;
+    if (!canSetVariant(accessState, key, callerOwner, external)) continue;
+    if (!canSetVariantValue(accessState, key, value, callerOwner, external)) {
+      continue;
+    }
+    const computedVariant = config.computedVariants?.[key];
+    if (computedVariant) {
+      const computedValue = computedVariant(value);
+      if (isRecordObject(computedValue) && isAccess(computedValue.access)) {
+        if (computedValue.access === "protected" && external) continue;
+        if (computedValue.access === "private" && external) continue;
+        if (
+          computedValue.access === "private" &&
+          callerOwner !== componentOwner
+        ) {
+          continue;
+        }
+      }
+    }
     filtered[key] = value;
   }
   return filtered;
@@ -432,6 +450,13 @@ function collectAccessState(
         variantValueAccess,
         meta.variantValueAccess,
       );
+    }
+  }
+
+  if (config.computedVariants) {
+    for (const key of Object.keys(config.computedVariants)) {
+      delete variantAccess[key];
+      delete variantValueAccess[key];
     }
   }
 
@@ -586,6 +611,7 @@ function collectStaticDefaults(
         accessState,
         config.defaultVariants as Record<string, unknown>,
         owner,
+        owner,
         false,
       ),
     );
@@ -663,6 +689,7 @@ function resolveVariants(
       accessState,
       filterUndefined(props),
       propsOwner,
+      selfOwner,
       external,
     ),
   };
@@ -866,6 +893,7 @@ function runComputedFunction(
           config,
           accessState,
           newVariants as Record<string, unknown>,
+          owner,
           owner,
           false,
         ),
@@ -1143,7 +1171,7 @@ export function create<M extends Mode = "jsx">({
   const cx = (...classes: ClsxClassValue[]) => transformClass(clsx(...classes));
 
   const cv = <
-    V extends Variants = {},
+    const V extends Variants = {},
     CV extends ComputedVariants = {},
     const E extends AnyComponent[] = [],
   >(

@@ -173,6 +173,11 @@ export interface CVComponent<
   E extends AnyComponent[] = [],
   R extends ComponentResult = ComponentResult,
 > extends ModalComponent<MergeVariants<V, CV, E>, R> {
+  readonly __types?: {
+    variants: V;
+    computedVariants: CV;
+    extend: E;
+  };
   jsx: ModalComponent<MergeVariants<V, CV, E>, JSXProps>;
   html: ModalComponent<MergeVariants<V, CV, E>, HTMLProps>;
   htmlObj: ModalComponent<MergeVariants<V, CV, E>, HTMLObjProps>;
@@ -193,13 +198,20 @@ type MergeExtendedComputedVariants<T> = T extends readonly [
   ? ExtractComputedVariants<First> & MergeExtendedComputedVariants<Rest>
   : {};
 
-type ExtractVariants<T> =
-  T extends CVComponent<infer V, any, infer E, any>
+type ExtractVariants<T> = T extends {
+  __types?: { variants: infer V; extend: infer E };
+}
+  ? V & MergeExtendedVariants<Extract<E, AnyComponent[]>>
+  : T extends CVComponent<infer V, any, infer E, any>
     ? V & MergeExtendedVariants<E>
     : {};
 
-type ExtractComputedVariants<T> =
-  T extends CVComponent<any, infer CV, infer E, any>
+type ExtractComputedVariants<T> = T extends {
+  __types?: { computedVariants: infer CV; extend: infer E };
+}
+  ? CV &
+      Omit<MergeExtendedComputedVariants<Extract<E, AnyComponent[]>>, keyof CV>
+  : T extends CVComponent<any, infer CV, infer E, any>
     ? CV & Omit<MergeExtendedComputedVariants<E>, keyof CV>
     : {};
 
@@ -241,15 +253,21 @@ type NonNullKeys<T> = {
   [K in keyof T]: T[K] extends null ? never : K;
 }[keyof T];
 
-type VariantLevelAccess<T> = T extends { access?: infer A }
-  ? A extends Access
-    ? A
-    : "public"
-  : "public";
+type VariantLevelAccess<T> = T extends (...args: any[]) => infer R
+  ? VariantLevelAccess<R>
+  : T extends { access?: infer A }
+    ? A extends Access
+      ? Access extends A
+        ? "public"
+        : A
+      : "public"
+    : "public";
 
 type VariantValueAccess<T> = T extends { access?: infer A }
   ? A extends Access
-    ? A
+    ? Access extends A
+      ? "public"
+      : A
     : "public"
   : "public";
 
@@ -276,7 +294,11 @@ type ExtractVariantValue<
 > = T extends null
   ? never
   : T extends (value: infer V) => any
-    ? V
+    ? Scope extends "external"
+      ? VariantLevelAccess<T> extends "protected" | "private"
+        ? never
+        : V
+      : V
     : T extends Record<string, any>
       ? StringToBoolean<Extract<ExtractVariantKeys<T, Scope>, string>>
       : T extends ClassValue
@@ -324,6 +346,25 @@ type ExtendedVariants<E extends AnyComponent[]> = MergeExtendedVariants<E> &
 
 type NullablePartial<T> =
   T extends Record<string, any> ? { [K in keyof T]?: T[K] | null } : T | null;
+
+type ExtendedSettableVariants<E extends AnyComponent[]> = {
+  [K in keyof ExtendedVariants<E> as VariantLevelAccess<
+    ExtendedVariants<E>[K]
+  > extends "private"
+    ? never
+    : K]: ExtendedVariants<E>[K];
+};
+
+type MergeSettableVariants<V, E extends AnyComponent[]> = MergeVariantMaps<
+  NoInfer<V>,
+  ExtendedSettableVariants<E>
+>;
+
+export type SettableVariants<
+  V extends Variants,
+  CV extends ComputedVariants,
+  E extends AnyComponent[],
+> = NoInfer<CV> & Omit<MergeSettableVariants<V, E>, keyof CV>;
 
 export type ExtendableVariants<
   V extends Variants,
