@@ -1903,6 +1903,158 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("base-lg") });
     });
 
+    test("extend can disable whole variant with null", () => {
+      const base = cv({
+        variants: { size: { sm: "base-sm", lg: "base-lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: null },
+          defaultVariants: {
+            // @ts-expect-error disabled variant cannot be set
+            size: "lg",
+          },
+        }),
+      );
+      const props = component({
+        // @ts-expect-error disabled variant cannot be set
+        size: "lg",
+      });
+      expect(getStyleClass(props)).toEqual({ class: "" });
+    });
+
+    test("extend can disable variant value with null", () => {
+      const base = cv({
+        variants: { size: { sm: "base-sm", lg: "base-lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: null } },
+          defaultVariants: {
+            // @ts-expect-error disabled variant value cannot be set
+            size: "sm",
+          },
+        }),
+      );
+      const disabledProps = component({
+        // @ts-expect-error disabled variant value cannot be set
+        size: "sm",
+      });
+      expect(getStyleClass(disabledProps)).toEqual({ class: "" });
+      const enabledProps = component({ size: "lg" });
+      expect(getStyleClass(enabledProps)).toEqual({ class: cls("base-lg") });
+    });
+
+    test("extend disabled variant value accepts valid defaultVariants", () => {
+      const base = cv({
+        variants: {
+          size: {
+            sm: { class: "base-sm", style: { fontSize: "12px" } },
+            lg: { class: "base-lg", style: { fontSize: "16px" } },
+          },
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: null } },
+          defaultVariants: { size: "lg" },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("base-lg"),
+        fontSize: "16px",
+      });
+    });
+
+    test("extend disabled variant value with computed setDefaultVariants", () => {
+      const base = cv({
+        variants: {
+          size: {
+            sm: { class: "base-sm", style: { fontSize: "12px" } },
+            lg: { class: "base-lg", style: { fontSize: "16px" } },
+          },
+        },
+      });
+      const validComponent = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: null } },
+          computed: ({ setDefaultVariants }) => {
+            setDefaultVariants({ size: "lg" });
+          },
+        }),
+      );
+      expect(getStyleClass(validComponent())).toEqual({
+        class: cls("base-lg"),
+        fontSize: "16px",
+      });
+
+      const invalidComponent = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: null } },
+          computed: ({ setDefaultVariants }) => {
+            setDefaultVariants({
+              // @ts-expect-error disabled variant value cannot be set
+              size: "sm",
+            });
+          },
+        }),
+      );
+      expect(getStyleClass(invalidComponent())).toEqual({ class: "" });
+    });
+
+    test("extend disabled variant value with computed setVariants", () => {
+      const base = cv({
+        variants: {
+          size: {
+            sm: { class: "base-sm", style: { fontSize: "12px" } },
+            lg: { class: "base-lg", style: { fontSize: "16px" } },
+          },
+        },
+      });
+      const validComponent = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: null } },
+          computed: ({ setVariants }) => {
+            setVariants({ size: "lg" });
+          },
+        }),
+      );
+      expect(getStyleClass(validComponent())).toEqual({
+        class: cls("base-lg"),
+        fontSize: "16px",
+      });
+
+      const invalidComponent = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: null } },
+          computed: ({ setVariants }) => {
+            setVariants({
+              // @ts-expect-error disabled variant value cannot be set
+              size: "sm",
+            });
+          },
+        }),
+      );
+      expect(getStyleClass(invalidComponent())).toEqual({ class: "" });
+    });
+
     test("extend inherits defaultVariants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },

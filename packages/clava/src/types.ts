@@ -201,22 +201,51 @@ type ExtractComputedVariants<T> =
     ? CV & Omit<MergeExtendedComputedVariants<E>, keyof CV>
     : {};
 
+type MergeVariantDefinition<Child, Parent> =
+  Child extends Record<string, any>
+    ? Parent extends Record<string, any>
+      ? Omit<Parent, keyof Child> & Child
+      : Child
+    : Child;
+
+type MergeVariantMaps<Child, Parent> = {
+  [K in keyof Child | keyof Parent]: K extends keyof Child
+    ? K extends keyof Parent
+      ? MergeVariantDefinition<Child[K], Parent[K]>
+      : Child[K]
+    : K extends keyof Parent
+      ? Parent[K]
+      : never;
+};
+
+type MergeExtendedAllVariants<E extends AnyComponent[]> =
+  MergeExtendedVariants<E> & MergeExtendedComputedVariants<E>;
+
+type MergeBaseVariants<V, E extends AnyComponent[]> = MergeVariantMaps<
+  NoInfer<V>,
+  MergeExtendedAllVariants<E>
+>;
+
 export type MergeVariants<V, CV, E extends AnyComponent[]> = NoInfer<CV> &
-  Omit<NoInfer<V>, keyof CV> &
-  Omit<MergeExtendedVariants<E>, keyof CV> &
-  Omit<MergeExtendedComputedVariants<E>, keyof CV>;
+  Omit<MergeBaseVariants<V, E>, keyof CV>;
 
 type StringToBoolean<T> = T extends "true" | "false" ? boolean : T;
 
 type VariantValue = ClassValue | StyleClassValue;
 
-type ExtractVariantValue<T> = T extends (value: infer V) => any
-  ? V
-  : T extends ClassValue
-    ? boolean
-    : T extends Record<infer K, any>
-      ? StringToBoolean<K>
-      : never;
+type NonNullKeys<T> = {
+  [K in keyof T]: T[K] extends null ? never : K;
+}[keyof T];
+
+type ExtractVariantValue<T> = T extends null
+  ? never
+  : T extends (value: infer V) => any
+    ? V
+    : T extends Record<string, any>
+      ? StringToBoolean<NonNullKeys<T>>
+      : T extends ClassValue
+        ? boolean
+        : never;
 
 export type VariantValues<V> = {
   [K in keyof V]?: ExtractVariantValue<V[K]>;
@@ -249,9 +278,14 @@ export type Variants = Record<string, Variant>;
 type ExtendedVariants<E extends AnyComponent[]> = MergeExtendedVariants<E> &
   MergeExtendedComputedVariants<E>;
 
+type NullablePartial<T> =
+  T extends Record<string, any> ? { [K in keyof T]?: T[K] | null } : T | null;
+
 export type ExtendableVariants<
   V extends Variants,
   E extends AnyComponent[],
 > = V & {
-  [K in keyof ExtendedVariants<E>]?: Partial<ExtendedVariants<E>[K]> | Variant;
+  [K in keyof ExtendedVariants<E>]?:
+    | NullablePartial<ExtendedVariants<E>[K]>
+    | Variant;
 };
