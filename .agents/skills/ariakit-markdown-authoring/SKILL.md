@@ -1,9 +1,8 @@
 ---
 name: ariakit-markdown-authoring
-description: Instructions for authoring markdown files.
+description: Instructions for authoring markdown files, including SKILL.md files.
 ---
 
 # Ariakit Markdown Authoring
 
-- Do not automatically wrap text in markdown files.
-- Do not insert single line breaks for formatting.
+- Do not automatically wrap text in Markdown files. Keep each paragraph on a single line.
