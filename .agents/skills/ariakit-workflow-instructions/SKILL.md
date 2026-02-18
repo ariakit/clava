@@ -48,6 +48,9 @@ description: Workflow instructions for this repository. Always use when planning
 - While the package is in `v0`, mark minor and patch-level changes as `patch`, and mark major changes as `minor`. This only affects the change type in the frontmatter. The description should still accurately explain what changed (do not disguise features as bug fixes). For breaking changes, be sure to call them out and include before-and-after examples.
 - Write changeset summaries in the past tense (for example, "Added", "Removed", "Fixed"), and end each sentence with a period.
 - Add a multiline markdown description when needed (for example, for new features), and prefer TypeScript code examples.
+- Keep each changeset file as a single changelog entry. Use the first line as the
+  past-tense summary sentence, then follow with natural-language details and
+  examples (instead of writing one changelog entry per paragraph).
 
 ## CI
 

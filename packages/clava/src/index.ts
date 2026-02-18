@@ -382,6 +382,40 @@ function filterRestrictedVariants(
   return filtered;
 }
 
+function filterReadableVariants(
+  accessState: AccessState,
+  variants: Record<string, unknown>,
+  owner: unknown,
+): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(variants)) {
+    const variantAccessEntry = accessState.variantAccess[key];
+    if (
+      variantAccessEntry?.level === "private" &&
+      variantAccessEntry.privateOwner !== owner
+    ) {
+      continue;
+    }
+
+    const valueKey = getVariantValueKey(value);
+    if (!valueKey) {
+      filtered[key] = value;
+      continue;
+    }
+
+    const variantValueAccessEntry =
+      accessState.variantValueAccess[key]?.[valueKey];
+    if (
+      variantValueAccessEntry?.level === "private" &&
+      variantValueAccessEntry.privateOwner !== owner
+    ) {
+      continue;
+    }
+    filtered[key] = value;
+  }
+  return filtered;
+}
+
 function collectAccessState(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   owner: unknown,
@@ -815,8 +849,14 @@ function runComputedFunction(
     return { classes, style, updatedVariants };
   }
 
+  const readableVariants = filterReadableVariants(
+    accessState,
+    resolvedVariants,
+    owner,
+  );
+
   const context = {
-    variants: resolvedVariants,
+    variants: readableVariants,
     setVariants: (
       newVariants: VariantValues<Record<string, unknown>, "internal">,
     ) => {
@@ -1053,8 +1093,13 @@ function createResolveDefaults(
     }
 
     if (config.computed) {
+      const readableVariants = filterReadableVariants(
+        accessState,
+        resolvedVariants,
+        owner,
+      );
       config.computed({
-        variants: resolvedVariants as VariantValues<
+        variants: readableVariants as VariantValues<
           Record<string, unknown>,
           "internal"
         >,

@@ -2,14 +2,24 @@
 "clava": patch
 ---
 
-Added access control for variants and variant values with `public`, `protected`,
-and `private` levels.
+Added access control for variants and variant values with `public`,
+`protected`, and `private` levels.
 
-Added support for `access` in variant definitions and style-class variant value
-objects.
+This change supported `access` on variant definitions and on
+`{ class, style }` variant values, and treated `access` as a special key on
+object variants.
 
-Enforced access restrictions for external variant props and APIs, while keeping
-private/protected variants applied when set internally.
+It enforced access restrictions for external variant props while still applying
+protected/private variants when they are set internally through
+`defaultVariants`, `setVariants`, and `setDefaultVariants`.
 
-Added tests for protected/private behavior, extending access rules, and invalid
-usage.
+```ts
+const base = cv({
+  variants: {
+    size: { access: "protected", sm: "text-sm", lg: "text-lg" },
+  },
+});
+
+const button = cv({ extend: [base] });
+button({ size: "lg" }); // type error + ignored at runtime
+```
