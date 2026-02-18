@@ -517,7 +517,7 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("old inline variant style shape does not work", () => {
+    test("rejects inline style object without style wrapper", () => {
       const component = getModalComponent(
         mode,
         cv({
