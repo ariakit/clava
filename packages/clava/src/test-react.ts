@@ -16,11 +16,11 @@ test("splitProps", () => {
   expect(variantProps.className).toBe("custom");
   expect(variantProps).toEqual({ size: "md", className: "custom" });
   expect(
-    // @ts-expect-error
+    // @ts-expect-error rest props should not have className
     rest.className,
   ).toBeUndefined();
   expect(
-    // @ts-expect-error
+    // @ts-expect-error rest props should not have style
     rest.style,
   ).toBeUndefined();
   expect(rest).toEqual({ id: "my-div" });
