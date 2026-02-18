@@ -19,5 +19,4 @@ button({ size: "lg" }); // ✅
 button({ size: "sm" }); // ❌ TypeScript error
 ```
 
-Disabled variants and values are excluded from `defaultVariants`, resolved
-variant props, and applied classes/styles.
+Disabled variants and values are excluded from `defaultVariants`, resolved variant props, and applied classes/styles.
