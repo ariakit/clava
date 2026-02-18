@@ -85,6 +85,16 @@ export type {
 export type VariantProps<T extends Pick<AnyComponent, "getVariants">> =
   ReturnType<T["getVariants"]>;
 
+type VariantKey<T> = T extends boolean ? "true" | "false" : Extract<T, string>;
+
+export type Variant<
+  T extends Pick<AnyComponent, "getVariants">,
+  K extends keyof VariantProps<T>,
+> = Record<
+  VariantKey<NonNullable<VariantProps<T>[K]>>,
+  ClassValue | StyleClassValue
+>;
+
 export interface CVConfig<
   V extends Variants = {},
   CV extends ComputedVariants = {},
