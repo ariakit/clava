@@ -1,5 +1,34 @@
 # clava
 
+## 0.1.17
+
+### Patch Changes
+
+- c2f1fa9: Added support for disabling inherited variants and variant values with `null`.
+
+  ```ts
+  const base = cv({
+    variants: { size: { sm: "sm", lg: "lg" } },
+    defaultVariants: { size: "sm" },
+  });
+
+  const button = cv({
+    extend: [base],
+    variants: { size: { sm: null } },
+  });
+
+  button({ size: "lg" }); // ✅
+  button({ size: "sm" }); // ❌ TypeScript error
+  ```
+
+  Disabled variants and values are excluded from `defaultVariants`, resolved variant props, and applied classes/styles.
+
+- a8cc18c: Added `Variant<T, K>` utility type for cross-component variant key constraints.
+- 4e54d51: Required an explicit `style` key for object-based variant/computed outputs.
+- 7e32a54: Reduced runtime overhead in `cv` hot paths.
+
+  This avoids repeated key-array allocations when merging style objects and when propagating override metadata to extended components. Behavior remains the same while reducing per-call work in frequently executed code paths, especially for components with many style merges or multiple `extend` entries.
+
 ## 0.1.16
 
 ### Patch Changes
