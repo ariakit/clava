@@ -227,7 +227,7 @@ export type StyleValue = CSS.Properties & {
 };
 
 export interface StyleClassValue {
-  style: StyleValue;
+  style?: StyleValue;
   class?: ClassValue;
 }
 

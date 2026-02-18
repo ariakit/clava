@@ -517,6 +517,24 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
+    test("old inline variant style shape does not work", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            color: {
+              // @ts-expect-error old shape requires `style` wrapper
+              red: { backgroundColor: "red" },
+            },
+          },
+        }),
+      );
+      const props = component({ color: "red" });
+      expect(getStyleClass(props)).toEqual({
+        class: "",
+      });
+    });
+
     test("variant with class and style value", () => {
       const component = getModalComponent(
         mode,

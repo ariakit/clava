@@ -116,7 +116,7 @@ function isRecordObject(value: unknown): value is Record<string, unknown> {
  */
 function isStyleClassValue(value: unknown): value is StyleClassValue {
   if (!isRecordObject(value)) return false;
-  return "style" in value;
+  return "style" in value || "class" in value;
 }
 
 /**
