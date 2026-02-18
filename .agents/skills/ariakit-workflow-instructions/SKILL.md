@@ -23,3 +23,7 @@ description: Workflow instructions for this repository. Always use when planning
 - While the package is in `v0`, use `patch` for minor and patch-level changes, and use `minor` for major changes.
 - Write changeset summaries in the past tense (for example, "Added", "Removed", "Fixed"), and end each sentence with a period.
 - Add a multiline markdown description when needed (for example, for new features), and prefer TypeScript code examples.
+
+## CI
+
+- When you have access to CI, always check its output to see if there are any errors that need to be fixed.
