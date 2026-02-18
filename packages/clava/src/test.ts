@@ -688,9 +688,9 @@ for (const config of Object.values(CONFIGS)) {
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const props = component({
-        // @ts-expect-error
+        // @ts-expect-error invalid value
         size:
-          // invalid value
+          // no error
           "invalid",
       });
       expect(getStyleClass(props)).toEqual({ class: "" });
@@ -790,9 +790,9 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: {
-            // @ts-expect-error
+            // @ts-expect-error invalid value
             size:
-              // invalid value
+              // no error
               "invalid",
           },
         }),
@@ -1625,9 +1625,9 @@ for (const config of Object.values(CONFIGS)) {
           variants: { size: { sm: "sm", lg: "lg" } },
           computed: ({ setVariants }) => {
             setVariants({
-              // @ts-expect-error
+              // @ts-expect-error invalid value
               size:
-                // invalid value
+                // no error
                 "invalid",
             });
           },
@@ -1922,7 +1922,7 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: {
             // @ts-expect-error disabled variant cannot be set
             size:
-              // disabled variant value
+              // no error
               "lg",
           },
         }),
@@ -1930,7 +1930,7 @@ for (const config of Object.values(CONFIGS)) {
       const props = component({
         // @ts-expect-error disabled variant cannot be set
         size:
-          // disabled variant value
+          // no error
           "lg",
       });
       expect(getStyleClass(props)).toEqual({ class: "" });
@@ -1949,7 +1949,7 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: {
             // @ts-expect-error disabled variant value cannot be set
             size:
-              // disabled variant value
+              // no error
               "sm",
           },
         }),
@@ -1957,7 +1957,7 @@ for (const config of Object.values(CONFIGS)) {
       const disabledProps = component({
         // @ts-expect-error disabled variant value cannot be set
         size:
-          // disabled variant value
+          // no error
           "sm",
       });
       expect(getStyleClass(disabledProps)).toEqual({ class: "" });
@@ -2022,7 +2022,7 @@ for (const config of Object.values(CONFIGS)) {
             setDefaultVariants({
               // @ts-expect-error disabled variant value cannot be set
               size:
-                // disabled variant value
+                // no error
                 "sm",
             });
           },
@@ -2064,7 +2064,7 @@ for (const config of Object.values(CONFIGS)) {
             setVariants({
               // @ts-expect-error disabled variant value cannot be set
               size:
-                // disabled variant value
+                // no error
                 "sm",
             });
           },
