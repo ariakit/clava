@@ -1918,8 +1918,10 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      // @ts-expect-error disabled variant cannot be set
-      const props = component({ size: "lg" });
+      const props = component({
+        // @ts-expect-error disabled variant cannot be set
+        size: "lg",
+      });
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
@@ -1939,8 +1941,10 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      // @ts-expect-error disabled variant value cannot be set
-      const disabledProps = component({ size: "sm" });
+      const disabledProps = component({
+        // @ts-expect-error disabled variant value cannot be set
+        size: "sm",
+      });
       expect(getStyleClass(disabledProps)).toEqual({ class: "" });
       const enabledProps = component({ size: "lg" });
       expect(getStyleClass(enabledProps)).toEqual({ class: cls("base-lg") });
