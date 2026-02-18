@@ -15,6 +15,10 @@ description: Workflow instructions for this repository. Always use when planning
 - Always write tests for the behavior you add or change.
 - Also write tests for invalid usage using `// @ts-expect-error` and runtime test assertions.
 
+## Skills
+
+- Whenever you learn something new worth noting about workflow or code standards, make sure to update the agent’s skills.
+
 ## Changesets
 
 - Add changesets in the `.changeset` folder for user-facing updates such as bug fixes, performance improvements, and new features.
