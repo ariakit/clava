@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
 import {
+  type Variant,
   type VariantProps,
   create,
   cv as cvBase,
@@ -2665,3 +2666,38 @@ for (const config of Object.values(CONFIGS)) {
     });
   });
 }
+
+describe("Variant utility type", () => {
+  test("matches variant keys from another component", () => {
+    const base = cvBase({
+      variants: { foo: { sm: "foo-sm", lg: "foo-lg" } },
+    });
+    const component = cvBase({
+      extend: [base],
+      variants: {
+        bar: {
+          sm: "bar-sm",
+          lg: "bar-lg",
+        } satisfies Variant<typeof base, "foo">,
+      },
+    });
+    expect(component({ bar: "sm" }).className).toContain("bar-sm");
+  });
+
+  test("rejects invalid variant keys", () => {
+    const base = cvBase({
+      variants: { foo: { sm: "foo-sm", lg: "foo-lg" } },
+    });
+    cvBase({
+      extend: [base],
+      variants: {
+        bar: {
+          sm: "bar-sm",
+          lg: "bar-lg",
+          // @ts-expect-error
+          xl: "bar-xl",
+        } satisfies Variant<typeof base, "foo">,
+      },
+    });
+  });
+});
