@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+name: ariakit-style-rules
+description: Ariakit code style rules for this repository. Use when writing or modifying TypeScript/JavaScript code so generated changes follow project conventions for loops, conditionals, comments, functions, typing, reuse, and readability.
 ---
 
 # Ariakit Style Rules
