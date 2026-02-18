@@ -226,7 +226,10 @@ export type StyleValue = CSS.Properties & {
   [key: `--${string}`]: string;
 };
 
-export type StyleClassValue = StyleValue & { class?: ClassValue };
+export interface StyleClassValue {
+  style?: StyleValue;
+  class?: ClassValue;
+}
 
 export interface ComputedContext<V> {
   variants: VariantValues<V>;
