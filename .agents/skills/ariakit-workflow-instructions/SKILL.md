@@ -7,7 +7,7 @@ description: Workflow instructions for this repository. Always use when planning
 
 ## Commands
 
-- Use `pnpm` commands for installing dependencies, running scripts, and validating changes.
+- Run `pnpm install` to install dependencies.
 - Always run `pnpm lint`, `pnpm test`, and `pnpm build` before and after making changes to make sure everything still works.
 
 ## Tests
