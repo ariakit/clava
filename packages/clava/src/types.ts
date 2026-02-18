@@ -59,7 +59,9 @@ export type NullableComponentResult = {
 
 export type ComponentProps<V = {}> = VariantValues<V> & NullableComponentResult;
 
-export type GetVariants<V> = (variants?: VariantValues<V>) => VariantValues<V>;
+export type GetVariants<V> = (
+  variants?: VariantValues<V>,
+) => VariantValues<V, "internal">;
 
 // Key source types - what can be passed as additional parameters to splitProps
 export type KeySourceArray = readonly string[];
@@ -231,24 +233,61 @@ export type MergeVariants<V, CV, E extends AnyComponent[]> = NoInfer<CV> &
 
 type StringToBoolean<T> = T extends "true" | "false" ? boolean : T;
 
+export type Access = "public" | "protected" | "private";
+
 type VariantValue = ClassValue | StyleClassValue;
 
 type NonNullKeys<T> = {
   [K in keyof T]: T[K] extends null ? never : K;
 }[keyof T];
 
-type ExtractVariantValue<T> = T extends null
+type VariantLevelAccess<T> = T extends { access?: infer A }
+  ? A extends Access
+    ? A
+    : "public"
+  : "public";
+
+type VariantValueAccess<T> = T extends { access?: infer A }
+  ? A extends Access
+    ? A
+    : "public"
+  : "public";
+
+type IsExternallyAccessible<T> = T extends "public" ? true : false;
+
+type ExtractVariantKeys<
+  T extends Record<string, any>,
+  Scope extends "external" | "internal",
+> = Scope extends "external"
+  ? IsExternallyAccessible<VariantLevelAccess<T>> extends true
+    ? {
+        [K in NonNullKeys<T>]: K extends "access"
+          ? never
+          : IsExternallyAccessible<VariantValueAccess<T[K]>> extends true
+            ? K
+            : never;
+      }[NonNullKeys<T>]
+    : never
+  : Exclude<NonNullKeys<T>, "access">;
+
+type ExtractVariantValue<
+  T,
+  Scope extends "external" | "internal" = "external",
+> = T extends null
   ? never
   : T extends (value: infer V) => any
     ? V
     : T extends Record<string, any>
-      ? StringToBoolean<NonNullKeys<T>>
+      ? StringToBoolean<Extract<ExtractVariantKeys<T, Scope>, string>>
       : T extends ClassValue
         ? boolean
         : never;
 
-export type VariantValues<V> = {
-  [K in keyof V]?: ExtractVariantValue<V[K]>;
+export type VariantValues<
+  V,
+  Scope extends "external" | "internal" = "external",
+> = {
+  [K in keyof V]?: ExtractVariantValue<V[K], Scope>;
 };
 
 export type StyleValue = CSS.Properties & {
@@ -256,14 +295,15 @@ export type StyleValue = CSS.Properties & {
 };
 
 export interface StyleClassValue {
+  access?: Access;
   style?: StyleValue;
   class?: ClassValue;
 }
 
 export interface ComputedContext<V> {
-  variants: VariantValues<V>;
-  setVariants: (variants: VariantValues<V>) => void;
-  setDefaultVariants: (variants: VariantValues<V>) => void;
+  variants: VariantValues<V, "internal">;
+  setVariants: (variants: VariantValues<V, "internal">) => void;
+  setDefaultVariants: (variants: VariantValues<V, "internal">) => void;
   addClass: (className: ClassValue) => void;
   addStyle: (style: StyleValue) => void;
 }
@@ -272,7 +312,11 @@ export type Computed<V> = (context: ComputedContext<V>) => VariantValue;
 
 export type ComputedVariant = (value: any) => VariantValue;
 export type ComputedVariants = Record<string, ComputedVariant>;
-export type Variant = ClassValue | Record<string, VariantValue>;
+export interface VariantObject {
+  access?: Access;
+  [key: string]: VariantValue | null | undefined;
+}
+export type Variant = ClassValue | VariantObject;
 export type Variants = Record<string, Variant>;
 
 type ExtendedVariants<E extends AnyComponent[]> = MergeExtendedVariants<E> &

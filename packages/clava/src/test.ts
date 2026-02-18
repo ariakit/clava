@@ -530,7 +530,10 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ color: "red" });
+      const props = component({
+        // @ts-expect-error invalid variant definitions fallback to boolean variants
+        color: "red",
+      });
       expect(getStyleClass(props)).toEqual({
         class: "",
       });
@@ -675,7 +678,10 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "sm" });
+      const props = component({
+        // @ts-expect-error invalid variant definitions fallback to boolean variants
+        size: "sm",
+      });
       expect(getStyleClass(props)).toEqual({
         class: cls("sm"),
         fontSize: expect.toBeOneOf(["12", "12px"]),
@@ -2053,6 +2059,106 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       expect(getStyleClass(invalidComponent())).toEqual({ class: "" });
+    });
+
+    test("protected variant cannot be set externally", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: { size: { access: "protected", sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+      const props = component({
+        // @ts-expect-error protected variant cannot be set externally
+        size: "lg",
+      });
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+      expect(
+        component.getVariants({
+          // @ts-expect-error protected variant cannot be set externally
+          size: "lg",
+        }),
+      ).toEqual({ size: "sm" });
+    });
+
+    test("private variant from extended component cannot be set by child", () => {
+      const base = cv({
+        variants: { size: { access: "private", sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          defaultVariants: { size: "lg" },
+          computed: ({ setVariants, setDefaultVariants }) => {
+            setVariants({ size: "lg" });
+            setDefaultVariants({ size: "lg" });
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
+    test("protected variant from extended component can be set by child", () => {
+      const base = cv({
+        variants: { size: { access: "protected", sm: "sm", lg: "lg" } },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          defaultVariants: { size: "sm" },
+          computed: ({ setVariants }) => {
+            setVariants({ size: "lg" });
+          },
+        }),
+      );
+      expect(getStyleClass(component())).toEqual({ class: cls("lg") });
+    });
+
+    test("protected variant value cannot be set externally", () => {
+      const component = getModalComponent(
+        mode,
+        cv({
+          variants: {
+            size: {
+              sm: { access: "protected", class: "sm" },
+              lg: { class: "lg" },
+            },
+          },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+      const defaultProps = component();
+      expect(getStyleClass(defaultProps)).toEqual({ class: cls("sm") });
+      const blockedProps = component({
+        // @ts-expect-error protected variant value cannot be set externally
+        size: "sm",
+      });
+      expect(getStyleClass(blockedProps)).toEqual({ class: cls("sm") });
+      const publicProps = component({ size: "lg" });
+      expect(getStyleClass(publicProps)).toEqual({ class: cls("lg") });
+    });
+
+    test("extended component cannot make access less strict", () => {
+      const base = cv({
+        variants: { size: { access: "protected", sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { access: "public" } },
+        }),
+      );
+      const props = component({
+        size: "lg",
+      });
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
     test("extend inherits defaultVariants", () => {

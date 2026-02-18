@@ -1,5 +1,6 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
 import type {
+  Access,
   AnyComponent,
   CVComponent,
   ClassValue,
@@ -36,10 +37,22 @@ import {
 interface ComponentMeta {
   baseClass: string;
   staticDefaults: Record<string, unknown>;
+  variantAccess: Record<string, AccessEntry>;
+  variantValueAccess: Record<string, Record<string, AccessEntry>>;
   resolveDefaults: (
     childDefaults: Record<string, unknown>,
     userProps?: Record<string, unknown>,
   ) => Record<string, unknown>;
+}
+
+interface AccessEntry {
+  level: Access;
+  privateOwner?: unknown;
+}
+
+interface AccessState {
+  variantAccess: Record<string, AccessEntry>;
+  variantValueAccess: Record<string, Record<string, AccessEntry>>;
 }
 
 const META_KEY = "__meta";
@@ -49,6 +62,7 @@ const META_KEY = "__meta";
 // see actual variant values while still skipping styling for overridden keys.
 const SKIP_STYLE_KEYS = Symbol("skipStyleKeys");
 const SKIP_STYLE_VARIANT_VALUES = Symbol("skipStyleVariantValues");
+const INTERNAL_ACCESS_OWNER = Symbol("internalAccessOwner");
 
 // Dynamic property access on function requires cast through unknown
 function getComponentMeta(component: AnyComponent): ComponentMeta | undefined {
@@ -59,6 +73,72 @@ function getComponentMeta(component: AnyComponent): ComponentMeta | undefined {
 
 function setComponentMeta(component: AnyComponent, meta: ComponentMeta): void {
   (component as unknown as Record<string, unknown>)[META_KEY] = meta;
+}
+
+const ACCESS_LEVEL_ORDER: Record<Access, number> = {
+  public: 0,
+  protected: 1,
+  private: 2,
+};
+
+function isAccess(value: unknown): value is Access {
+  return value === "public" || value === "protected" || value === "private";
+}
+
+function getMoreRestrictiveAccess(current: Access, next: Access): Access {
+  return ACCESS_LEVEL_ORDER[current] >= ACCESS_LEVEL_ORDER[next]
+    ? current
+    : next;
+}
+
+function mergeAccessEntry(
+  base: AccessEntry | undefined,
+  next: AccessEntry,
+): AccessEntry {
+  if (!base) {
+    return next;
+  }
+  const level = getMoreRestrictiveAccess(base.level, next.level);
+  if (level === base.level) {
+    return base;
+  }
+  return next;
+}
+
+function mergeAccessMap(
+  base: Record<string, AccessEntry>,
+  override: Record<string, AccessEntry>,
+): Record<string, AccessEntry> {
+  const merged: Record<string, AccessEntry> = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    merged[key] = mergeAccessEntry(merged[key], value);
+  }
+  return merged;
+}
+
+function mergeAccessValueMap(
+  base: Record<string, Record<string, AccessEntry>>,
+  override: Record<string, Record<string, AccessEntry>>,
+): Record<string, Record<string, AccessEntry>> {
+  const merged: Record<string, Record<string, AccessEntry>> = {};
+
+  for (const [variantKey, valueMap] of Object.entries(base)) {
+    merged[variantKey] = { ...valueMap };
+  }
+
+  for (const [variantKey, valueMap] of Object.entries(override)) {
+    if (!merged[variantKey]) {
+      merged[variantKey] = {};
+    }
+    for (const [valueKey, accessEntry] of Object.entries(valueMap)) {
+      merged[variantKey][valueKey] = mergeAccessEntry(
+        merged[variantKey][valueKey],
+        accessEntry,
+      );
+    }
+  }
+
+  return merged;
 }
 
 /**
@@ -107,7 +187,7 @@ export interface CVConfig<
   style?: StyleValue;
   variants?: ExtendableVariants<V, E>;
   computedVariants?: CV;
-  defaultVariants?: VariantValues<MergeVariants<V, CV, E>>;
+  defaultVariants?: VariantValues<MergeVariants<V, CV, E>, "internal">;
   computed?: Computed<MergeVariants<V, CV, E>>;
 }
 
@@ -228,6 +308,37 @@ function getVariantValueKey(value: unknown): string | undefined {
   return undefined;
 }
 
+function canSetVariant(
+  accessState: AccessState,
+  key: string,
+  owner: unknown,
+  external: boolean,
+): boolean {
+  const accessEntry = accessState.variantAccess[key];
+  if (!accessEntry) return true;
+  if (accessEntry.level === "public") return true;
+  if (external) return false;
+  if (accessEntry.level === "protected") return true;
+  return accessEntry.privateOwner === owner;
+}
+
+function canSetVariantValue(
+  accessState: AccessState,
+  key: string,
+  value: unknown,
+  owner: unknown,
+  external: boolean,
+): boolean {
+  const valueKey = getVariantValueKey(value);
+  if (!valueKey) return true;
+  const accessEntry = accessState.variantValueAccess[key]?.[valueKey];
+  if (!accessEntry) return true;
+  if (accessEntry.level === "public") return true;
+  if (external) return false;
+  if (accessEntry.level === "protected") return true;
+  return accessEntry.privateOwner === owner;
+}
+
 function isVariantValueDisabled(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   key: string,
@@ -253,6 +364,97 @@ function filterDisabledVariants(
   return filtered;
 }
 
+function filterRestrictedVariants(
+  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  accessState: AccessState,
+  variants: Record<string, unknown>,
+  owner: unknown,
+  external: boolean,
+): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(variants)) {
+    if (isVariantDisabled(config, key)) continue;
+    if (isVariantValueDisabled(config, key, value)) continue;
+    if (!canSetVariant(accessState, key, owner, external)) continue;
+    if (!canSetVariantValue(accessState, key, value, owner, external)) continue;
+    filtered[key] = value;
+  }
+  return filtered;
+}
+
+function collectAccessState(
+  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  owner: unknown,
+): AccessState {
+  let variantAccess: Record<string, AccessEntry> = {};
+  let variantValueAccess: Record<string, Record<string, AccessEntry>> = {};
+
+  if (config.extend) {
+    for (const ext of config.extend) {
+      const meta = getComponentMeta(ext);
+      if (!meta) continue;
+      variantAccess = mergeAccessMap(variantAccess, meta.variantAccess);
+      variantValueAccess = mergeAccessValueMap(
+        variantValueAccess,
+        meta.variantValueAccess,
+      );
+    }
+  }
+
+  if (!config.variants) {
+    return { variantAccess, variantValueAccess };
+  }
+
+  for (const [variantName, variantDef] of Object.entries(config.variants)) {
+    if (!isRecordObject(variantDef)) continue;
+
+    const variantAccessValue = variantDef.access;
+    if (isAccess(variantAccessValue)) {
+      const previousAccess = variantAccess[variantName];
+      const previousLevel = previousAccess?.level ?? "public";
+      const level = getMoreRestrictiveAccess(previousLevel, variantAccessValue);
+      if (level === "private" && previousLevel !== "private") {
+        variantAccess[variantName] = { level, privateOwner: owner };
+      } else {
+        variantAccess[variantName] = {
+          level,
+          privateOwner: previousAccess?.privateOwner,
+        };
+      }
+    }
+
+    for (const [valueKey, variantValue] of Object.entries(variantDef)) {
+      if (valueKey === "access") continue;
+      if (!isRecordObject(variantValue)) continue;
+      if (!isAccess(variantValue.access)) continue;
+
+      if (!variantValueAccess[variantName]) {
+        variantValueAccess[variantName] = {};
+      }
+
+      const previousAccess = variantValueAccess[variantName][valueKey];
+      const previousLevel = previousAccess?.level ?? "public";
+      const level = getMoreRestrictiveAccess(
+        previousLevel,
+        variantValue.access,
+      );
+      if (level === "private" && previousLevel !== "private") {
+        variantValueAccess[variantName][valueKey] = {
+          level,
+          privateOwner: owner,
+        };
+      } else {
+        variantValueAccess[variantName][valueKey] = {
+          level,
+          privateOwner: previousAccess?.privateOwner,
+        };
+      }
+    }
+  }
+
+  return { variantAccess, variantValueAccess };
+}
+
 function collectDisabledVariantKeys(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
 ): Set<string> {
@@ -274,6 +476,7 @@ function collectDisabledVariantValues(
   for (const [key, variant] of Object.entries(config.variants)) {
     if (!isRecordObject(variant)) continue;
     for (const [variantValue, variantEntry] of Object.entries(variant)) {
+      if (variantValue === "access") continue;
       if (variantEntry !== null) continue;
       if (!values[key]) {
         values[key] = new Set<string>();
@@ -311,6 +514,8 @@ function mergeDisabledVariantValues(
  */
 function collectStaticDefaults(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  accessState: AccessState,
+  owner: unknown,
 ): Record<string, unknown> {
   const defaults: Record<string, unknown> = {};
 
@@ -340,7 +545,16 @@ function collectStaticDefaults(
 
   // Override with current config's static defaults
   if (config.defaultVariants) {
-    Object.assign(defaults, config.defaultVariants);
+    Object.assign(
+      defaults,
+      filterRestrictedVariants(
+        config,
+        accessState,
+        config.defaultVariants as Record<string, unknown>,
+        owner,
+        false,
+      ),
+    );
   }
 
   return filterDisabledVariants(config, defaults);
@@ -354,10 +568,12 @@ function collectStaticDefaults(
  */
 function collectDefaultVariants(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  accessState: AccessState,
+  owner: unknown,
   propsVariants: Record<string, unknown> = {},
 ): Record<string, unknown> {
   // Start with static defaults (parent static < child static)
-  const defaults = collectStaticDefaults(config);
+  const defaults = collectStaticDefaults(config, accessState, owner);
 
   // Apply computed defaults from extended components
   // Parent's setDefaultVariants should override child's static defaults
@@ -394,13 +610,28 @@ function filterUndefined(
  */
 function resolveVariants(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  accessState: AccessState,
+  selfOwner: unknown,
+  propsOwner: unknown,
+  external: boolean,
   props: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  const defaults = collectDefaultVariants(config, props);
-  return filterDisabledVariants(config, {
+  const defaults = collectDefaultVariants(
+    config,
+    accessState,
+    selfOwner,
+    props,
+  );
+  return {
     ...defaults,
-    ...filterUndefined(props),
-  });
+    ...filterRestrictedVariants(
+      config,
+      accessState,
+      filterUndefined(props),
+      propsOwner,
+      external,
+    ),
+  };
 }
 
 /**
@@ -452,6 +683,7 @@ function extractVariantClasses(fullClass: string, baseClass: string): string {
 function computeExtendedStyles(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   resolvedVariants: Record<string, unknown>,
+  owner: unknown,
   overrideVariantKeys: Set<string> = new Set(),
   overrideVariantValues: Record<string, Set<string>> = {},
 ): {
@@ -478,6 +710,7 @@ function computeExtendedStyles(
     if (Object.keys(overrideVariantValues).length > 0) {
       propsForExt[SKIP_STYLE_VARIANT_VALUES] = overrideVariantValues;
     }
+    propsForExt[INTERNAL_ACCESS_OWNER] = owner;
 
     const extResult = ext(
       propsForExt as ComponentProps<Record<string, unknown>>,
@@ -565,6 +798,8 @@ function computeVariantStyles(
  */
 function runComputedFunction(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  accessState: AccessState,
+  owner: unknown,
   resolvedVariants: Record<string, unknown>,
   propsVariants: Record<string, unknown>,
 ): {
@@ -582,18 +817,30 @@ function runComputedFunction(
 
   const context = {
     variants: resolvedVariants,
-    setVariants: (newVariants: VariantValues<Record<string, unknown>>) => {
+    setVariants: (
+      newVariants: VariantValues<Record<string, unknown>, "internal">,
+    ) => {
       Object.assign(
         updatedVariants,
-        filterDisabledVariants(config, newVariants),
+        filterRestrictedVariants(
+          config,
+          accessState,
+          newVariants as Record<string, unknown>,
+          owner,
+          false,
+        ),
       );
     },
     setDefaultVariants: (
-      newDefaults: VariantValues<Record<string, unknown>>,
+      newDefaults: VariantValues<Record<string, unknown>, "internal">,
     ) => {
       // Only apply defaults for variants not explicitly set in props
       for (const [key, value] of Object.entries(newDefaults)) {
         if (propsVariants[key] === undefined) {
+          if (!canSetVariant(accessState, key, owner, false)) continue;
+          if (!canSetVariantValue(accessState, key, value, owner, false)) {
+            continue;
+          }
           if (isVariantDisabled(config, key)) continue;
           if (isVariantValueDisabled(config, key, value)) continue;
           updatedVariants[key] = value;
@@ -774,10 +1021,12 @@ export const splitProps: SplitPropsFunction = ((
  */
 function createResolveDefaults(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  accessState: AccessState,
+  owner: unknown,
 ): ComponentMeta["resolveDefaults"] {
   return (childDefaults, userProps = {}) => {
     // Get static defaults (including from extended components)
-    const staticDefaults = collectStaticDefaults(config);
+    const staticDefaults = collectStaticDefaults(config, accessState, owner);
 
     // Merge: parent static < child static < user props
     // This is what parent's computed will see in `variants`
@@ -805,7 +1054,10 @@ function createResolveDefaults(
 
     if (config.computed) {
       config.computed({
-        variants: resolvedVariants as VariantValues<Record<string, unknown>>,
+        variants: resolvedVariants as VariantValues<
+          Record<string, unknown>,
+          "internal"
+        >,
         setVariants: () => {
           // Not relevant for collecting defaults
         },
@@ -814,6 +1066,10 @@ function createResolveDefaults(
           // (child's static defaults should not block setDefaultVariants)
           for (const [key, value] of Object.entries(newDefaults)) {
             if (userProps[key] !== undefined) continue;
+            if (!canSetVariant(accessState, key, owner, false)) continue;
+            if (!canSetVariantValue(accessState, key, value, owner, false)) {
+              continue;
+            }
             if (isVariantDisabled(config, key)) continue;
             if (isVariantValueDisabled(config, key, value)) continue;
             computedDefaults[key] = value;
@@ -849,6 +1105,11 @@ export function create<M extends Mode = "jsx">({
     config: CVConfig<V, CV, E> = {},
   ): CVComponent<V, CV, E, StyleProps[M]> => {
     type MergedVariants = MergeVariants<V, CV, E>;
+    const accessOwner = {};
+    const accessState = collectAccessState(
+      config as CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+      accessOwner,
+    );
 
     const variantKeys = collectVariantKeys(config);
     const disabledVariantKeys = collectDisabledVariantKeys(config);
@@ -875,6 +1136,13 @@ export function create<M extends Mode = "jsx">({
         ((props as Record<symbol, unknown>)[SKIP_STYLE_VARIANT_VALUES] as
           | Record<string, Set<string>>
           | undefined) ?? {};
+      const internalAccessOwner = (props as Record<symbol, unknown>)[
+        INTERNAL_ACCESS_OWNER
+      ];
+      const isExternalAccess = internalAccessOwner === undefined;
+      const variantAccessOwner = isExternalAccess
+        ? accessOwner
+        : internalAccessOwner;
 
       // Extract variant props from input
       const variantProps: Record<string, unknown> = {};
@@ -884,10 +1152,19 @@ export function create<M extends Mode = "jsx">({
         }
       }
       // Resolve variants with defaults
-      let resolvedVariants = resolveVariants(config, variantProps);
+      let resolvedVariants = resolveVariants(
+        config,
+        accessState,
+        accessOwner,
+        variantAccessOwner,
+        isExternalAccess,
+        variantProps,
+      );
       // Process computed first to potentially update variants
       const computedResult = runComputedFunction(
         config,
+        accessState,
+        accessOwner,
         resolvedVariants,
         variantProps,
       );
@@ -914,6 +1191,7 @@ export function create<M extends Mode = "jsx">({
       const extendedResult = computeExtendedStyles(
         config,
         resolvedVariants,
+        accessOwner,
         computedVariantKeys,
         computedVariantValues,
       );
@@ -997,13 +1275,22 @@ export function create<M extends Mode = "jsx">({
 
       component.getVariants = (variants?: VariantValues<MergedVariants>) => {
         const variantProps = variants ?? {};
-        const resolvedVariants = resolveVariants(config, variantProps);
+        const resolvedVariants = resolveVariants(
+          config,
+          accessState,
+          accessOwner,
+          accessOwner,
+          true,
+          variantProps as Record<string, unknown>,
+        );
         // Run computed function to get variants set via setVariants and
         // setDefaultVariants
         const { updatedVariants } = runComputedFunction(
           config,
+          accessState,
+          accessOwner,
           resolvedVariants,
-          variantProps,
+          variantProps as Record<string, unknown>,
         );
         return updatedVariants as VariantValues<MergedVariants>;
       };
@@ -1027,13 +1314,23 @@ export function create<M extends Mode = "jsx">({
 
       // Compute static defaults once at creation time (without triggering
       // computed functions)
-      const staticDefaults = collectStaticDefaults(config);
+      const staticDefaults = collectStaticDefaults(
+        config,
+        accessState,
+        accessOwner,
+      );
 
       // Store internal metadata hidden from public types
       setComponentMeta(component, {
         baseClass,
         staticDefaults,
-        resolveDefaults: createResolveDefaults(config),
+        variantAccess: accessState.variantAccess,
+        variantValueAccess: accessState.variantValueAccess,
+        resolveDefaults: createResolveDefaults(
+          config,
+          accessState,
+          accessOwner,
+        ),
       });
 
       return component;
