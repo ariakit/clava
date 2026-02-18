@@ -524,7 +524,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           variants: {
             color: {
-              // @ts-expect-error old shape requires `style` wrapper
+              // @ts-expect-error
               red: { backgroundColor: "red" },
             },
           },
@@ -1914,13 +1914,13 @@ for (const config of Object.values(CONFIGS)) {
           extend: [base],
           variants: { size: null },
           defaultVariants: {
-            // @ts-expect-error disabled variant cannot be set
+            // @ts-expect-error
             size: "lg",
           },
         }),
       );
       const props = component({
-        // @ts-expect-error disabled variant cannot be set
+        // @ts-expect-error
         size: "lg",
       });
       expect(getStyleClass(props)).toEqual({ class: "" });
@@ -1937,13 +1937,13 @@ for (const config of Object.values(CONFIGS)) {
           extend: [base],
           variants: { size: { sm: null } },
           defaultVariants: {
-            // @ts-expect-error disabled variant value cannot be set
+            // @ts-expect-error
             size: "sm",
           },
         }),
       );
       const disabledProps = component({
-        // @ts-expect-error disabled variant value cannot be set
+        // @ts-expect-error
         size: "sm",
       });
       expect(getStyleClass(disabledProps)).toEqual({ class: "" });
@@ -2006,7 +2006,7 @@ for (const config of Object.values(CONFIGS)) {
           variants: { size: { sm: null } },
           computed: ({ setDefaultVariants }) => {
             setDefaultVariants({
-              // @ts-expect-error disabled variant value cannot be set
+              // @ts-expect-error
               size: "sm",
             });
           },
@@ -2046,7 +2046,7 @@ for (const config of Object.values(CONFIGS)) {
           variants: { size: { sm: null } },
           computed: ({ setVariants }) => {
             setVariants({
-              // @ts-expect-error disabled variant value cannot be set
+              // @ts-expect-error
               size: "sm",
             });
           },

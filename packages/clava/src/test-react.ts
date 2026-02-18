@@ -1,7 +1,7 @@
 import type { CSSProperties, ComponentProps } from "react";
 import { expect, expectTypeOf, test } from "vitest";
-import type { JSXProps } from "./types.ts";
 import { type VariantProps, cv, splitProps } from "./index.ts";
+import type { JSXProps } from "./types.ts";
 
 test("splitProps", () => {
   const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
@@ -16,11 +16,11 @@ test("splitProps", () => {
   expect(variantProps.className).toBe("custom");
   expect(variantProps).toEqual({ size: "md", className: "custom" });
   expect(
-    // @ts-expect-error rest props should not have className
+    // @ts-expect-error
     rest.className,
   ).toBeUndefined();
   expect(
-    // @ts-expect-error rest props should not have style
+    // @ts-expect-error
     rest.style,
   ).toBeUndefined();
   expect(rest).toEqual({ id: "my-div" });
