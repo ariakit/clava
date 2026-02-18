@@ -104,15 +104,19 @@ interface CreateParams<M extends Mode> {
   transformClass?: (className: string) => string;
 }
 
-/**
- * Checks if a value is a style-class object (has style properties, not just a
- * class value).
- */
-function isStyleClassValue(value: unknown): value is StyleClassValue {
+function isRecordObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object") return false;
   if (value == null) return false;
   if (Array.isArray(value)) return false;
   return true;
+}
+
+/**
+ * Checks if a value is a style-class object (`{ style, class? }`).
+ */
+function isStyleClassValue(value: unknown): value is StyleClassValue {
+  if (!isRecordObject(value)) return false;
+  return "style" in value;
 }
 
 /**
@@ -139,8 +143,7 @@ function extractStyleClass(value: StyleClassValue): {
   class: ClassValue;
   style: StyleValue;
 } {
-  const { class: cls, ...style } = value;
-  return { class: cls, style };
+  return { class: value.class, style: normalizeStyle(value.style) };
 }
 
 /**
@@ -153,6 +156,9 @@ function extractClassAndStyle(value: unknown): {
 } {
   if (isStyleClassValue(value)) {
     return extractStyleClass(value);
+  }
+  if (isRecordObject(value)) {
+    return { class: null, style: {} };
   }
   return { class: value as ClassValue, style: {} };
 }
@@ -218,7 +224,7 @@ function collectStaticDefaults(
   // If a variant has a `false` key, default to false when no value is provided
   if (config.variants) {
     for (const [variantName, variantDef] of Object.entries(config.variants)) {
-      if (!isStyleClassValue(variantDef)) continue;
+      if (!isRecordObject(variantDef)) continue;
       const keys = Object.keys(variantDef);
       const hasFalse = keys.includes("false");
       if (hasFalse && !defaults[variantName]) {
@@ -298,7 +304,7 @@ function getVariantResult(
   selectedValue: unknown,
 ): { class: ClassValue; style: StyleValue } {
   // Shorthand variant: `disabled: "disabled-class"` means { true: "..." }
-  if (!isStyleClassValue(variantDef)) {
+  if (!isRecordObject(variantDef)) {
     if (selectedValue === true) {
       return extractClassAndStyle(variantDef);
     }
@@ -307,7 +313,7 @@ function getVariantResult(
 
   // Object variant: { sm: "...", lg: "..." }
   const key = String(selectedValue);
-  const value = (variantDef as Record<string, unknown>)[key];
+  const value = variantDef[key];
   if (value === undefined) return { class: null, style: {} };
 
   return extractClassAndStyle(value);

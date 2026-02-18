@@ -12,7 +12,6 @@ import type {
   ComputedVariants,
   HTMLCSSProperties,
   JSXCSSProperties,
-  StyleClassValue,
   StyleProperty,
   Variants,
 } from "./types.ts";
@@ -168,7 +167,7 @@ function getStyle(props: Pick<ComponentResult, "style">) {
   return {};
 }
 
-function getStyleClass(props: ComponentResult): StyleClassValue {
+function getStyleClass(props: ComponentResult): Record<string, unknown> {
   return {
     ...getStyle(props),
     class: getClass(props),
@@ -505,8 +504,8 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           variants: {
             color: {
-              red: { backgroundColor: "red" },
-              blue: { backgroundColor: "blue" },
+              red: { style: { backgroundColor: "red" } },
+              blue: { style: { backgroundColor: "blue" } },
             },
           },
         }),
@@ -524,8 +523,8 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           variants: {
             color: {
-              red: { class: "text-red", backgroundColor: "red" },
-              blue: { class: "text-blue", backgroundColor: "blue" },
+              red: { class: "text-red", style: { backgroundColor: "red" } },
+              blue: { class: "text-blue", style: { backgroundColor: "blue" } },
             },
           },
         }),
@@ -650,9 +649,9 @@ for (const config of Object.values(CONFIGS)) {
             size: {
               sm: {
                 class: "sm",
-                fontSize: 12,
+                style: { fontSize: 12 },
               },
-              lg: { class: "lg", fontSize: "16px" },
+              lg: { class: "lg", style: { fontSize: "16px" } },
             },
           },
         }),
@@ -823,7 +822,7 @@ for (const config of Object.values(CONFIGS)) {
           computedVariants: {
             size: (value: "sm" | "lg") => ({
               class: value === "sm" ? "small" : "large",
-              fontSize: value === "sm" ? "12px" : "16px",
+              style: { fontSize: value === "sm" ? "12px" : "16px" },
             }),
           },
         }),
@@ -839,8 +838,8 @@ for (const config of Object.values(CONFIGS)) {
       const base = cv({
         variants: {
           size: {
-            sm: { class: "base-sm", fontSize: "12px" },
-            lg: { class: "base-lg", fontSize: "16px" },
+            sm: { class: "base-sm", style: { fontSize: "12px" } },
+            lg: { class: "base-lg", style: { fontSize: "16px" } },
           },
         },
       });
@@ -851,7 +850,9 @@ for (const config of Object.values(CONFIGS)) {
           computedVariants: {
             size: (value: "sm" | "lg") => ({
               class: value === "sm" ? "extended-sm" : "extended-lg",
-              backgroundColor: value === "sm" ? "lightgray" : "gray",
+              style: {
+                backgroundColor: value === "sm" ? "lightgray" : "gray",
+              },
             }),
           },
         }),
@@ -868,7 +869,7 @@ for (const config of Object.values(CONFIGS)) {
         computedVariants: {
           size: (value: "sm" | "lg") => ({
             class: value === "sm" ? "base-sm" : "base-lg",
-            fontSize: value === "sm" ? "12px" : "16px",
+            style: { fontSize: value === "sm" ? "12px" : "16px" },
           }),
         },
       });
@@ -879,7 +880,9 @@ for (const config of Object.values(CONFIGS)) {
           computedVariants: {
             size: (value: "sm" | "lg") => ({
               class: value === "sm" ? "extended-sm" : "extended-lg",
-              backgroundColor: value === "sm" ? "lightgray" : "gray",
+              style: {
+                backgroundColor: value === "sm" ? "lightgray" : "gray",
+              },
             }),
           },
         }),
@@ -899,7 +902,7 @@ for (const config of Object.values(CONFIGS)) {
             // @ts-expect-error
             size: (value: "sm" | "lg") => ({
               class: value === "sm" ? "small" : "large",
-              fontSize: value === "sm" ? 12 : 16,
+              style: { fontSize: value === "sm" ? 12 : 16 },
             }),
           },
         }),
@@ -964,7 +967,7 @@ for (const config of Object.values(CONFIGS)) {
           computedVariants: {
             columns: (value: number) => ({
               class: `grid-cols-${value}`,
-              "--grid-columns": `${value}`,
+              style: { "--grid-columns": `${value}` },
             }),
           },
         }),
@@ -982,11 +985,13 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           computedVariants: {
             gap: (value: number) => ({
-              "--gap": `${value * 4}px`,
+              style: { "--gap": `${value * 4}px` },
             }),
             padding: (value: number) => ({
-              "--padding-x": `${value}px`,
-              "--padding-y": `${value * 0.5}px`,
+              style: {
+                "--padding-x": `${value}px`,
+                "--padding-y": `${value * 0.5}px`,
+              },
             }),
           },
         }),
@@ -1007,7 +1012,7 @@ for (const config of Object.values(CONFIGS)) {
           computedVariants: {
             color: (value: string | null) => ({
               class: value ? `color-${value}` : "color-default",
-              "--color": value ?? "inherit",
+              style: { "--color": value ?? "inherit" },
             }),
           },
         }),
@@ -1035,7 +1040,7 @@ for (const config of Object.values(CONFIGS)) {
           computedVariants: {
             size: (value: number) => ({
               class: "text-custom",
-              fontSize: `${value}px`,
+              style: { fontSize: `${value}px` },
             }),
           },
         }),
@@ -1523,7 +1528,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           computed: ({ variants }) =>
-            variants.size === "lg" ? { fontSize: "20px" } : null,
+            variants.size === "lg" ? { style: { fontSize: "20px" } } : null,
         }),
       );
       const props = component({ size: "lg" });
@@ -1540,7 +1545,7 @@ for (const config of Object.values(CONFIGS)) {
           variants: { size: { sm: "sm", lg: "lg" } },
           computed: ({ variants }) =>
             variants.size === "lg"
-              ? { class: "computed-lg", fontSize: "20px" }
+              ? { class: "computed-lg", style: { fontSize: "20px" } }
               : null,
         }),
       );
@@ -1561,7 +1566,7 @@ for (const config of Object.values(CONFIGS)) {
             variants.size === "lg"
               ? {
                   class: "computed-lg",
-                  fontSize: 20,
+                  style: { fontSize: 20 },
                 }
               : null,
         }),
@@ -1689,7 +1694,7 @@ for (const config of Object.values(CONFIGS)) {
             if (variants.size === "lg") {
               addStyle({ fontSize: "20px" });
             }
-            return { backgroundColor: "red" };
+            return { style: { backgroundColor: "red" } };
           },
         }),
       );
@@ -1731,7 +1736,10 @@ for (const config of Object.values(CONFIGS)) {
               addClass("added-lg");
               addStyle({ fontSize: "20px" });
             }
-            return { class: "returned-class", backgroundColor: "red" };
+            return {
+              class: "returned-class",
+              style: { backgroundColor: "red" },
+            };
           },
         }),
       );
