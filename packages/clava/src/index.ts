@@ -264,7 +264,9 @@ function collectDisabledVariantValues(
     if (!isRecordObject(variant)) continue;
     for (const [variantValue, variantEntry] of Object.entries(variant)) {
       if (variantEntry !== null) continue;
-      values[key] ??= new Set<string>();
+      if (!values[key]) {
+        values[key] = new Set<string>();
+      }
       values[key].add(variantValue);
     }
   }
@@ -280,7 +282,9 @@ function mergeDisabledVariantValues(
     merged[key] = new Set(values);
   }
   for (const [key, values] of Object.entries(override)) {
-    merged[key] ??= new Set<string>();
+    if (!merged[key]) {
+      merged[key] = new Set<string>();
+    }
     for (const value of values) {
       merged[key].add(value);
     }

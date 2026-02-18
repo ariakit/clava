@@ -218,8 +218,8 @@ type ExtractVariantValue<T> = [T] extends [null]
   ? never
   : T extends (value: infer V) => any
     ? V
-    : T extends Record<string, any>
-      ? StringToBoolean<NonNullKeys<T>>
+    : T extends Record<infer K extends string, any>
+      ? StringToBoolean<Extract<NonNullKeys<T>, K>>
       : T extends ClassValue
         ? boolean
         : never;
