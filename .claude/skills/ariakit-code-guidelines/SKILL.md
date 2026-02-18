@@ -41,7 +41,7 @@ These rules guide AI-assisted edits in this repository.
 - Place comments above the code they describe, not at the end of the line.
 - Use JSDoc for functions, parameters, and types when top-level functions, APIs or non-obvious behavior.
 - If logic feels complex, extract a well-named helper that explains the WHAT; add a short rationale comment if useful.
-- If the comment is not JSDoc, it should start with `//`. If it's multi-line comment, each line should start with `//`.
+- If the comment is not JSDoc, it should start with `//`. If it's a multi-line comment, each line should start with `//`.
 
 ## Functions
 
