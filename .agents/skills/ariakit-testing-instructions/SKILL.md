@@ -15,7 +15,7 @@ description: Test authoring instructions for this repository. Use when adding or
   const props = component({
     // @ts-expect-error invalid size
     size:
-      // value
+      // invalid value
       "sm",
   });
   ```
