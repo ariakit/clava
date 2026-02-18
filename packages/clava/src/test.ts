@@ -1902,6 +1902,50 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("base-lg") });
     });
 
+    test("extend can disable whole variant with null", () => {
+      const base = cv({
+        variants: { size: { sm: "base-sm", lg: "base-lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: null },
+          // @ts-expect-error disabled variant cannot be set
+          defaultVariants: {
+            size: "lg",
+          },
+        }),
+      );
+      // @ts-expect-error disabled variant cannot be set
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({ class: "" });
+    });
+
+    test("extend can disable variant value with null", () => {
+      const base = cv({
+        variants: { size: { sm: "base-sm", lg: "base-lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: null } },
+          defaultVariants: {
+            // @ts-expect-error disabled variant value cannot be set
+            size: "sm",
+          },
+        }),
+      );
+      // @ts-expect-error disabled variant value cannot be set
+      const disabledProps = component({ size: "sm" });
+      expect(getStyleClass(disabledProps)).toEqual({ class: "" });
+      const enabledProps = component({ size: "lg" } as any);
+      expect(getStyleClass(enabledProps)).toEqual({ class: cls("base-lg") });
+    });
+
     test("extend inherits defaultVariants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },

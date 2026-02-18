@@ -48,6 +48,7 @@ const META_KEY = "__meta";
 // polluting the actual variant values. This allows the computed function to
 // see actual variant values while still skipping styling for overridden keys.
 const SKIP_STYLE_KEYS = Symbol("skipStyleKeys");
+const SKIP_STYLE_VARIANT_VALUES = Symbol("skipStyleVariantValues");
 
 // Dynamic property access on function requires cast through unknown
 function getComponentMeta(component: AnyComponent): ComponentMeta | undefined {
@@ -183,7 +184,11 @@ function collectVariantKeys(
 
   // Collect from variants
   if (config.variants) {
-    for (const key of Object.keys(config.variants)) {
+    for (const [key, variant] of Object.entries(config.variants)) {
+      if (variant === null) {
+        keys.delete(key);
+        continue;
+      }
       keys.add(key);
     }
   }
@@ -196,6 +201,91 @@ function collectVariantKeys(
   }
 
   return Array.from(keys);
+}
+
+function isVariantDisabled(
+  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  key: string,
+): boolean {
+  return config.variants?.[key] === null;
+}
+
+function getVariantValueKey(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return String(value);
+  return undefined;
+}
+
+function isVariantValueDisabled(
+  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  key: string,
+  value: unknown,
+): boolean {
+  const valueKey = getVariantValueKey(value);
+  if (valueKey == null) return false;
+  const variant = config.variants?.[key];
+  if (!isRecordObject(variant)) return false;
+  return variant[valueKey] === null;
+}
+
+function filterDisabledVariants(
+  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  variants: Record<string, unknown>,
+): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(variants)) {
+    if (isVariantDisabled(config, key)) continue;
+    if (isVariantValueDisabled(config, key, value)) continue;
+    filtered[key] = value;
+  }
+  return filtered;
+}
+
+function collectDisabledVariantKeys(
+  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+): Set<string> {
+  const keys = new Set<string>();
+  if (!config.variants) return keys;
+  for (const [key, value] of Object.entries(config.variants)) {
+    if (value === null) {
+      keys.add(key);
+    }
+  }
+  return keys;
+}
+
+function collectDisabledVariantValues(
+  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+): Record<string, Set<string>> {
+  const values: Record<string, Set<string>> = {};
+  if (!config.variants) return values;
+  for (const [key, variant] of Object.entries(config.variants)) {
+    if (!isRecordObject(variant)) continue;
+    for (const [variantValue, variantEntry] of Object.entries(variant)) {
+      if (variantEntry !== null) continue;
+      values[key] ??= new Set<string>();
+      values[key].add(variantValue);
+    }
+  }
+  return values;
+}
+
+function mergeDisabledVariantValues(
+  base: Record<string, Set<string>>,
+  override: Record<string, Set<string>>,
+): Record<string, Set<string>> {
+  const merged: Record<string, Set<string>> = {};
+  for (const [key, values] of Object.entries(base)) {
+    merged[key] = new Set(values);
+  }
+  for (const [key, values] of Object.entries(override)) {
+    merged[key] ??= new Set<string>();
+    for (const value of values) {
+      merged[key].add(value);
+    }
+  }
+  return merged;
 }
 
 /**
@@ -238,7 +328,7 @@ function collectStaticDefaults(
     Object.assign(defaults, config.defaultVariants);
   }
 
-  return defaults;
+  return filterDisabledVariants(config, defaults);
 }
 
 /**
@@ -266,7 +356,7 @@ function collectDefaultVariants(
     Object.assign(defaults, meta.resolveDefaults(defaults, propsVariants));
   }
 
-  return defaults;
+  return filterDisabledVariants(config, defaults);
 }
 
 /**
@@ -292,7 +382,10 @@ function resolveVariants(
   props: Record<string, unknown> = {},
 ): Record<string, unknown> {
   const defaults = collectDefaultVariants(config, props);
-  return { ...defaults, ...filterUndefined(props) };
+  return filterDisabledVariants(config, {
+    ...defaults,
+    ...filterUndefined(props),
+  });
 }
 
 /**
@@ -345,6 +438,7 @@ function computeExtendedStyles(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   resolvedVariants: Record<string, unknown>,
   overrideVariantKeys: Set<string> = new Set(),
+  overrideVariantValues: Record<string, Set<string>> = {},
 ): {
   baseClasses: ClassValue[];
   variantClasses: ClassValue[];
@@ -366,8 +460,13 @@ function computeExtendedStyles(
     if (overrideVariantKeys.size > 0) {
       propsForExt[SKIP_STYLE_KEYS] = overrideVariantKeys;
     }
+    if (Object.keys(overrideVariantValues).length > 0) {
+      propsForExt[SKIP_STYLE_VARIANT_VALUES] = overrideVariantValues;
+    }
 
-    const extResult = ext(propsForExt);
+    const extResult = ext(
+      propsForExt as ComponentProps<Record<string, unknown>>,
+    );
     assign(style, normalizeStyle(extResult.style));
 
     // Get base class from internal metadata (no variants)
@@ -396,6 +495,7 @@ function computeVariantStyles(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
   resolvedVariants: Record<string | symbol, unknown>,
   skipStyleKeys: Set<string> = new Set(),
+  skipVariantValues: Record<string, Set<string>> = {},
 ): { classes: ClassValue[]; style: StyleValue } {
   const classes: ClassValue[] = [];
   const style: StyleValue = {};
@@ -408,6 +508,10 @@ function computeVariantStyles(
 
       const selectedValue = resolvedVariants[variantName];
       if (selectedValue === undefined) continue;
+      const selectedKey = getVariantValueKey(selectedValue);
+      if (selectedKey && skipVariantValues[variantName]?.has(selectedKey)) {
+        continue;
+      }
 
       const result = getVariantResult(variantDef, selectedValue);
       classes.push(result.class);
@@ -425,6 +529,10 @@ function computeVariantStyles(
 
       const selectedValue = resolvedVariants[variantName];
       if (selectedValue === undefined) continue;
+      const selectedKey = getVariantValueKey(selectedValue);
+      if (selectedKey && skipVariantValues[variantName]?.has(selectedKey)) {
+        continue;
+      }
 
       const computedResult = computeFn(selectedValue);
       const result = extractClassAndStyle(computedResult);
@@ -460,7 +568,10 @@ function runComputedFunction(
   const context = {
     variants: resolvedVariants,
     setVariants: (newVariants: VariantValues<Record<string, unknown>>) => {
-      Object.assign(updatedVariants, newVariants);
+      Object.assign(
+        updatedVariants,
+        filterDisabledVariants(config, newVariants),
+      );
     },
     setDefaultVariants: (
       newDefaults: VariantValues<Record<string, unknown>>,
@@ -468,6 +579,8 @@ function runComputedFunction(
       // Only apply defaults for variants not explicitly set in props
       for (const [key, value] of Object.entries(newDefaults)) {
         if (propsVariants[key] === undefined) {
+          if (isVariantDisabled(config, key)) continue;
+          if (isVariantValueDisabled(config, key, value)) continue;
           updatedVariants[key] = value;
         }
       }
@@ -487,7 +600,11 @@ function runComputedFunction(
     assign(style, result.style);
   }
 
-  return { classes, style, updatedVariants };
+  return {
+    classes,
+    style,
+    updatedVariants: filterDisabledVariants(config, updatedVariants),
+  };
 }
 
 interface NormalizedSource {
@@ -682,6 +799,8 @@ function createResolveDefaults(
           // (child's static defaults should not block setDefaultVariants)
           for (const [key, value] of Object.entries(newDefaults)) {
             if (userProps[key] !== undefined) continue;
+            if (isVariantDisabled(config, key)) continue;
+            if (isVariantValueDisabled(config, key, value)) continue;
             computedDefaults[key] = value;
           }
         },
@@ -717,6 +836,8 @@ export function create<M extends Mode = "jsx">({
     type MergedVariants = MergeVariants<V, CV, E>;
 
     const variantKeys = collectVariantKeys(config);
+    const disabledVariantKeys = collectDisabledVariantKeys(config);
+    const disabledVariantValues = collectDisabledVariantValues(config);
 
     const getPropsKeys = (mode: Mode) => [
       getClassPropertyName(mode),
@@ -735,6 +856,10 @@ export function create<M extends Mode = "jsx">({
         ((props as Record<symbol, unknown>)[SKIP_STYLE_KEYS] as
           | Set<string>
           | undefined) ?? new Set<string>();
+      const skipStyleVariantValues =
+        ((props as Record<symbol, unknown>)[SKIP_STYLE_VARIANT_VALUES] as
+          | Record<string, Set<string>>
+          | undefined) ?? {};
 
       // Extract variant props from input
       const variantProps: Record<string, unknown> = {};
@@ -755,18 +880,27 @@ export function create<M extends Mode = "jsx">({
 
       // Collect computedVariants keys that will override extended variants.
       // Combine with incoming skip keys to propagate through the extend chain.
-      const computedVariantKeys = new Set<string>(skipStyleKeys);
+      const currentVariantKeys = new Set<string>(skipStyleKeys);
+      for (const key of disabledVariantKeys) {
+        currentVariantKeys.add(key);
+      }
+      const computedVariantKeys = new Set<string>(currentVariantKeys);
       if (config.computedVariants) {
         for (const key of Object.keys(config.computedVariants)) {
           computedVariantKeys.add(key);
         }
       }
+      const computedVariantValues = mergeDisabledVariantValues(
+        skipStyleVariantValues,
+        disabledVariantValues,
+      );
 
       // Process extended components (separates base and variant classes)
       const extendedResult = computeExtendedStyles(
         config,
         resolvedVariants,
         computedVariantKeys,
+        computedVariantValues,
       );
 
       // 1. Extended base classes first
@@ -788,7 +922,8 @@ export function create<M extends Mode = "jsx">({
       const variantsResult = computeVariantStyles(
         config,
         resolvedVariants,
-        skipStyleKeys,
+        currentVariantKeys,
+        computedVariantValues,
       );
       allClasses.push(...variantsResult.classes);
       assign(allStyle, variantsResult.style);

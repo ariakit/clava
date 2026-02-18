@@ -210,13 +210,19 @@ type StringToBoolean<T> = T extends "true" | "false" ? boolean : T;
 
 type VariantValue = ClassValue | StyleClassValue;
 
-type ExtractVariantValue<T> = T extends (value: infer V) => any
-  ? V
-  : T extends ClassValue
-    ? boolean
-    : T extends Record<infer K, any>
-      ? StringToBoolean<K>
-      : never;
+type NonNullKeys<T> = {
+  [K in keyof T]: T[K] extends null ? never : K;
+}[keyof T];
+
+type ExtractVariantValue<T> = [T] extends [null]
+  ? never
+  : T extends (value: infer V) => any
+    ? V
+    : T extends Record<string, any>
+      ? StringToBoolean<NonNullKeys<T>>
+      : T extends ClassValue
+        ? boolean
+        : never;
 
 export type VariantValues<V> = {
   [K in keyof V]?: ExtractVariantValue<V[K]>;
@@ -249,9 +255,14 @@ export type Variants = Record<string, Variant>;
 type ExtendedVariants<E extends AnyComponent[]> = MergeExtendedVariants<E> &
   MergeExtendedComputedVariants<E>;
 
+type NullablePartial<T> =
+  T extends Record<string, any> ? { [K in keyof T]?: T[K] | null } : T | null;
+
 export type ExtendableVariants<
   V extends Variants,
   E extends AnyComponent[],
 > = V & {
-  [K in keyof ExtendedVariants<E>]?: Partial<ExtendedVariants<E>[K]> | Variant;
+  [K in keyof ExtendedVariants<E>]?:
+    | NullablePartial<ExtendedVariants<E>[K]>
+    | Variant;
 };
