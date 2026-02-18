@@ -31,7 +31,7 @@ description: Workflow instructions for this repository. Always use when planning
     });
     ```
 
-    `oxfmt` will handle the rest of the formatting. Just make sure the error is as isolated as possible.
+    `oxfmt` will handle the rest of the formatting. Just make sure the error is as isolated as possible. If the error is on `size`, though, it’s fine to keep `size: "sm"` on one line.
 
 ## Skills
 
