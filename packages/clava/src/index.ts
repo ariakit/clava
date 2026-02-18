@@ -85,6 +85,7 @@ export type {
 export type VariantProps<T extends Pick<AnyComponent, "getVariants">> =
   ReturnType<T["getVariants"]>;
 
+// Variant props expose booleans, but variant object keys are always strings.
 type VariantKey<T> = T extends boolean ? "true" | "false" : Extract<T, string>;
 
 export type Variant<
