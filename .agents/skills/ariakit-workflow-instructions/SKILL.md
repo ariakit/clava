@@ -18,7 +18,7 @@ description: Workflow instructions for this repository. Use when planning or imp
 
 ## Changesets
 
-- Add changesets for user-facing updates such as bug fixes, performance
+- Add changesets in the `.changeset` folder for user-facing updates such as bug fixes, performance
   improvements, and new features.
 - Refactors and other changes that do not affect shipped code should not
   require changesets.
