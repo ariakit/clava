@@ -214,7 +214,7 @@ type NonNullKeys<T> = {
   [K in keyof T]: T[K] extends null ? never : K;
 }[keyof T];
 
-type ExtractVariantValue<T> = [T] extends [null]
+type ExtractVariantValue<T> = T extends null
   ? never
   : T extends (value: infer V) => any
     ? V
