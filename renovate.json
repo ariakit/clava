@@ -4,6 +4,10 @@
   "semanticCommits": "disabled",
   "packageRules": [
     {
+      "groupName": "changesets",
+      "matchPackageNames": ["/^@changesets//"]
+    },
+    {
       "groupName": "oxc",
       "matchPackageNames": ["/^oxlint/", "/^oxfmt/"]
     },
