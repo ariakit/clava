@@ -1,9 +1,9 @@
 ---
-name: ariakit-testing-instructions
+name: ariakit-testing
 description: Test authoring instructions for this repository. Use when adding or updating tests.
 ---
 
-# Ariakit Testing Instructions
+# Ariakit Testing
 
 - Also write tests for invalid usage using `// @ts-expect-error` and runtime test assertions.
 - When adding `// @ts-expect-error`, isolate the offending code as much as possible.

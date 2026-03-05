@@ -1,9 +1,9 @@
 ---
-name: ariakit-workflow-instructions
+name: ariakit-workflow
 description: Workflow instructions for this repository. Always use when planning or implementing changes to follow command and testing expectations.
 ---
 
-# Ariakit Workflow Instructions
+# Ariakit Workflow
 
 - Run `pnpm install` to install dependencies.
 - Always run `pnpm lint`, `pnpm test`, and `pnpm build` before and after making changes to make sure everything still works.
