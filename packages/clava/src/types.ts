@@ -57,12 +57,9 @@ export type NullableComponentResult = {
   [K in AllComponentResultKeys]?: ComponentResultValue<K> | null;
 };
 
-export type ComponentProps<V = {}, Resolved = V> = VariantValues<V, Resolved> &
-  NullableComponentResult;
+export type ComponentProps<V = {}> = VariantValues<V> & NullableComponentResult;
 
-export type GetVariants<V, Resolved = V> = (
-  variants?: VariantValues<V, Resolved>,
-) => VariantValues<V, Resolved>;
+export type GetVariants<V> = (variants?: VariantValues<V>) => VariantValues<V>;
 
 // Key source types - what can be passed as additional parameters to splitProps
 export type KeySourceArray = readonly string[];
@@ -158,11 +155,11 @@ type SplitPropsFunctionResult<
   ...BuildSourceResults<T, Sources, IsComponent<S1>, SourceKeys<S1>>,
 ];
 
-export interface ModalComponent<V, R extends ComponentResult, Resolved = V> {
-  (props?: ComponentProps<V, Resolved>): R;
-  class: (props?: ComponentProps<V, Resolved>) => string;
-  style: (props?: ComponentProps<V, Resolved>) => R["style"];
-  getVariants: GetVariants<V, Resolved>;
+export interface ModalComponent<V, R extends ComponentResult> {
+  (props?: ComponentProps<V>): R;
+  class: (props?: ComponentProps<V>) => string;
+  style: (props?: ComponentProps<V>) => R["style"];
+  getVariants: GetVariants<V>;
   keys: (keyof V | keyof R)[];
   variantKeys: (keyof V)[];
   propKeys: (keyof V | keyof R)[];
@@ -173,27 +170,15 @@ export interface CVComponent<
   CV extends ComputedVariants = {},
   E extends AnyComponent[] = [],
   R extends ComponentResult = ComponentResult,
-> extends ModalComponent<PublicVariants<V, CV, E>, R, MergeVariants<V, CV, E>> {
-  jsx: ModalComponent<
-    PublicVariants<V, CV, E>,
-    JSXProps,
-    MergeVariants<V, CV, E>
-  >;
-  html: ModalComponent<
-    PublicVariants<V, CV, E>,
-    HTMLProps,
-    MergeVariants<V, CV, E>
-  >;
-  htmlObj: ModalComponent<
-    PublicVariants<V, CV, E>,
-    HTMLObjProps,
-    MergeVariants<V, CV, E>
-  >;
+> extends ModalComponent<MergeVariants<V, CV, E>, R> {
+  jsx: ModalComponent<MergeVariants<V, CV, E>, JSXProps>;
+  html: ModalComponent<MergeVariants<V, CV, E>, HTMLProps>;
+  htmlObj: ModalComponent<MergeVariants<V, CV, E>, HTMLObjProps>;
 }
 
 export type AnyComponent =
   | CVComponent<any, any, any, any>
-  | ModalComponent<any, any, any>;
+  | ModalComponent<any, any>;
 
 type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
   ? ExtractVariants<First> & MergeExtendedVariants<Rest>
@@ -223,22 +208,16 @@ type MergeVariantDefinition<Child, Parent> =
       : Child
     : Child;
 
-type MergeVariantMaps<Child, Parent> = {
-  [K in keyof Child | keyof Parent]: K extends keyof Child
-    ? K extends keyof Parent
-      ? MergeVariantDefinition<Child[K], Parent[K]>
-      : Child[K]
-    : K extends keyof Parent
-      ? Parent[K]
-      : never;
-};
+type MergeVariantMaps<Child, Parent> = Omit<Parent, keyof Child> &
+  Child & {
+    [K in keyof Child & keyof Parent]: MergeVariantDefinition<
+      Child[K],
+      Parent[K]
+    >;
+  };
 
 type MergeExtendedAllVariants<E extends AnyComponent[]> =
   MergeExtendedVariants<E> & MergeExtendedComputedVariants<E>;
-
-export type PublicVariants<V, CV, E extends AnyComponent[]> = NoInfer<CV> &
-  Omit<NoInfer<V>, keyof CV> &
-  Omit<MergeExtendedAllVariants<E>, keyof V | keyof CV>;
 
 type MergeBaseVariants<V, E extends AnyComponent[]> = MergeVariantMaps<
   NoInfer<V>,
@@ -266,15 +245,8 @@ type ExtractVariantValue<T> = T extends null
         ? boolean
         : never;
 
-// Preserve property symbols from the public variant shape so editor navigation
-// still resolves back to the component's local `variants` object, while value
-// unions keep following the fully merged variant definitions.
-export type VariantValues<V, Resolved = V> = {
-  [K in keyof V]?: K extends keyof Resolved
-    ? ExtractVariantValue<Resolved[K]>
-    : never;
-} & {
-  [K in Exclude<keyof Resolved, keyof V>]?: ExtractVariantValue<Resolved[K]>;
+export type VariantValues<V> = {
+  [K in keyof V]?: ExtractVariantValue<V[K]>;
 };
 
 export type StyleValue = CSS.Properties & {
