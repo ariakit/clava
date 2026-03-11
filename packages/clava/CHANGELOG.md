@@ -1,5 +1,11 @@
 # clava
 
+## 0.1.18
+
+### Patch Changes
+
+- f1aefb1: Preserved `clsx` and `csstype` as external imports in the published Clava build instead of bundling them into `dist`.
+
 ## 0.1.17
 
 ### Patch Changes
