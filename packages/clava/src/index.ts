@@ -13,6 +13,7 @@ import type {
   JSXProps,
   MergeVariants,
   ModalComponent,
+  PublicVariants,
   SplitPropsFunction,
   StyleClassValue,
   StyleProps,
@@ -108,7 +109,10 @@ export interface CVConfig<
   style?: StyleValue;
   variants?: ExtendableVariants<V, E>;
   computedVariants?: CV;
-  defaultVariants?: VariantValues<MergeVariants<V, CV, E>>;
+  defaultVariants?: VariantValues<
+    PublicVariants<V, CV, E>,
+    MergeVariants<V, CV, E>
+  >;
   computed?: Computed<MergeVariants<V, CV, E>>;
 }
 
@@ -853,6 +857,7 @@ export function create<M extends Mode = "jsx">({
     config: CVConfig<V, CV, E> = {},
   ): CVComponent<V, CV, E, StyleProps[M]> => {
     type MergedVariants = MergeVariants<V, CV, E>;
+    type ComponentVariants = PublicVariants<V, CV, E>;
 
     const variantKeys = collectVariantKeys(config);
     const disabledVariantKeys = collectDisabledVariantKeys(config);
@@ -865,7 +870,7 @@ export function create<M extends Mode = "jsx">({
     ];
 
     const computeResult = (
-      props: ComponentProps<MergedVariants> = {},
+      props: ComponentProps<ComponentVariants, MergedVariants> = {},
     ): { className: string; style: StyleValue } => {
       const allClasses: ClassValue[] = [];
       const allStyle: StyleValue = {};
@@ -972,10 +977,12 @@ export function create<M extends Mode = "jsx">({
 
     const createModalComponent = <R extends ComponentResult>(
       mode: Mode,
-    ): ModalComponent<MergedVariants, R> => {
+    ): ModalComponent<ComponentVariants, R, MergedVariants> => {
       const propsKeys = getPropsKeys(mode);
 
-      const component = ((props: ComponentProps<MergedVariants> = {}) => {
+      const component = ((
+        props: ComponentProps<ComponentVariants, MergedVariants> = {},
+      ) => {
         const { className, style } = computeResult(props);
 
         if (mode === "jsx") {
@@ -986,20 +993,26 @@ export function create<M extends Mode = "jsx">({
         }
         // htmlObj
         return { class: className, style: styleValueToHTMLObjStyle(style) };
-      }) as ModalComponent<MergedVariants, R>;
+      }) as ModalComponent<ComponentVariants, R, MergedVariants>;
 
-      component.class = (props: ComponentProps<MergedVariants> = {}) => {
+      component.class = (
+        props: ComponentProps<ComponentVariants, MergedVariants> = {},
+      ) => {
         return computeResult(props).className;
       };
 
-      component.style = (props: ComponentProps<MergedVariants> = {}) => {
+      component.style = (
+        props: ComponentProps<ComponentVariants, MergedVariants> = {},
+      ) => {
         const { style } = computeResult(props);
         if (mode === "jsx") return styleValueToJSXStyle(style);
         if (mode === "html") return styleValueToHTMLStyle(style);
         return styleValueToHTMLObjStyle(style);
       };
 
-      component.getVariants = (variants?: VariantValues<MergedVariants>) => {
+      component.getVariants = (
+        variants?: VariantValues<ComponentVariants, MergedVariants>,
+      ) => {
         const variantProps = variants ?? {};
         const resolvedVariants = resolveVariants(config, variantProps);
         // Run computed function to get variants set via setVariants and
@@ -1009,7 +1022,10 @@ export function create<M extends Mode = "jsx">({
           resolvedVariants,
           variantProps,
         );
-        return updatedVariants as VariantValues<MergedVariants>;
+        return updatedVariants as VariantValues<
+          ComponentVariants,
+          MergedVariants
+        >;
       };
 
       component.keys = propsKeys;
