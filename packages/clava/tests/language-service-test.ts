@@ -10,8 +10,9 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { afterEach, describe, expect, test } from "vitest";
 
-const sourceDir = dirname(fileURLToPath(import.meta.url));
-const packageDir = resolve(sourceDir, "..");
+const testDir = dirname(fileURLToPath(import.meta.url));
+const packageDir = resolve(testDir, "..");
+const sourceDir = resolve(packageDir, "src");
 const workspaceDir = resolve(packageDir, "../..");
 const tempDirs: string[] = [];
 

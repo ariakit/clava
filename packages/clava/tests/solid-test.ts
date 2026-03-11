@@ -1,7 +1,7 @@
 import type { ComponentProps, JSX } from "solid-js";
 import { expect, expectTypeOf, test } from "vitest";
-import { type VariantProps, cv, splitProps } from "./index.ts";
-import { type HTMLObjProps } from "./types.ts";
+import { type VariantProps, cv, splitProps } from "../src/index.ts";
+import { type HTMLObjProps } from "../src/types.ts";
 
 test("splitProps", () => {
   const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
