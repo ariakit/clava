@@ -1,7 +1,7 @@
 import type { CSSProperties, ComponentProps } from "react";
 import { expect, expectTypeOf, test } from "vitest";
-import { type VariantProps, cv, splitProps } from "./index.ts";
-import type { JSXProps } from "./types.ts";
+import { type VariantProps, cv, splitProps } from "../src/index.ts";
+import type { JSXProps } from "../src/types.ts";
 
 test("splitProps", () => {
   const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
