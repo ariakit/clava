@@ -4,7 +4,7 @@
 
 Removed the `defaultMode` option from `create()` and changed the default callable Clava component result to return normalized `{ class, style }` props.
 
-Calling a component directly now always returns Clava's definition-compatible shape, with camelCase style keys and stringified values. Use `.jsx`, `.html`, or `.htmlObj` when a framework- or renderer-specific prop shape is needed.
+Calling a component directly now always returns Clava's definition-compatible shape, with camelCase style keys. Use `.jsx`, `.html`, or `.htmlObj` when a framework- or renderer-specific prop shape is needed.
 
 Before:
 
