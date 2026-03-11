@@ -1,3 +1,6 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import * as ts from "typescript";
 import { describe, expect, expectTypeOf, test } from "vitest";
 import {
   type Variant,
@@ -22,6 +25,25 @@ import {
   isHTMLObjStyle,
   jsxStyleToStyleValue,
 } from "./utils.ts";
+
+const TEST_DIRECTORY = dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = join(TEST_DIRECTORY, "..");
+const PACKAGE_TSCONFIG_PATH = join(PACKAGE_ROOT, "tsconfig.json");
+const packageConfigFile = ts.readConfigFile(PACKAGE_TSCONFIG_PATH, (fileName) =>
+  ts.sys.readFile(fileName),
+);
+
+if (packageConfigFile.error) {
+  throw new Error(
+    ts.flattenDiagnosticMessageText(packageConfigFile.error.messageText, "\n"),
+  );
+}
+
+const packageConfig = ts.parseJsonConfigFileContent(
+  packageConfigFile.config,
+  ts.sys,
+  PACKAGE_ROOT,
+);
 
 const MODES = ["jsx", "html", "htmlObj"] as const;
 type Mode = (typeof MODES)[number] | null;
@@ -172,6 +194,49 @@ function getStyleClass(props: ComponentResult): Record<string, unknown> {
   return {
     ...getStyle(props),
     class: getClass(props),
+  };
+}
+
+function createLanguageService(source: string) {
+  const filePath = join(
+    TEST_DIRECTORY,
+    "__variant-language-service-fixture.ts",
+  );
+  const inMemoryFiles = new Map([[filePath, source]]);
+  const scriptFileNames = [...new Set([...packageConfig.fileNames, filePath])];
+
+  const getFileText = (fileName: string) => {
+    const inMemoryText = inMemoryFiles.get(fileName);
+    if (inMemoryText != null) {
+      return inMemoryText;
+    }
+    return ts.sys.readFile(fileName);
+  };
+
+  const host: ts.LanguageServiceHost = {
+    getCompilationSettings: () => packageConfig.options,
+    getCurrentDirectory: () => PACKAGE_ROOT,
+    getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
+    getScriptFileNames: () => scriptFileNames,
+    getScriptVersion: () => "0",
+    getScriptSnapshot: (fileName) => {
+      const fileText = getFileText(fileName);
+      if (fileText == null) {
+        return;
+      }
+      return ts.ScriptSnapshot.fromString(fileText);
+    },
+    fileExists: (fileName) =>
+      inMemoryFiles.has(fileName) || ts.sys.fileExists(fileName),
+    readFile: getFileText,
+    readDirectory: (...args) => ts.sys.readDirectory(...args),
+    directoryExists: (directoryName) => ts.sys.directoryExists(directoryName),
+    getDirectories: (directoryName) => ts.sys.getDirectories(directoryName),
+  };
+
+  return {
+    filePath,
+    service: ts.createLanguageService(host),
   };
 }
 
@@ -2869,5 +2934,98 @@ describe("Variant utility type", () => {
         } satisfies Variant<typeof base, "foo">,
       },
     });
+  });
+});
+
+describe("language service variant symbols", () => {
+  test("goes to the local variant property definition and renames usages", () => {
+    const source = `import { cv } from "./index.ts";
+
+const button = cv({
+  variants: {
+    size: {
+      sm: "text-sm",
+      lg: "text-lg",
+    },
+  },
+});
+
+button({ size: "sm" });
+`;
+    const definitionStart = source.indexOf("size: {");
+    const usageStart = source.lastIndexOf('size: "sm"');
+    const { filePath, service } = createLanguageService(source);
+    const diagnostics = service.getSemanticDiagnostics(filePath);
+    const definitions = service.getDefinitionAtPosition(
+      filePath,
+      usageStart + 1,
+    );
+    const renameLocations =
+      service.findRenameLocations(
+        filePath,
+        definitionStart + 1,
+        false,
+        false,
+        true,
+      ) ?? [];
+
+    expect(diagnostics).toHaveLength(0);
+    expect(
+      definitions?.map((definition) => definition.textSpan.start),
+    ).toContain(definitionStart);
+    expect(
+      renameLocations
+        .filter((location) => location.fileName === filePath)
+        .map((location) => location.textSpan.start),
+    ).toEqual(expect.arrayContaining([definitionStart, usageStart]));
+  });
+
+  test("goes to the overriding variant property definition when extending", () => {
+    const source = `import { cv } from "./index.ts";
+
+const base = cv({
+  variants: {
+    size: {
+      sm: "text-sm",
+      lg: "text-lg",
+    },
+  },
+});
+
+const button = cv({
+  extend: [base],
+  variants: {
+    size: {
+      lg: "text-large",
+    },
+  },
+});
+
+button({ size: "sm" });
+`;
+    const definitionStart = source.lastIndexOf("size: {");
+    const usageStart = source.lastIndexOf('size: "sm"');
+    const { filePath, service } = createLanguageService(source);
+    const definitions = service.getDefinitionAtPosition(
+      filePath,
+      usageStart + 1,
+    );
+    const renameLocations =
+      service.findRenameLocations(
+        filePath,
+        definitionStart + 1,
+        false,
+        false,
+        true,
+      ) ?? [];
+
+    expect(
+      definitions?.map((definition) => definition.textSpan.start),
+    ).toContain(definitionStart);
+    expect(
+      renameLocations
+        .filter((location) => location.fileName === filePath)
+        .map((location) => location.textSpan.start),
+    ).toEqual(expect.arrayContaining([definitionStart, usageStart]));
   });
 });
