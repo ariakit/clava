@@ -1,9 +1,7 @@
 import type { ComponentProps, JSX } from "solid-js";
 import { expect, expectTypeOf, test } from "vitest";
-import { type VariantProps, create, splitProps } from "./index.ts";
+import { type VariantProps, cv, splitProps } from "./index.ts";
 import { type HTMLObjProps } from "./types.ts";
-
-const { cv } = create({ defaultMode: "htmlObj" });
 
 test("splitProps", () => {
   const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
@@ -26,7 +24,7 @@ test("component props", () => {
   const component = cv({
     style: { fontSize: "16px" },
     variants: { size: { sm: "sm", md: "md" } },
-  });
+  }).htmlObj;
   const props = component({ size: "sm", className: "custom" });
   expectTypeOf(props).toEqualTypeOf<HTMLObjProps>();
   expect(props).toEqual({
