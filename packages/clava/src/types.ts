@@ -208,15 +208,13 @@ type MergeVariantDefinition<Child, Parent> =
       : Child
     : Child;
 
-type MergeVariantMaps<Child, Parent> = {
-  [K in keyof Child | keyof Parent]: K extends keyof Child
-    ? K extends keyof Parent
-      ? MergeVariantDefinition<Child[K], Parent[K]>
-      : Child[K]
-    : K extends keyof Parent
-      ? Parent[K]
-      : never;
-};
+type MergeVariantMaps<Child, Parent> = Omit<Parent, keyof Child> &
+  Child & {
+    [K in keyof Child & keyof Parent]: MergeVariantDefinition<
+      Child[K],
+      Parent[K]
+    >;
+  };
 
 type MergeExtendedAllVariants<E extends AnyComponent[]> =
   MergeExtendedVariants<E> & MergeExtendedComputedVariants<E>;
