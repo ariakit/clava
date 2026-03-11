@@ -31,9 +31,17 @@ function createCompilerOptions(): ts.CompilerOptions {
     skipLibCheck: true,
     esModuleInterop: true,
     resolveJsonModule: true,
-    lib: ["lib.es2020.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
+    lib: ["ES2020", "DOM", "DOM.Iterable"],
     customConditions: ["source"],
   };
+}
+
+function getFixturePosition(source: string, pattern: string): number {
+  const position = source.indexOf(pattern);
+  if (position === -1) {
+    throw new Error(`Pattern not found in fixture source: ${pattern}`);
+  }
+  return position;
 }
 
 function createLanguageServiceHost(
@@ -124,8 +132,11 @@ afterEach(() => {
 describe("TypeScript language service", () => {
   test("goes to the local variant definition from a variant prop usage", () => {
     const fixture = createLanguageServiceFixture(getVariantFixtureSource());
-    const definitionStart = fixture.consumerSource.indexOf("size: { sm");
-    const usageStart = fixture.consumerSource.indexOf('size: "sm"');
+    const definitionStart = getFixturePosition(
+      fixture.consumerSource,
+      "size: { sm",
+    );
+    const usageStart = getFixturePosition(fixture.consumerSource, 'size: "sm"');
     const definitions =
       fixture.service.getDefinitionAtPosition(
         fixture.consumerFile,
@@ -141,8 +152,11 @@ describe("TypeScript language service", () => {
 
   test("renames variant prop usages when renaming the variant definition", () => {
     const fixture = createLanguageServiceFixture(getVariantFixtureSource());
-    const definitionStart = fixture.consumerSource.indexOf("size: { sm");
-    const usageStart = fixture.consumerSource.indexOf('size: "sm"');
+    const definitionStart = getFixturePosition(
+      fixture.consumerSource,
+      "size: { sm",
+    );
+    const usageStart = getFixturePosition(fixture.consumerSource, 'size: "sm"');
     const renameLocations =
       fixture.service.findRenameLocations(
         fixture.consumerFile,
