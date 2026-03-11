@@ -32,13 +32,22 @@ export interface HTMLObjProps {
   style: HTMLCSSProperties;
 }
 
+export interface StyleClassProps {
+  class: string;
+  style: StyleValue;
+}
+
 export interface StyleProps {
   jsx: JSXProps;
   html: HTMLProps;
   htmlObj: HTMLObjProps;
 }
 
-export type ComponentResult = JSXProps | HTMLProps | HTMLObjProps;
+export type ComponentResult =
+  | JSXProps
+  | HTMLProps
+  | HTMLObjProps
+  | StyleClassProps;
 
 type AllComponentResultKeys =
   | keyof JSXProps
@@ -160,16 +169,16 @@ export interface ModalComponent<V, R extends ComponentResult> {
   class: (props?: ComponentProps<V>) => string;
   style: (props?: ComponentProps<V>) => R["style"];
   getVariants: GetVariants<V>;
-  keys: (keyof V | keyof R)[];
+  keys: (keyof V | keyof NullableComponentResult)[];
   variantKeys: (keyof V)[];
-  propKeys: (keyof V | keyof R)[];
+  propKeys: (keyof V | keyof NullableComponentResult)[];
 }
 
 export interface CVComponent<
   V extends Variants = {},
   CV extends ComputedVariants = {},
   E extends AnyComponent[] = [],
-  R extends ComponentResult = ComponentResult,
+  R extends ComponentResult = StyleClassProps,
 > extends ModalComponent<MergeVariants<V, CV, E>, R> {
   jsx: ModalComponent<MergeVariants<V, CV, E>, JSXProps>;
   html: ModalComponent<MergeVariants<V, CV, E>, HTMLProps>;

@@ -30,7 +30,7 @@ test("component props", () => {
   const component = cv({
     style: { fontSize: "16px" },
     variants: { size: { sm: "sm", md: "md" } },
-  });
+  }).jsx;
   const props = component({ size: "sm", className: "custom" });
   expectTypeOf(props).toEqualTypeOf<JSXProps>();
   expect(props).toEqual({

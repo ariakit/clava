@@ -12,8 +12,13 @@ import type {
   ComponentResult,
   ComputedVariants,
   HTMLCSSProperties,
+  HTMLObjProps,
+  HTMLProps,
   JSXCSSProperties,
+  JSXProps,
+  StyleClassProps,
   StyleProperty,
+  StyleValue,
   Variants,
 } from "./types.ts";
 import {
@@ -37,26 +42,20 @@ type ConfigParams = NonNullable<Parameters<typeof create>[0]>;
 
 interface Config {
   mode: Mode;
-  defaultMode: Mode;
   transformClass?: ConfigParams["transformClass"];
 }
-
-type ConfigMode<T extends Config> = NonNullable<T["mode"] | T["defaultMode"]>;
 
 const transformClass = {
   uppercase: (className) => className.toUpperCase(),
 } satisfies Record<string, Config["transformClass"]>;
 
 const CONFIGS = {
-  default: { mode: null, defaultMode: null },
-  jsx: { mode: "jsx", defaultMode: null },
-  html: { mode: "html", defaultMode: null },
-  htmlObj: { mode: "htmlObj", defaultMode: null },
-  htmlDefault: { mode: null, defaultMode: "html" },
-  htmlObjDefault: { mode: null, defaultMode: "htmlObj" },
+  default: { mode: null },
+  jsx: { mode: "jsx" },
+  html: { mode: "html" },
+  htmlObj: { mode: "htmlObj" },
   uppercase: {
     mode: null,
-    defaultMode: null,
     transformClass: transformClass.uppercase,
   },
 } satisfies Record<string, Config>;
@@ -64,11 +63,6 @@ const CONFIGS = {
 function getConfigMode<T extends Config>(config: T): T["mode"] {
   if (!("mode" in config)) return null;
   return config.mode;
-}
-
-function getConfigDefaultMode<T extends Config>(config: T): T["defaultMode"] {
-  if (!("defaultMode" in config)) return null;
-  return config.defaultMode;
 }
 
 function getConfigTransformClass(config: Config) {
@@ -88,17 +82,14 @@ function getConfigDescription(config: Config) {
 
 function createCVFromConfig<T extends Config>(
   config: T,
-): T["defaultMode"] & T["transformClass"] extends never
-  ? typeof cvBase
-  : ReturnType<typeof create>["cv"] {
-  const defaultMode = getConfigDefaultMode(config);
+): ReturnType<typeof create>["cv"] {
   const transformClass = getConfigTransformClass(config);
   const hasTransform = "transformClass" in config && config.transformClass;
-  if (!defaultMode && !hasTransform) {
+  if (!hasTransform) {
     return cvBase;
   }
-  const { cv } = create({ defaultMode: defaultMode ?? "jsx", transformClass });
-  return cv as any;
+  const { cv } = create({ transformClass });
+  return cv;
 }
 
 function getModalComponent<
@@ -117,41 +108,55 @@ function getClass(props: ComponentResult) {
 }
 
 function getClassPropertyName(config: Config) {
-  const mode = config.mode ?? config.defaultMode;
-  // null defaults to jsx mode
+  const mode = config.mode;
   if (mode === "jsx" || mode === null) return "className";
   return "class";
 }
 
-function assertClassProperty<T extends Config>(
-  config: T,
+function getExpectedPropsKeys(config: Config, ...variantKeys: string[]) {
+  if (config.mode === null) {
+    return ["class", "className", "style", ...variantKeys];
+  }
+  return [getClassPropertyName(config), "style", ...variantKeys];
+}
+
+function assertDefaultProps(
   props: ComponentResult,
-): asserts props is ConfigMode<T> extends "html" | "htmlObj"
-  ? Extract<ComponentResult, { class: string }>
-  : Extract<ComponentResult, { className: string }> {
-  const mode = config.mode ?? config.defaultMode;
-  if (mode === "html" || mode === "htmlObj") {
-    if (!("class" in props)) {
-      expect.fail(`Expected ${mode} props to have class`);
-    }
-  } else {
-    if (!("className" in props)) {
-      expect.fail(`Expected ${mode ?? "jsx"} props to have className`);
-    }
+): asserts props is StyleClassProps {
+  if (!("class" in props)) {
+    expect.fail("Expected default props to have class");
+  }
+  if (!("style" in props) || typeof props.style !== "object") {
+    expect.fail("Expected default props to have style");
   }
 }
 
-function assertStyleProperty<T extends Config>(
-  config: T,
+function assertJSXProps(props: ComponentResult): asserts props is JSXProps {
+  if (!("className" in props)) {
+    expect.fail("Expected jsx props to have className");
+  }
+  if (!("style" in props) || typeof props.style !== "object") {
+    expect.fail("Expected jsx props to have style");
+  }
+}
+
+function assertHTMLProps(props: ComponentResult): asserts props is HTMLProps {
+  if (!("class" in props)) {
+    expect.fail("Expected html props to have class");
+  }
+  if (!("style" in props) || typeof props.style !== "string") {
+    expect.fail("Expected html props to have style");
+  }
+}
+
+function assertHTMLObjProps(
   props: ComponentResult,
-): asserts props is ConfigMode<T> extends "html"
-  ? Extract<ComponentResult, { style: string }>
-  : ConfigMode<T> extends "htmlObj"
-    ? Extract<ComponentResult, { style: HTMLCSSProperties }>
-    : Extract<ComponentResult, { style: JSXCSSProperties }> {
-  if (!("style" in props)) {
-    const mode = config.mode ?? config.defaultMode;
-    expect.fail(`Expected ${mode ?? "jsx"} props to have style`);
+): asserts props is HTMLObjProps {
+  if (!("class" in props)) {
+    expect.fail("Expected htmlObj props to have class");
+  }
+  if (!("style" in props) || typeof props.style !== "object") {
+    expect.fail("Expected htmlObj props to have style");
   }
 }
 
@@ -175,7 +180,7 @@ function getStyleClass(props: ComponentResult): Record<string, unknown> {
   };
 }
 
-for (const config of [CONFIGS.default, CONFIGS.jsx, CONFIGS.uppercase]) {
+for (const config of [CONFIGS.default, CONFIGS.uppercase]) {
   const mode = getConfigMode(config);
   const cv = createCVFromConfig(config);
   const cls = getConfigTransformClass(config);
@@ -187,7 +192,40 @@ for (const config of [CONFIGS.default, CONFIGS.jsx, CONFIGS.uppercase]) {
         cv({ class: "base", style: { backgroundColor: "red" } }),
       );
       const props = component();
-      assertClassProperty(config, props);
+      assertDefaultProps(props);
+      expect(props).not.toHaveProperty("className");
+      expect(props.class).toBe(cls("base"));
+      expect(props.style.backgroundColor).toBe("red");
+      expectTypeOf(props).toEqualTypeOf<StyleClassProps>();
+      expectTypeOf(props.style).toEqualTypeOf<StyleValue>();
+    });
+
+    test("no argument still returns normalized shape", () => {
+      const component = getModalComponent(mode, cv());
+      const props = component();
+      assertDefaultProps(props);
+      expect(props).not.toHaveProperty("className");
+      expect(props.class).toBe("");
+      expect(props.style).toEqual({});
+      expectTypeOf(props).toEqualTypeOf<StyleClassProps>();
+      expectTypeOf(props.style).toEqualTypeOf<StyleValue>();
+    });
+  });
+}
+
+for (const config of [CONFIGS.jsx]) {
+  const mode = getConfigMode(config);
+  const cv = createCVFromConfig(config);
+  const cls = getConfigTransformClass(config);
+
+  describe(getConfigDescription(config), () => {
+    test("style has correct shape for mode", () => {
+      const component = getModalComponent(
+        mode,
+        cv({ class: "base", style: { backgroundColor: "red" } }),
+      );
+      const props = component();
+      assertJSXProps(props);
       expect(props).not.toHaveProperty("class");
       expect(props.className).toBe(cls("base"));
       expect(props.style.backgroundColor).toBe("red");
@@ -197,7 +235,7 @@ for (const config of [CONFIGS.default, CONFIGS.jsx, CONFIGS.uppercase]) {
     test("no argument still returns jsx shape", () => {
       const component = getModalComponent(mode, cv());
       const props = component();
-      assertClassProperty(config, props);
+      assertJSXProps(props);
       expect(props).not.toHaveProperty("class");
       expect(props.className).toBe("");
       expect(props.style).toEqual({});
@@ -206,7 +244,7 @@ for (const config of [CONFIGS.default, CONFIGS.jsx, CONFIGS.uppercase]) {
   });
 }
 
-for (const config of [CONFIGS.html, CONFIGS.htmlDefault]) {
+for (const config of [CONFIGS.html]) {
   const mode = getConfigMode(config);
   const cv = createCVFromConfig(config);
   const cls = getConfigTransformClass(config);
@@ -218,7 +256,7 @@ for (const config of [CONFIGS.html, CONFIGS.htmlDefault]) {
         cv({ class: "base", style: { backgroundColor: "red" } }),
       );
       const props = component();
-      assertClassProperty(config, props);
+      assertHTMLProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe(cls("base"));
       expect(props.style).toBe("background-color: red;");
@@ -227,7 +265,7 @@ for (const config of [CONFIGS.html, CONFIGS.htmlDefault]) {
     test("no argument still returns html shape", () => {
       const component = getModalComponent(mode, cv());
       const props = component();
-      assertClassProperty(config, props);
+      assertHTMLProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe("");
       expect(props.style).toBe("");
@@ -235,7 +273,7 @@ for (const config of [CONFIGS.html, CONFIGS.htmlDefault]) {
   });
 }
 
-for (const config of [CONFIGS.htmlObj, CONFIGS.htmlObjDefault]) {
+for (const config of [CONFIGS.htmlObj]) {
   const mode = getConfigMode(config);
   const cv = createCVFromConfig(config);
   const cls = getConfigTransformClass(config);
@@ -247,8 +285,7 @@ for (const config of [CONFIGS.htmlObj, CONFIGS.htmlObjDefault]) {
         cv({ class: "base", style: { backgroundColor: "red" } }),
       );
       const props = component();
-      assertClassProperty(config, props);
-      assertStyleProperty(config, props);
+      assertHTMLObjProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe(cls("base"));
       expect(props.style["background-color"]).toBe("red");
@@ -258,8 +295,7 @@ for (const config of [CONFIGS.htmlObj, CONFIGS.htmlObjDefault]) {
     test("no argument still returns htmlObj shape", () => {
       const component = getModalComponent(mode, cv());
       const props = component();
-      assertClassProperty(config, props);
-      assertStyleProperty(config, props);
+      assertHTMLObjProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe("");
       expect(props.style).toEqual({});
@@ -853,6 +889,32 @@ for (const config of Object.values(CONFIGS)) {
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("large"),
+        fontSize: "16px",
+      });
+    });
+
+    test("computedVariants can return another component default result", () => {
+      const button = cv({
+        variants: {
+          size: {
+            sm: { class: "button-sm", style: { fontSize: "12px" } },
+            lg: { class: "button-lg", style: { fontSize: "16px" } },
+          },
+        },
+      });
+      const component = getModalComponent(
+        mode,
+        cv({
+          computedVariants: {
+            size: (value: "sm" | "lg") => {
+              return button({ size: value });
+            },
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("button-lg"),
         fontSize: "16px",
       });
     });
@@ -2218,12 +2280,9 @@ for (const config of Object.values(CONFIGS)) {
       expectTypeOf(component.keys).toExtend<
         ("class" | "className" | "style" | "size" | "color")[]
       >();
-      expect(component.keys).toEqual([
-        getClassPropertyName(config),
-        "style",
-        "size",
-        "color",
-      ]);
+      expect(component.keys).toEqual(
+        getExpectedPropsKeys(config, "size", "color"),
+      );
     });
 
     test("splitProps separates variant props", () => {
@@ -2297,16 +2356,12 @@ for (const config of Object.values(CONFIGS)) {
         mode,
         cv({ variants: { size: { sm: "sm" }, color: { red: "red" } } }),
       );
-      const classNameProp = getClassPropertyName(config);
       expectTypeOf(component.propKeys).toExtend<
         ("class" | "className" | "style" | "size" | "color")[]
       >();
-      expect(component.propKeys).toEqual([
-        classNameProp,
-        "style",
-        "size",
-        "color",
-      ]);
+      expect(component.propKeys).toEqual(
+        getExpectedPropsKeys(config, "size", "color"),
+      );
     });
 
     test("propKeys on different modes", () => {
@@ -2314,8 +2369,7 @@ for (const config of Object.values(CONFIGS)) {
         mode,
         cv({ variants: { size: { sm: "sm" } } }),
       );
-      const classNameProp = getClassPropertyName(config);
-      expect(component.propKeys).toEqual([classNameProp, "style", "size"]);
+      expect(component.propKeys).toEqual(getExpectedPropsKeys(config, "size"));
     });
 
     test("splitProps does not include defaultVariants", () => {
@@ -2851,7 +2905,7 @@ describe("Variant utility type", () => {
         } satisfies Variant<typeof base, "foo">,
       },
     });
-    expect(component({ bar: "sm" }).className).toContain("bar-sm");
+    expect(component({ bar: "sm" }).class).toContain("bar-sm");
   });
 
   test("rejects invalid variant keys", () => {

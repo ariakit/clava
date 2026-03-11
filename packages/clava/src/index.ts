@@ -14,8 +14,8 @@ import type {
   MergeVariants,
   ModalComponent,
   SplitPropsFunction,
+  StyleClassProps,
   StyleClassValue,
-  StyleProps,
   StyleValue,
   VariantValues,
   Variants,
@@ -77,6 +77,7 @@ function assign<T extends object>(target: T, source: T): void {
 export type {
   ClassValue,
   StyleValue,
+  StyleClassProps,
   StyleClassValue,
   JSXProps,
   HTMLProps,
@@ -112,8 +113,7 @@ export interface CVConfig<
   computed?: Computed<MergeVariants<V, CV, E>>;
 }
 
-interface CreateParams<M extends Mode> {
-  defaultMode?: M;
+interface CreateParams {
   transformClass?: (className: string) => string;
 }
 
@@ -839,10 +839,9 @@ function createResolveDefaults(
 /**
  * Creates the cv and cx functions.
  */
-export function create<M extends Mode = "jsx">({
-  defaultMode = "jsx" as M,
+export function create({
   transformClass = (className) => className,
-}: CreateParams<M> = {}) {
+}: CreateParams = {}) {
   const cx = (...classes: ClsxClassValue[]) => transformClass(clsx(...classes));
 
   const cv = <
@@ -851,12 +850,13 @@ export function create<M extends Mode = "jsx">({
     const E extends AnyComponent[] = [],
   >(
     config: CVConfig<V, CV, E> = {},
-  ): CVComponent<V, CV, E, StyleProps[M]> => {
+  ): CVComponent<V, CV, E> => {
     type MergedVariants = MergeVariants<V, CV, E>;
 
     const variantKeys = collectVariantKeys(config);
     const disabledVariantKeys = collectDisabledVariantKeys(config);
     const disabledVariantValues = collectDisabledVariantValues(config);
+    const inputPropsKeys = ["class", "className", "style", ...variantKeys];
 
     const getPropsKeys = (mode: Mode) => [
       getClassPropertyName(mode),
@@ -970,6 +970,75 @@ export function create<M extends Mode = "jsx">({
       };
     };
 
+    const getVariants = (variants?: VariantValues<MergedVariants>) => {
+      const variantProps = variants ?? {};
+      const resolvedVariants = resolveVariants(config, variantProps);
+      // Run computed function to get variants set via setVariants and
+      // setDefaultVariants
+      const { updatedVariants } = runComputedFunction(
+        config,
+        resolvedVariants,
+        variantProps,
+      );
+      return updatedVariants as VariantValues<MergedVariants>;
+    };
+
+    // Compute base class (without variants) - includes extended base classes
+    const extendedBaseClasses: ClassValue[] = [];
+    if (config.extend) {
+      for (const ext of config.extend) {
+        const meta = getComponentMeta(ext);
+        extendedBaseClasses.push(meta?.baseClass ?? "");
+      }
+    }
+    const baseClass = cx(
+      ...(extendedBaseClasses as ClsxClassValue[]),
+      config.class as ClsxClassValue,
+    );
+
+    // Compute static defaults once at creation time (without triggering
+    // computed functions)
+    const staticDefaults = collectStaticDefaults(config);
+
+    const initializeComponent = <
+      R extends ComponentResult,
+      T extends ModalComponent<MergedVariants, R>,
+    >(
+      component: T,
+      propsKeys: string[],
+    ): T => {
+      component.class = (props: ComponentProps<MergedVariants> = {}) => {
+        return computeResult(props).className;
+      };
+
+      component.getVariants = getVariants;
+      component.keys = propsKeys;
+      component.variantKeys = variantKeys;
+      component.propKeys = propsKeys;
+
+      // Store internal metadata hidden from public types
+      setComponentMeta(component, {
+        baseClass,
+        staticDefaults,
+        resolveDefaults: createResolveDefaults(config),
+      });
+
+      return component;
+    };
+
+    const createDefaultComponent = (): CVComponent<V, CV, E> => {
+      const component = ((props: ComponentProps<MergedVariants> = {}) => {
+        const { className, style } = computeResult(props);
+        return { class: className, style };
+      }) as CVComponent<V, CV, E>;
+
+      component.style = (props: ComponentProps<MergedVariants> = {}) => {
+        return computeResult(props).style;
+      };
+
+      return initializeComponent(component, inputPropsKeys);
+    };
+
     const createModalComponent = <R extends ComponentResult>(
       mode: Mode,
     ): ModalComponent<MergedVariants, R> => {
@@ -998,53 +1067,10 @@ export function create<M extends Mode = "jsx">({
         if (mode === "html") return styleValueToHTMLStyle(style);
         return styleValueToHTMLObjStyle(style);
       };
-
-      component.getVariants = (variants?: VariantValues<MergedVariants>) => {
-        const variantProps = variants ?? {};
-        const resolvedVariants = resolveVariants(config, variantProps);
-        // Run computed function to get variants set via setVariants and
-        // setDefaultVariants
-        const { updatedVariants } = runComputedFunction(
-          config,
-          resolvedVariants,
-          variantProps,
-        );
-        return updatedVariants as VariantValues<MergedVariants>;
-      };
-
-      component.keys = propsKeys;
-      component.variantKeys = variantKeys;
-      component.propKeys = propsKeys;
-
-      // Compute base class (without variants) - includes extended base classes
-      const extendedBaseClasses: ClassValue[] = [];
-      if (config.extend) {
-        for (const ext of config.extend) {
-          const meta = getComponentMeta(ext);
-          extendedBaseClasses.push(meta?.baseClass ?? "");
-        }
-      }
-      const baseClass = cx(
-        ...(extendedBaseClasses as ClsxClassValue[]),
-        config.class as ClsxClassValue,
-      );
-
-      // Compute static defaults once at creation time (without triggering
-      // computed functions)
-      const staticDefaults = collectStaticDefaults(config);
-
-      // Store internal metadata hidden from public types
-      setComponentMeta(component, {
-        baseClass,
-        staticDefaults,
-        resolveDefaults: createResolveDefaults(config),
-      });
-
-      return component;
+      return initializeComponent(component, propsKeys);
     };
 
-    // Create the default modal component
-    const defaultComponent = createModalComponent<StyleProps[M]>(defaultMode);
+    const defaultComponent = createDefaultComponent();
 
     // Create all modal variants
     const jsxComponent = createModalComponent<JSXProps>("jsx");
@@ -1052,7 +1078,7 @@ export function create<M extends Mode = "jsx">({
     const htmlObjComponent = createModalComponent<HTMLObjProps>("htmlObj");
 
     // Build the final component
-    const component = defaultComponent as CVComponent<V, CV, E, StyleProps[M]>;
+    const component = defaultComponent;
     component.jsx = jsxComponent;
     component.html = htmlComponent;
     component.htmlObj = htmlObjComponent;
