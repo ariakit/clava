@@ -1,0 +1,24 @@
+---
+title: Variant
+description: "Reference entry generated from the current public export."
+---
+
+## Summary
+
+Reference entry generated from the current public export.
+
+## Signature
+
+```ts
+type Variant<
+  T extends Pick<AnyComponent, "getVariants">,
+  K extends keyof VariantProps<T>,
+> = Record<
+  VariantKey<NonNullable<VariantProps<T>[K]>>,
+  ClassValue | StyleClassValue
+>;
+```
+
+## Source
+
+- [`packages/clava/src/index.ts`](https://github.com/ariakit/clava/blob/main/packages/clava/src/index.ts#L94)

@@ -4,11 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
   },
   "dependencies": {
-    "clava": "workspace:*"
+    "@astrojs/cloudflare": "13.1.0",
+    "@astrojs/mdx": "5.0.0",
+    "@astrojs/starlight": "0.38.1",
+    "astro": "6.0.3",
+    "clava": "workspace:*",
+    "wrangler": "4.72.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.7",
+    "typescript": "5.9.3"
   }
 }

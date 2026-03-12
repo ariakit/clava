@@ -6,5 +6,5 @@
     "emitDeclarationOnly": false
   },
   "include": ["**/*.ts", "**/*.js"],
-  "references": [{ "path": "./packages/clava" }, { "path": "./app" }]
+  "references": [{ "path": "./packages/clava" }]
 }

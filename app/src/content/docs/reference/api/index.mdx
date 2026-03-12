@@ -1,0 +1,35 @@
+---
+title: API Symbols
+description: Generated reference for every public Clava symbol.
+---
+
+This section is generated at build time from the public exports in `packages/clava/src/index.ts` and the related declarations they point to.
+
+Use [`Public API`](/reference/public-api/) for the curated overview, then come here for signatures, summaries, and source links.
+
+## Functions
+
+- [`create`](/reference/api/create/) - Creates the cv and cx functions.
+
+## Constants
+
+- [`cv`](/reference/api/cv/)
+- [`cx`](/reference/api/cx/)
+- [`splitProps`](/reference/api/split-props/) - Splits props into multiple groups based on key sources. Each source gets its own result object containing all its matching keys. The first component source claims styling props (class/className/style). Subsequent components only receive variant props. Arrays receive their listed keys but don't claim styling props. The last element is always the "rest" containing keys not claimed by any source.
+
+## Interfaces
+
+- [`CVComponent`](/reference/api/cv-component/)
+- [`CVConfig`](/reference/api/cv-config/)
+- [`HTMLObjProps`](/reference/api/html-obj-props/)
+- [`HTMLProps`](/reference/api/html-props/)
+- [`JSXProps`](/reference/api/jsx-props/)
+- [`StyleClassProps`](/reference/api/style-class-props/)
+- [`StyleClassValue`](/reference/api/style-class-value/)
+
+## Types
+
+- [`ClassValue`](/reference/api/class-value/)
+- [`StyleValue`](/reference/api/style-value/)
+- [`Variant`](/reference/api/variant/)
+- [`VariantProps`](/reference/api/variant-props/)

@@ -1,0 +1,92 @@
+:root {
+  --sl-font: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --sl-font-system: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --sl-font-mono:
+    "IBM Plex Mono", "SFMono-Regular", "SF Mono", Consolas, monospace;
+}
+
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #0d1720;
+  --sl-color-accent: #4be3c2;
+  --sl-color-accent-high: #d6fff7;
+  --sl-color-bg: #050b10;
+  --sl-color-bg-nav: color-mix(in srgb, #050b10 88%, transparent);
+  --sl-color-bg-sidebar: #071019;
+  --sl-color-bg-inline-code: #0b1622;
+  --sl-color-hairline-light: rgba(150, 229, 214, 0.16);
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #eefaf7;
+  --sl-color-accent: #0b8b74;
+  --sl-color-accent-high: #08362f;
+  --sl-color-bg: #f6fbfa;
+  --sl-color-bg-nav: color-mix(in srgb, #f6fbfa 92%, transparent);
+  --sl-color-bg-sidebar: #eff8f5;
+  --sl-color-bg-inline-code: #eef7f3;
+  --sl-color-hairline-light: rgba(6, 76, 64, 0.12);
+}
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(75, 227, 194, 0.12), transparent 28%),
+    linear-gradient(180deg, transparent, rgba(75, 227, 194, 0.04));
+}
+
+.hero {
+  position: relative;
+}
+
+.hero::after {
+  background:
+    linear-gradient(135deg, rgba(75, 227, 194, 0.26), transparent 56%),
+    linear-gradient(225deg, rgba(90, 156, 255, 0.16), transparent 48%);
+  border-radius: 1.5rem;
+  content: "";
+  inset: -0.75rem;
+  opacity: 0.9;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.landing-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin-block: 2rem;
+}
+
+.landing-card {
+  backdrop-filter: blur(20px);
+  background: color-mix(in srgb, var(--sl-color-black) 68%, transparent);
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 1rem;
+  padding: 1.1rem 1.15rem;
+}
+
+:root[data-theme="light"] .landing-card {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.landing-card h3 {
+  font-size: 1rem;
+  margin-bottom: 0.45rem;
+}
+
+.landing-card p {
+  margin: 0;
+}
+
+.landing-kicker {
+  color: var(--sl-color-accent);
+  font-size: 0.85rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  margin-bottom: 0.6rem;
+  text-transform: uppercase;
+}
+
+.sl-markdown-content .expressive-code {
+  box-shadow: 0 20px 50px rgba(5, 11, 16, 0.22);
+}

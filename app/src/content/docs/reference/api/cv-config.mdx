@@ -1,0 +1,30 @@
+---
+title: CVConfig
+description: "Reference entry generated from the current public export."
+---
+
+## Summary
+
+Reference entry generated from the current public export.
+
+## Signature
+
+```ts
+interface CVConfig<
+  V extends Variants = {},
+  CV extends ComputedVariants = {},
+  E extends AnyComponent[] = [],
+> {
+  extend?: E;
+  class?: ClassValue;
+  style?: StyleValue;
+  variants?: ExtendableVariants<V, E>;
+  computedVariants?: CV;
+  defaultVariants?: VariantValues<MergeVariants<V, CV, E>>;
+  computed?: Computed<MergeVariants<V, CV, E>>;
+}
+```
+
+## Source
+
+- [`packages/clava/src/index.ts`](https://github.com/ariakit/clava/blob/main/packages/clava/src/index.ts#L102)

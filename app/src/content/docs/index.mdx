@@ -1,0 +1,105 @@
+---
+title: Clava
+description: Type-safe class variance for building reusable style APIs.
+template: splash
+hero:
+  title: Type-safe class variance without the string soup.
+  tagline: Build reusable style APIs with predictable JSX, HTML string, and HTML object outputs from the same configuration.
+  actions:
+    - text: Start here
+      link: /start/overview/
+      icon: right-arrow
+    - text: Public API
+      link: /reference/public-api/
+    - text: GitHub
+      link: https://github.com/ariakit/clava
+      icon: external
+      variant: minimal
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+<div class="landing-kicker">
+  v0 docs line for design system authors, library maintainers, and teams
+  standardizing variant-driven styling.
+</div>
+
+<div class="landing-grid">
+  <div class="landing-card">
+    <h3>Typed styling contracts</h3>
+    <p>
+      Move class composition into a reusable API with variants, defaults,
+      computed behavior, and extension points.
+    </p>
+  </div>
+  <div class="landing-card">
+    <h3>Framework-neutral outputs</h3>
+    <p>
+      Use the same component definition to produce JSX props, HTML strings, or
+      HTML object styles depending on the rendering target.
+    </p>
+  </div>
+  <div class="landing-card">
+    <h3>Ready for system-scale reuse</h3>
+    <p>
+      Compose shared primitives, split variant props cleanly, and keep styling
+      logic discoverable in the public API.
+    </p>
+  </div>
+</div>
+
+## Why Clava
+
+Clava is aimed at teams that want the ergonomics of variant-based styling without locking their design system to one rendering model. The v0 docs set is intentionally small, but the site structure is already the final one: Start, Guides, Reference, and a changelog that grows with the package.
+
+## One component, three output modes
+
+<Tabs syncKey="clava-output">
+  <TabItem label="JSX">
+
+```ts
+import { cv } from "clava";
+
+const button = cv({
+  class: "inline-flex items-center rounded-md font-medium",
+  variants: {
+    size: {
+      sm: "h-8 px-3 text-sm",
+      md: "h-10 px-4 text-sm",
+    },
+    tone: {
+      solid: "bg-black text-white",
+      subtle: "bg-zinc-100 text-zinc-900",
+    },
+  },
+  defaultVariants: {
+    size: "md",
+    tone: "solid",
+  },
+});
+
+button.jsx({ size: "sm" });
+```
+
+  </TabItem>
+  <TabItem label="HTML string">
+
+```ts
+button.html({ tone: "subtle" });
+```
+
+  </TabItem>
+  <TabItem label="HTML object">
+
+```ts
+button.htmlObj({ size: "sm" });
+```
+
+  </TabItem>
+</Tabs>
+
+## Next steps
+
+- Start with the [overview](/start/overview/) if you are evaluating the library.
+- Jump to [Quick Start](/start/quick-start/) if you want to write a component immediately.
+- Use [Public API](/reference/public-api/) and [API Symbols](/reference/api/) when you need exact signatures.

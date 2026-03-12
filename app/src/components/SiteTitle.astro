@@ -1,0 +1,55 @@
+---
+import { currentDocsVersion } from "../lib/docs-version.ts";
+
+const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<div class="site-title-shell">
+  <a href={siteTitleHref} class="site-title sl-flex">
+    <span translate="no">{siteTitle}</span>
+  </a>
+  <span class="version-badge">{currentDocsVersion.label}</span>
+</div>
+
+<style>
+  @layer starlight.core {
+    .site-title-shell {
+      align-items: center;
+      display: flex;
+      gap: 0.7rem;
+      min-width: 0;
+    }
+
+    .site-title {
+      align-items: center;
+      color: var(--sl-color-white);
+      font-size: var(--sl-text-h4);
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      min-width: 0;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .site-title span {
+      overflow: hidden;
+    }
+
+    .version-badge {
+      background: color-mix(in srgb, var(--sl-color-black) 72%, transparent);
+      border: 1px solid color-mix(
+        in srgb,
+        var(--sl-color-accent-high) 18%,
+        transparent
+      );
+      border-radius: 999px;
+      color: var(--sl-color-accent-high);
+      font-size: 0.76rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      padding: 0.45rem 0.72rem;
+      text-transform: uppercase;
+    }
+  }
+</style>

@@ -1,0 +1,27 @@
+---
+title: CVComponent
+description: "Reference entry generated from the current public export."
+---
+
+## Summary
+
+Reference entry generated from the current public export.
+
+## Signature
+
+```ts
+interface CVComponent<
+  V extends Variants = {},
+  CV extends ComputedVariants = {},
+  E extends AnyComponent[] = [],
+  R extends ComponentResult = StyleClassProps,
+> extends ModalComponent<MergeVariants<V, CV, E>, R> {
+  jsx: ModalComponent<MergeVariants<V, CV, E>, JSXProps>;
+  html: ModalComponent<MergeVariants<V, CV, E>, HTMLProps>;
+  htmlObj: ModalComponent<MergeVariants<V, CV, E>, HTMLObjProps>;
+}
+```
+
+## Source
+
+- [`packages/clava/src/types.ts`](https://github.com/ariakit/clava/blob/main/packages/clava/src/types.ts#L177)

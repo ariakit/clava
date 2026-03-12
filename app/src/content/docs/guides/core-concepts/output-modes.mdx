@@ -1,0 +1,43 @@
+---
+title: Output Modes
+description: Choose between default, JSX, HTML, and HTML object outputs.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+Clava exposes multiple output shapes so one configuration can serve more than one renderer.
+
+<Tabs syncKey="output-mode-guide">
+  <TabItem label="Default">
+
+```ts
+button({ size: "sm" });
+```
+
+  </TabItem>
+  <TabItem label="JSX">
+
+```ts
+button.jsx({ size: "sm" });
+```
+
+  </TabItem>
+  <TabItem label="HTML">
+
+```ts
+button.html({ size: "sm" });
+```
+
+  </TabItem>
+  <TabItem label="HTML object">
+
+```ts
+button.htmlObj({ size: "sm" });
+```
+
+  </TabItem>
+</Tabs>
+
+## Placeholder scope
+
+The final version of this page should explain output selection, style conversion, and when to normalize around one mode inside a component library.

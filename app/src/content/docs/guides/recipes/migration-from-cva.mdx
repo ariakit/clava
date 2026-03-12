@@ -1,0 +1,16 @@
+---
+title: Migration from CVA
+description: Move from CVA or ad hoc class helpers to Clava with a stable migration path.
+---
+
+Clava overlaps with CVA conceptually, but it expands the model around output modes, composition, and variant-aware prop handling.
+
+## Migration shape
+
+- Start by mapping existing variant objects and defaults to `cv()`.
+- Decide whether your current component boundaries need `splitProps`.
+- Keep the initial migration shallow, then adopt multi-mode outputs or `create()` only where they provide a real benefit.
+
+## Placeholder scope
+
+The finished version of this page should include a side-by-side example, naming guidance, and migration notes for teams already invested in class-merging utilities.

@@ -1,0 +1,39 @@
+---
+title: Quick Start
+description: Build a small variant-driven component with defaults in a few lines.
+---
+
+```ts
+import { cv } from "clava";
+
+const button = cv({
+  class: "inline-flex items-center rounded-md font-medium transition-colors",
+  variants: {
+    size: {
+      sm: "h-8 px-3 text-sm",
+      md: "h-10 px-4 text-sm",
+    },
+    tone: {
+      primary: "bg-black text-white",
+      subtle: "bg-zinc-100 text-zinc-900",
+    },
+  },
+  defaultVariants: {
+    size: "md",
+    tone: "primary",
+  },
+});
+
+button({ size: "sm" });
+```
+
+## What this gives you
+
+- A single source of truth for the component’s styling API.
+- Variant props that stay typed as the configuration evolves.
+- Multiple output modes when you need to move between JSX, HTML strings, and HTML object styles.
+
+## Continue with
+
+- [First Component](/start/first-component/) for output-mode examples.
+- [Variants and Defaults](/guides/core-concepts/variants-defaults/) for the core mental model.

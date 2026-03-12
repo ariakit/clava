@@ -1,0 +1,51 @@
+---
+title: First Component
+description: See one Clava component rendered through each supported output mode.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+The same Clava definition can power different rendering environments. This page anchors that idea early because the rest of the guides assume you are designing an API, not just composing a class string.
+
+<Tabs syncKey="first-component-output">
+  <TabItem label="JSX">
+
+```ts
+import { cv } from "clava";
+
+const badge = cv({
+  class: "inline-flex rounded-full font-medium",
+  variants: {
+    tone: {
+      neutral: "bg-zinc-100 text-zinc-900",
+      success: "bg-emerald-100 text-emerald-900",
+    },
+  },
+  defaultVariants: {
+    tone: "neutral",
+  },
+});
+
+badge.jsx({ tone: "success" });
+```
+
+  </TabItem>
+  <TabItem label="HTML string">
+
+```ts
+badge.html({ tone: "neutral" });
+```
+
+  </TabItem>
+  <TabItem label="HTML object">
+
+```ts
+badge.htmlObj({ tone: "success" });
+```
+
+  </TabItem>
+</Tabs>
+
+## Why this matters
+
+Use the default `badge()` form when you want class/style pairs, and choose the mode-specific helpers when the target renderer expects a particular shape. The deeper guide is [Output Modes](/guides/core-concepts/output-modes/).

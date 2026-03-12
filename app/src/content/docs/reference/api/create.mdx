@@ -1,0 +1,27 @@
+---
+title: create
+description: "Creates the cv and cx functions."
+---
+
+## Summary
+
+Creates the cv and cx functions.
+
+## Signature
+
+```ts
+function create({ transformClass }?: CreateParams): {
+  cv: <
+    V extends Variants = {},
+    CV extends ComputedVariants = {},
+    const E extends AnyComponent[] = [],
+  >(
+    config?: CVConfig<V, CV, E>,
+  ) => CVComponent<V, CV, E>;
+  cx: (...classes: ClsxClassValue[]) => string;
+};
+```
+
+## Source
+
+- [`packages/clava/src/index.ts`](https://github.com/ariakit/clava/blob/main/packages/clava/src/index.ts#L842)
