@@ -4,6 +4,7 @@
     "target": "ES2020",
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    "types": ["node"],
     "customConditions": ["source"],
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "strict": true,
