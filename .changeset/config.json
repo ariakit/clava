@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@changesets/config/schema.json",
-  "changelog": "@changesets/changelog-git",
+  "changelog": "./changelog.ts",
   "commit": false,
   "fixed": [],
   "linked": [],
