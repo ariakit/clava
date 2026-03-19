@@ -1,97 +1,101 @@
 /// <reference types="node" />
 
-import applyReleasePlan from "@changesets/apply-release-plan";
-import { mkdir, mkdtemp, readFile, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
+import applyReleasePlan from "@changesets/apply-release-plan";
 import { expect, test } from "vitest";
 
 test("changesets getChangelogEntry hook", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "changesets-test-"));
-  const packageDir = path.join(tempDir, "pkg-a");
-  await mkdir(packageDir, { recursive: true });
-  await writeFile(
-    path.join(packageDir, "package.json"),
-    JSON.stringify({ name: "pkg-a", version: "1.0.0" }, null, 2),
-  );
+  try {
+    const packageDir = path.join(tempDir, "pkg-a");
+    await mkdir(packageDir, { recursive: true });
+    await writeFile(
+      path.join(packageDir, "package.json"),
+      JSON.stringify({ name: "pkg-a", version: "1.0.0" }, null, 2),
+    );
 
-  const releasePlan = {
-    changesets: [
-      {
-        id: "fake-id-1",
-        summary: "Overview\n\nAdd awesome feature",
-        releases: [{ name: "pkg-a", type: "minor" }],
+    const releasePlan = {
+      changesets: [
+        {
+          id: "fake-id-1",
+          summary: "Overview\n\nAdd awesome feature",
+          releases: [{ name: "pkg-a", type: "minor" }],
+        },
+        {
+          id: "fake-id-2",
+          summary: "Testing title\n\nAdd awesome feature\n\n2",
+          releases: [{ name: "pkg-a", type: "minor" }],
+        },
+        {
+          id: "fake-id-3",
+          summary: "Chore: update docs",
+          releases: [{ name: "pkg-a", type: "patch" }],
+        },
+      ],
+      releases: [
+        {
+          name: "pkg-a",
+          type: "minor",
+          newVersion: "1.1.0",
+          changesets: ["fake-id-1", "fake-id-2", "fake-id-3"],
+        },
+      ],
+      preState: undefined,
+    } as const;
+
+    const packages = {
+      root: { dir: process.cwd() },
+      packages: [
+        {
+          dir: packageDir,
+          packageJson: { name: "pkg-a", version: "1.0.0" },
+        },
+      ],
+    } as const;
+
+    const config = {
+      changelog: ["./changelog.ts", {}],
+      updateInternalDependencies: "patch",
+      ___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH: {
+        onlyUpdatePeerDependentsWhenOutOfRange: true,
       },
-      {
-        id: "fake-id-2",
-        summary: "Testing title\n\nAdd awesome feature\n\n2",
-        releases: [{ name: "pkg-a", type: "minor" }],
-      },
-      {
-        id: "fake-id-3",
-        summary: "Chore: update docs",
-        releases: [{ name: "pkg-a", type: "patch" }],
-      },
-    ],
-    releases: [
-      {
-        name: "pkg-a",
-        type: "minor",
-        newVersion: "1.1.0",
-        changesets: ["fake-id-1", "fake-id-2", "fake-id-3"],
-      },
-    ],
-    preState: undefined,
-  } as const;
+      bumpVersionsWithWorkspaceProtocolOnly: false,
+      prettier: false,
+      ignore: [],
+      privatePackages: { version: false, tag: false },
+    } as const;
 
-  const packages = {
-    root: { dir: process.cwd() },
-    packages: [
-      {
-        dir: packageDir,
-        packageJson: { name: "pkg-a", version: "1.0.0" },
-      },
-    ],
-  } as const;
+    const releasePlanRunner = applyReleasePlan as (
+      ...arguments_: any[]
+    ) => Promise<string[]>;
 
-  const config = {
-    changelog: ["./changelog.ts", {}],
-    updateInternalDependencies: "patch",
-    ___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH: {
-      onlyUpdatePeerDependentsWhenOutOfRange: true,
-    },
-    bumpVersionsWithWorkspaceProtocolOnly: false,
-    prettier: false,
-    ignore: [],
-    privatePackages: { version: false, tag: false },
-  } as const;
+    const touched = await releasePlanRunner(releasePlan, packages, config);
+    expect(Array.isArray(touched)).toBe(true);
 
-  const releasePlanRunner = applyReleasePlan as (
-    ...arguments_: any[]
-  ) => Promise<string[]>;
+    const changelogPath = path.join(packageDir, "CHANGELOG.md");
+    const changelog = await readFile(changelogPath, "utf8");
 
-  const touched = await releasePlanRunner(releasePlan, packages, config);
-  expect(Array.isArray(touched)).toBe(true);
+    expect(changelog).toMatchInlineSnapshot(`
+      "# pkg-a
 
-  const changelogPath = path.join(packageDir, "CHANGELOG.md");
-  const changelog = await readFile(changelogPath, "utf8");
+      ## 1.1.0
 
-  expect(changelog).toMatchInlineSnapshot(`
-    "# pkg-a
+      Add awesome feature
 
-    ## 1.1.0
+      ### Testing title
 
-    Add awesome feature
+      Add awesome feature
 
-    ### Testing title
+      2
 
-    Add awesome feature
+      ### Other updates
 
-    2
-
-    ### Other updates
-
-    - Chore: update docs
-    "
-  `);
+      - Chore: update docs
+      "
+    `);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 });
