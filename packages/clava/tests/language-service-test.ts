@@ -27,6 +27,9 @@ function createCompilerOptions(): ts.CompilerOptions {
     target: ts.ScriptTarget.ES2020,
     module: ts.ModuleKind.NodeNext,
     moduleResolution: ts.ModuleResolutionKind.NodeNext,
+    // Match the repo's Node-aware TS environment so language-service
+    // navigation in the fixture reflects real editor behavior.
+    types: ["node"],
     allowImportingTsExtensions: true,
     strict: true,
     skipLibCheck: true,
