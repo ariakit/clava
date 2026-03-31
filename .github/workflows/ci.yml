@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run oxlint
+      - name: Lint
         run: pnpm lint
 
   test:
