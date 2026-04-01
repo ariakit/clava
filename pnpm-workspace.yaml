@@ -3,3 +3,8 @@ packages:
   - "app"
 
 minimumReleaseAge: 4320
+
+allowBuilds:
+  esbuild: true
+
+trustPolicy: no-downgrade
