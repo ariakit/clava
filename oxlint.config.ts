@@ -14,5 +14,6 @@ export default defineConfig({
     "eslint/no-unused-vars": "error",
     "eslint/sort-imports": ["error", { ignoreDeclarationSort: true }],
     "eslint/no-shadow": "off",
+    "typescript/consistent-return": "off",
   },
 });
