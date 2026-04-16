@@ -71,8 +71,8 @@ export function getConfigDescription(config: Config) {
   return "custom";
 }
 
-export function createCVFromConfig<T extends Config>(
-  config: T,
+export function createCVFromConfig(
+  config: Config,
 ): ReturnType<typeof create>["cv"] {
   const transformClass = getConfigTransformClass(config);
   const hasTransform = "transformClass" in config && config.transformClass;
