@@ -1,8 +1,8 @@
 diff --git a/dist/changesets-apply-release-plan.cjs.js b/dist/changesets-apply-release-plan.cjs.js
-index 2e57ca5e53b45a05c637766852336ad1353bbe9f..90c6ab946bef23f79027a5ca0f3d0691c89f0bdc 100644
+index e71b99fa922361c1d91d591ec15b4ed9c3689779..beb6e33d0c99575ac835ac03403df7a3f0f52f78 100644
 --- a/dist/changesets-apply-release-plan.cjs.js
 +++ b/dist/changesets-apply-release-plan.cjs.js
-@@ -414,15 +414,61 @@ async function getNewChangelogEntry(releasesWithPackage, changesets, config, cwd
+@@ -447,15 +447,61 @@ async function getNewChangelogEntry(releasesWithPackage, changesets, config, cwd
    } else {
      throw new Error("Could not resolve changelog generation functions");
    }
@@ -12,7 +12,7 @@ index 2e57ca5e53b45a05c637766852336ad1353bbe9f..90c6ab946bef23f79027a5ca0f3d0691
      commit: commits[i]
    }));
    return Promise.all(releasesWithPackage.map(async release => {
--    let changelog = await getChangelogEntry(release, releasesWithPackage, moddedChangesets, getChangelogFuncs, changelogOpts, {
+-    let changelog = await getChangelogEntry(cwd, release, releasesWithPackage, moddedChangesets, getChangelogFuncs, changelogOpts, {
 -      updateInternalDependencies: config.updateInternalDependencies,
 -      onlyUpdatePeerDependentsWhenOutOfRange: config.___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH.onlyUpdatePeerDependentsWhenOutOfRange
 -    });
@@ -60,7 +60,7 @@ index 2e57ca5e53b45a05c637766852336ad1353bbe9f..90c6ab946bef23f79027a5ca0f3d0691
 +        changelog = await customGetChangelogEntry(release, changelogLines);
 +      }
 +    } else {
-+      changelog = await getChangelogEntry(release, releasesWithPackage, moddedChangesets, getChangelogFuncs, changelogOpts, {
++      changelog = await getChangelogEntry(cwd, release, releasesWithPackage, moddedChangesets, getChangelogFuncs, changelogOpts, {
 +        updateInternalDependencies: config.updateInternalDependencies,
 +        onlyUpdatePeerDependentsWhenOutOfRange: config.___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH.onlyUpdatePeerDependentsWhenOutOfRange
 +      });
