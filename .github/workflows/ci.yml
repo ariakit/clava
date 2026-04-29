@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint
@@ -80,7 +84,9 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout base branch
-        run: git checkout -f ${{ github.event.pull_request.base.sha }}
+        run: |
+          git checkout -f ${{ github.event.pull_request.base.sha }}
+          git clean -fdx
 
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -93,9 +99,9 @@ jobs:
 
       - name: Run baseline perf tests
         run: |
-          pnpm perf \
+          pnpm exec vitest bench \
             --outputJson .perf-results/baseline.json \
-            --passWithNoTests || true
+            --passWithNoTests
 
       - name: Save baseline results
         run: |
@@ -103,7 +109,9 @@ jobs:
           cp .perf-results/baseline.json /tmp/perf-baseline/ 2>/dev/null || true
 
       - name: Checkout merge commit
-        run: git checkout -f ${{ github.sha }}
+        run: |
+          git checkout -f ${{ github.sha }}
+          git clean -fdx
 
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -121,7 +129,7 @@ jobs:
 
       - name: Run current perf tests
         run: |
-          pnpm perf \
+          pnpm exec vitest bench \
             --outputJson .perf-results/current.json \
             --passWithNoTests
 
@@ -136,6 +144,7 @@ jobs:
           name: perf-results
           path: .perf-results
           if-no-files-found: ignore
+          include-hidden-files: true
           retention-days: 7
 
       - name: Post or update PR comment

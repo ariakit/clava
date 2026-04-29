@@ -61,7 +61,15 @@ interface ComparisonSummary {
 
 function readJsonFile(filePath: string): unknown {
   if (!existsSync(filePath)) return {};
-  return JSON.parse(readFileSync(filePath, "utf-8"));
+  try {
+    return JSON.parse(readFileSync(filePath, "utf-8"));
+  } catch (error) {
+    console.warn(
+      `Warning: failed to parse JSON file at ${filePath}. Falling back to empty results.`,
+      error,
+    );
+    return {};
+  }
 }
 
 function getNumber(value: unknown): number {
@@ -262,12 +270,18 @@ function formatMarkdown(summary: ComparisonSummary) {
 
   if (hasSignificantChanges) {
     lines.push(...formatBenchmarkRows(significantRows));
-  } else if (rows.length === 0 && newBenchmarks.length > 0) {
+  } else if (rows.length > 0) {
+    lines.push("No significant performance changes detected.");
+  } else if (newBenchmarks.length > 0 && removedBenchmarks.length === 0) {
     lines.push("No baseline results available for comparison.");
+  } else if (newBenchmarks.length === 0 && removedBenchmarks.length > 0) {
+    lines.push(
+      "Some benchmarks were removed; no comparable benchmarks remain.",
+    );
+  } else if (newBenchmarks.length > 0 && removedBenchmarks.length > 0) {
+    lines.push("All benchmarks were renamed; no comparison possible.");
   } else if (totalBenchmarks === 0) {
     lines.push("No performance results found.");
-  } else {
-    lines.push("No significant performance changes detected.");
   }
 
   lines.push("");
