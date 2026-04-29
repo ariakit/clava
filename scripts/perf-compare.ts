@@ -75,8 +75,18 @@ function normalizeFilePath(filePath: string) {
   return path.relative(process.cwd(), filePath);
 }
 
+function getPackageName(filePath: string) {
+  const [workspace, packageName] = filePath.split(/[\\/]/);
+  if (workspace === "packages" && packageName) return packageName;
+  return workspace ?? "";
+}
+
 function formatLabel(entry: BenchmarkEntry): string {
-  const parts = [entry.group, entry.name].filter(Boolean);
+  const parts = [
+    getPackageName(entry.file),
+    path.basename(entry.file),
+    entry.name,
+  ].filter(Boolean);
   return parts.join(" > ");
 }
 
