@@ -2,7 +2,6 @@ import type * as CSS from "csstype";
 import type {
   HTMLCSSProperties,
   JSXCSSProperties,
-  StyleDefinition,
   StyleValue,
 } from "./types.ts";
 
@@ -118,24 +117,6 @@ export function jsxStyleToStyleValue(style: JSXCSSProperties) {
     if (value == null) continue;
     // CSS property names and values are dynamic - cast required for index access
     (result as Record<string, string>)[key] = parseLengthValue(value);
-  }
-  return result;
-}
-
-/**
- * Converts a Clava style definition object to a normalized StyleValue object.
- * @example
- * styleDefinitionToStyleValue({ fontSize: "16px", "--columns": 3 });
- * // { fontSize: "16px", "--columns": "3" }
- */
-export function styleDefinitionToStyleValue(style: StyleDefinition) {
-  const result: StyleValue = {};
-  for (const [key, value] of Object.entries(style)) {
-    if (value == null) continue;
-    const property = hyphenToCamel(key);
-    const definitionValue = key.startsWith("--") ? `${value}` : value;
-    // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string | number>)[property] = definitionValue;
   }
   return result;
 }

@@ -28,7 +28,6 @@ import {
   htmlStyleToStyleValue,
   isHTMLObjStyle,
   jsxStyleToStyleValue,
-  styleDefinitionToStyleValue,
   styleValueToHTMLObjStyle,
   styleValueToHTMLStyle,
   styleValueToJSXStyle,
@@ -157,9 +156,22 @@ function normalizeStyleDefinition(style: unknown): StyleValue {
     return htmlStyleToStyleValue(style);
   }
   if (typeof style === "object" && style != null) {
-    return styleDefinitionToStyleValue(style as StyleDefinition);
+    return stringifyStyleDefinitionNumbers(style as StyleDefinition);
   }
   return {};
+}
+
+function stringifyStyleDefinitionNumbers(style: StyleDefinition): StyleValue {
+  let result: StyleValue | undefined;
+  for (const key in style) {
+    if (!Object.prototype.hasOwnProperty.call(style, key)) continue;
+    if (!key.startsWith("--")) continue;
+    const value = (style as Record<string, unknown>)[key];
+    if (typeof value !== "number") continue;
+    result ??= { ...style } as StyleValue;
+    (result as Record<string, string>)[key] = `${value}`;
+  }
+  return result ?? (style as StyleValue);
 }
 
 /**
