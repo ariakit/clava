@@ -16,6 +16,7 @@ import type {
   SplitPropsFunction,
   StyleClassProps,
   StyleClassValue,
+  StyleDefinition,
   StyleValue,
   VariantValues,
   Variants,
@@ -27,6 +28,7 @@ import {
   htmlStyleToStyleValue,
   isHTMLObjStyle,
   jsxStyleToStyleValue,
+  styleDefinitionToStyleValue,
   styleValueToHTMLObjStyle,
   styleValueToHTMLStyle,
   styleValueToJSXStyle,
@@ -76,6 +78,7 @@ function assign<T extends object>(target: T, source: T): void {
 
 export type {
   ClassValue,
+  StyleDefinition,
   StyleValue,
   StyleClassProps,
   StyleClassValue,
@@ -106,7 +109,7 @@ export interface CVConfig<
 > {
   extend?: E;
   class?: ClassValue;
-  style?: StyleValue;
+  style?: StyleDefinition;
   variants?: ExtendableVariants<V, E>;
   computedVariants?: CV;
   defaultVariants?: VariantValues<MergeVariants<V, CV, E>>;
@@ -149,6 +152,16 @@ function normalizeStyle(style: unknown): StyleValue {
   return {};
 }
 
+function normalizeStyleDefinition(style: unknown): StyleValue {
+  if (typeof style === "string") {
+    return htmlStyleToStyleValue(style);
+  }
+  if (typeof style === "object" && style != null) {
+    return styleDefinitionToStyleValue(style as StyleDefinition);
+  }
+  return {};
+}
+
 /**
  * Extracts class and style from a style-class value object.
  */
@@ -156,7 +169,7 @@ function extractStyleClass(value: StyleClassValue): {
   class: ClassValue;
   style: StyleValue;
 } {
-  return { class: value.class, style: normalizeStyle(value.style) };
+  return { class: value.class, style: normalizeStyleDefinition(value.style) };
 }
 
 /**
@@ -607,8 +620,8 @@ function runComputedFunction(
     addClass: (className: ClassValue) => {
       classes.push(className);
     },
-    addStyle: (newStyle: StyleValue) => {
-      assign(style, newStyle);
+    addStyle: (newStyle: StyleDefinition) => {
+      assign(style, normalizeStyleDefinition(newStyle));
     },
   };
 
@@ -931,7 +944,7 @@ export function create({
 
       // 3. Add base style
       if (config.style) {
-        assign(allStyle, config.style);
+        assign(allStyle, normalizeStyleDefinition(config.style));
       }
 
       // 4. Extended variant classes

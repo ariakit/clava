@@ -515,12 +515,11 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("computed style does not accept numbers", () => {
+    test("computed style accepts numbers", () => {
       const component = getModeComponent(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
-          // @ts-expect-error
           computed: ({ variants }) =>
             variants.size === "lg"
               ? {
@@ -533,7 +532,7 @@ for (const config of Object.values(CONFIGS)) {
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg computed-lg"),
-        fontSize: expect.toBeOneOf(["20", "20px"]),
+        fontSize: "20",
       });
     });
 
@@ -775,17 +774,14 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("computed addStyle does not accept numbers", () => {
+    test("computed addStyle accepts numbers", () => {
       const component = getModeComponent(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           computed: ({ variants, addStyle }) => {
             if (variants.size === "lg") {
-              addStyle({
-                // @ts-expect-error
-                fontSize: 20,
-              });
+              addStyle({ fontSize: 20 });
             }
           },
         }),
@@ -793,7 +789,7 @@ for (const config of Object.values(CONFIGS)) {
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
-        fontSize: expect.toBeOneOf(["20", "20px"]),
+        fontSize: "20",
       });
     });
   });

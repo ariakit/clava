@@ -258,12 +258,16 @@ export type VariantValues<V> = {
   [K in keyof V]?: ExtractVariantValue<V[K]>;
 };
 
-export type StyleValue = CSS.Properties & {
+export interface StyleDefinition extends CSS.Properties<string | number> {
+  [key: `--${string}`]: string | number;
+}
+
+export interface StyleValue extends CSS.Properties {
   [key: `--${string}`]: string;
-};
+}
 
 export interface StyleClassValue {
-  style?: StyleValue;
+  style?: StyleDefinition;
   class?: ClassValue;
 }
 
@@ -272,7 +276,7 @@ export interface ComputedContext<V> {
   setVariants: (variants: VariantValues<V>) => void;
   setDefaultVariants: (variants: VariantValues<V>) => void;
   addClass: (className: ClassValue) => void;
-  addStyle: (style: StyleValue) => void;
+  addStyle: (style: StyleDefinition) => void;
 }
 
 export type Computed<V> = (context: ComputedContext<V>) => VariantValue;

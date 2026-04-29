@@ -2,6 +2,7 @@ import type * as CSS from "csstype";
 import type {
   HTMLCSSProperties,
   JSXCSSProperties,
+  StyleDefinition,
   StyleValue,
 } from "./types.ts";
 
@@ -55,6 +56,16 @@ export function camelToHyphen(str: string) {
 export function parseLengthValue(value: string | number) {
   if (typeof value === "string") return value;
   return `${value}px`;
+}
+
+/**
+ * Parses a style definition value without appending CSS units.
+ * @example
+ * parseStyleDefinitionValue(16); // "16"
+ * parseStyleDefinitionValue("2em"); // "2em"
+ */
+export function parseStyleDefinitionValue(value: string | number) {
+  return `${value}`;
 }
 
 /**
@@ -117,6 +128,24 @@ export function jsxStyleToStyleValue(style: JSXCSSProperties) {
     if (value == null) continue;
     // CSS property names and values are dynamic - cast required for index access
     (result as Record<string, string>)[key] = parseLengthValue(value);
+  }
+  return result;
+}
+
+/**
+ * Converts a Clava style definition object to a normalized StyleValue object.
+ * @example
+ * styleDefinitionToStyleValue({ fontSize: 16, "--columns": 3 });
+ * // { fontSize: "16", "--columns": "3" }
+ */
+export function styleDefinitionToStyleValue(style: StyleDefinition) {
+  const result: StyleValue = {};
+  for (const [key, value] of Object.entries(style)) {
+    if (value == null) continue;
+    const property = hyphenToCamel(key);
+    // CSS property names and values are dynamic - cast required for index access
+    (result as Record<string, string>)[property] =
+      parseStyleDefinitionValue(value);
   }
   return result;
 }

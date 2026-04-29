@@ -242,14 +242,14 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("style does not accept numbers", () => {
+    test("style accepts numbers", () => {
       const component = getModeComponent(
         mode,
         cv({
           style: {
             backgroundColor: "red",
-            // @ts-expect-error
             fontSize: 16,
+            "--custom-var": 3,
           },
         }),
       );
@@ -257,7 +257,8 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
-        fontSize: expect.toBeOneOf(["16", "16px"]),
+        fontSize: "16",
+        "--custom-var": "3",
       });
     });
 

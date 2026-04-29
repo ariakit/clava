@@ -211,16 +211,15 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
-    test("variant style does not accept numbers", () => {
+    test("variant style accepts numbers", () => {
       const component = getModeComponent(
         mode,
         cv({
           variants: {
-            // @ts-expect-error
             size: {
               sm: {
                 class: "sm",
-                style: { fontSize: 12 },
+                style: { fontSize: 12, "--size": 1 },
               },
               lg: { class: "lg", style: { fontSize: "16px" } },
             },
@@ -230,7 +229,8 @@ for (const config of Object.values(CONFIGS)) {
       const props = component({ size: "sm" });
       expect(getStyleClass(props)).toEqual({
         class: cls("sm"),
-        fontSize: expect.toBeOneOf(["12", "12px"]),
+        fontSize: "12",
+        "--size": "1",
       });
     });
 
