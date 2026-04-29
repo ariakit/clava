@@ -133,11 +133,12 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("computedVariants style accepts numbers", () => {
+    test("computedVariants style does not accept number lengths", () => {
       const component = getModeComponent(
         mode,
         cv({
           computedVariants: {
+            // @ts-expect-error number lengths should use explicit units
             size: (value: "sm" | "lg") => ({
               class: value === "sm" ? "small" : "large",
               style: { fontSize: value === "sm" ? 12 : 16 },
@@ -148,7 +149,7 @@ for (const config of Object.values(CONFIGS)) {
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("large"),
-        fontSize: "16",
+        fontSize: expect.toBeOneOf(["16", "16px"]),
       });
     });
 

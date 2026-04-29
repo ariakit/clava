@@ -487,13 +487,16 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           computed: ({ variants }) =>
-            variants.size === "lg" ? { style: { fontSize: "20px" } } : null,
+            variants.size === "lg"
+              ? { style: { fontSize: "20px", "--scale": 2 } }
+              : null,
         }),
       );
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: "20px",
+        "--scale": "2",
       });
     });
 
@@ -515,11 +518,12 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("computed style accepts numbers", () => {
+    test("computed style does not accept number lengths", () => {
       const component = getModeComponent(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
+          // @ts-expect-error number lengths should use explicit units
           computed: ({ variants }) =>
             variants.size === "lg"
               ? {
@@ -532,7 +536,7 @@ for (const config of Object.values(CONFIGS)) {
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg computed-lg"),
-        fontSize: "20",
+        fontSize: expect.toBeOneOf(["20", "20px"]),
       });
     });
 
@@ -614,7 +618,7 @@ for (const config of Object.values(CONFIGS)) {
           variants: { size: { sm: "sm", lg: "lg" } },
           computed: ({ variants, addStyle }) => {
             if (variants.size === "lg") {
-              addStyle({ fontSize: "20px" });
+              addStyle({ fontSize: "20px", "--scale": 2 });
             }
           },
         }),
@@ -623,6 +627,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: "20px",
+        "--scale": "2",
       });
     });
 
@@ -774,14 +779,17 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("computed addStyle accepts numbers", () => {
+    test("computed addStyle does not accept number lengths", () => {
       const component = getModeComponent(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           computed: ({ variants, addStyle }) => {
             if (variants.size === "lg") {
-              addStyle({ fontSize: 20 });
+              addStyle({
+                // @ts-expect-error number lengths should use explicit units
+                fontSize: 20,
+              });
             }
           },
         }),
@@ -789,7 +797,7 @@ for (const config of Object.values(CONFIGS)) {
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
-        fontSize: "20",
+        fontSize: expect.toBeOneOf(["20", "20px"]),
       });
     });
   });

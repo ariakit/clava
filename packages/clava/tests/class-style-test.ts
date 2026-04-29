@@ -242,13 +242,13 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("style accepts numbers", () => {
+    test("style accepts custom property numbers", () => {
       const component = getModeComponent(
         mode,
         cv({
           style: {
             backgroundColor: "red",
-            fontSize: 16,
+            fontSize: "16px",
             "--custom-var": 3,
           },
         }),
@@ -257,8 +257,27 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
-        fontSize: "16",
+        fontSize: "16px",
         "--custom-var": "3",
+      });
+    });
+
+    test("style does not accept number lengths", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          style: {
+            backgroundColor: "red",
+            // @ts-expect-error number lengths should use explicit units
+            fontSize: 16,
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: "",
+        backgroundColor: "red",
+        fontSize: expect.toBeOneOf(["16", "16px"]),
       });
     });
 

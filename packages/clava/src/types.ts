@@ -258,7 +258,7 @@ export type VariantValues<V> = {
   [K in keyof V]?: ExtractVariantValue<V[K]>;
 };
 
-export interface StyleDefinition extends CSS.Properties<string | number> {
+export interface StyleDefinition extends CSS.Properties {
   [key: `--${string}`]: string | number;
 }
 

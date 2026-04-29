@@ -135,17 +135,19 @@ export function jsxStyleToStyleValue(style: JSXCSSProperties) {
 /**
  * Converts a Clava style definition object to a normalized StyleValue object.
  * @example
- * styleDefinitionToStyleValue({ fontSize: 16, "--columns": 3 });
- * // { fontSize: "16", "--columns": "3" }
+ * styleDefinitionToStyleValue({ fontSize: "16px", "--columns": 3 });
+ * // { fontSize: "16px", "--columns": "3" }
  */
 export function styleDefinitionToStyleValue(style: StyleDefinition) {
   const result: StyleValue = {};
   for (const [key, value] of Object.entries(style)) {
     if (value == null) continue;
     const property = hyphenToCamel(key);
+    const definitionValue = key.startsWith("--")
+      ? parseStyleDefinitionValue(value)
+      : value;
     // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string>)[property] =
-      parseStyleDefinitionValue(value);
+    (result as Record<string, string | number>)[property] = definitionValue;
   }
   return result;
 }
