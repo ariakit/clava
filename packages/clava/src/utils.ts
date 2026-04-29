@@ -59,16 +59,6 @@ export function parseLengthValue(value: string | number) {
 }
 
 /**
- * Parses a style definition value without appending CSS units.
- * @example
- * parseStyleDefinitionValue(16); // "16"
- * parseStyleDefinitionValue("2em"); // "2em"
- */
-export function parseStyleDefinitionValue(value: string | number) {
-  return `${value}`;
-}
-
-/**
  * Parses a CSS style string into a StyleValue object.
  * @example
  * htmlStyleToStyleValue("background-color: red; font-size: 16px;");
@@ -143,9 +133,7 @@ export function styleDefinitionToStyleValue(style: StyleDefinition) {
   for (const [key, value] of Object.entries(style)) {
     if (value == null) continue;
     const property = hyphenToCamel(key);
-    const definitionValue = key.startsWith("--")
-      ? parseStyleDefinitionValue(value)
-      : value;
+    const definitionValue = key.startsWith("--") ? `${value}` : value;
     // CSS property names and values are dynamic - cast required for index access
     (result as Record<string, string | number>)[property] = definitionValue;
   }
