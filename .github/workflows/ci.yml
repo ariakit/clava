@@ -66,3 +66,118 @@ jobs:
 
       - name: Build all packages
         run: pnpm build
+
+  perf:
+    name: Performance
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Checkout base branch
+        run: git checkout -f ${{ github.event.pull_request.base.sha }}
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install base dependencies
+        run: pnpm install
+
+      - name: Run baseline perf tests
+        run: |
+          pnpm perf \
+            --outputJson .perf-results/baseline.json \
+            --passWithNoTests || true
+
+      - name: Save baseline results
+        run: |
+          mkdir -p /tmp/perf-baseline
+          cp .perf-results/baseline.json /tmp/perf-baseline/ 2>/dev/null || true
+
+      - name: Checkout merge commit
+        run: git checkout -f ${{ github.sha }}
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install PR dependencies
+        run: pnpm install
+
+      - name: Restore baseline results
+        run: |
+          mkdir -p .perf-results
+          cp /tmp/perf-baseline/baseline.json .perf-results/ 2>/dev/null || true
+
+      - name: Run current perf tests
+        run: |
+          pnpm perf \
+            --outputJson .perf-results/current.json \
+            --passWithNoTests
+
+      - name: Compare results
+        if: always()
+        run: pnpm perf-compare
+
+      - name: Upload performance results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-results
+          path: .perf-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Post or update PR comment
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- perf-results -->";
+            let body;
+            try {
+              body = fs.readFileSync(".perf-results/comparison.md", "utf-8");
+            } catch {
+              body = "No performance results available.";
+            }
+            body = `${marker}\n${body}`;
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+              },
+            );
+            const existing = comments.find((comment) =>
+              comment.body?.includes(marker),
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
