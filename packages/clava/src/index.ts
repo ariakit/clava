@@ -907,10 +907,13 @@ export function create({
 
       // Process extended components
       if (hasExtend) {
+        const hasComputedVariantKeysSet =
+          !!computedVariantKeysSet && computedVariantKeysSet.size > 0;
+        const hasComputedVariantValues =
+          !!computedVariantValues &&
+          Object.keys(computedVariantValues).length > 0;
         const hasSkipForExt =
-          (computedVariantKeysSet && computedVariantKeysSet.size > 0) ||
-          (computedVariantValues &&
-            Object.keys(computedVariantValues).length > 0);
+          hasComputedVariantKeysSet || hasComputedVariantValues;
 
         const extVariantClasses: ClassValue[] = [];
 
@@ -926,13 +929,10 @@ export function create({
                 propsForExt[k] = resolvedVariants[k];
               }
             }
-            if (computedVariantKeysSet && computedVariantKeysSet.size > 0) {
+            if (hasComputedVariantKeysSet) {
               propsForExt[SKIP_STYLE_KEYS] = computedVariantKeysSet;
             }
-            if (
-              computedVariantValues &&
-              Object.keys(computedVariantValues).length > 0
-            ) {
+            if (hasComputedVariantValues) {
               propsForExt[SKIP_STYLE_VARIANT_VALUES] = computedVariantValues;
             }
           } else {
@@ -1125,16 +1125,11 @@ export function create({
       return resolvedVariants as VariantValues<MergedVariants>;
     };
 
-    // Compute base class (without variants) - includes extended base classes
-    const extendedBaseClasses: ClassValue[] = [];
-    if (extend) {
-      for (const ext of extend) {
-        const meta = getComponentMeta(ext);
-        extendedBaseClasses.push(meta?.baseClass ?? "");
-      }
-    }
+    // Compute base class (without variants) - includes extended base classes.
+    // Reuses `extBaseClassesArr` (built earlier) so we don't walk `extend` and
+    // call `getComponentMeta` a second time.
     const computedBaseClass = cx(
-      ...(extendedBaseClasses as ClsxClassValue[]),
+      ...(extBaseClassesArr as ClsxClassValue[]),
       config.class as ClsxClassValue,
     );
 
