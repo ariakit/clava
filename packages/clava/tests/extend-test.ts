@@ -250,6 +250,22 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg") });
     });
 
+    test("extend jsx modal component preserves style", () => {
+      const base = cv({
+        class: "base",
+        style: { backgroundColor: "red" },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [base.jsx], class: "extended" }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("base extended"),
+        backgroundColor: "red",
+      });
+    });
+
     test("extend html modal component preserves style", () => {
       const base = cv({
         class: "base",
