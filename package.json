@@ -11,6 +11,8 @@
   "scripts": {
     "build": "pnpm -r --filter './packages/**' build",
     "test": "vitest",
+    "perf": "vitest bench",
+    "perf-compare": "node scripts/perf-compare.ts",
     "tsc": "tsc -b",
     "lint": "oxlint --type-aware --type-check . && oxfmt --check .",
     "lint-fix": "oxlint --type-aware --type-check --fix . && oxfmt .",
