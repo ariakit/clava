@@ -2,8 +2,8 @@ import { bench, describe } from "vitest";
 import { cv, splitProps } from "../src/index.ts";
 
 const options = {
-  time: 500,
-  warmupTime: 100,
+  time: 2000,
+  warmupTime: 500,
 };
 
 let sink: unknown;

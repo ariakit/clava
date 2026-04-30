@@ -78,60 +78,55 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      PERF_ROUNDS: 5
+      # Skip husky's `prepare` script: linked worktrees share `.git/hooks` with
+      # the main checkout, so installing in the baseline tree would otherwise
+      # rewrite the main repo's hooks.
+      HUSKY: 0
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Checkout base branch
-        run: |
-          git checkout -f ${{ github.event.pull_request.base.sha }}
-          git clean -fdx
-
       - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
-      - name: Install base dependencies
+      # `runner.temp` is not available in job-level `env`, so set BASELINE_DIR
+      # here using the auto-injected $RUNNER_TEMP and export it for later steps.
+      - name: Set up baseline worktree
+        run: |
+          BASELINE_DIR="$RUNNER_TEMP/perf-baseline"
+          echo "BASELINE_DIR=$BASELINE_DIR" >> "$GITHUB_ENV"
+          git worktree add --detach "$BASELINE_DIR" \
+            ${{ github.event.pull_request.base.sha }}
+
+      - name: Install dependencies (current)
         run: pnpm install
 
-      - name: Run baseline perf tests
-        run: |
-          pnpm exec vitest bench \
-            --outputJson .perf-results/baseline.json \
-            --passWithNoTests
-
-      - name: Save baseline results
-        run: |
-          mkdir -p /tmp/perf-baseline
-          cp .perf-results/baseline.json /tmp/perf-baseline/ 2>/dev/null || true
-
-      - name: Checkout merge commit
-        run: |
-          git checkout -f ${{ github.sha }}
-          git clean -fdx
-
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
-
-      - name: Install PR dependencies
+      - name: Install dependencies (baseline)
+        working-directory: ${{ env.BASELINE_DIR }}
         run: pnpm install
 
-      - name: Restore baseline results
+      - name: Run interleaved benchmarks
         run: |
           mkdir -p .perf-results
-          cp /tmp/perf-baseline/baseline.json .perf-results/ 2>/dev/null || true
-
-      - name: Run current perf tests
-        run: |
-          pnpm exec vitest bench \
-            --outputJson .perf-results/current.json \
-            --passWithNoTests
+          for i in $(seq 1 "$PERF_ROUNDS"); do
+            echo "::group::Round $i — baseline"
+            (cd "$BASELINE_DIR" && pnpm exec vitest bench \
+              --outputJson "$GITHUB_WORKSPACE/.perf-results/baseline-$i.json" \
+              --passWithNoTests)
+            echo "::endgroup::"
+            echo "::group::Round $i — current"
+            pnpm exec vitest bench \
+              --outputJson ".perf-results/current-$i.json" \
+              --passWithNoTests
+            echo "::endgroup::"
+          done
 
       - name: Compare results
         if: always()
