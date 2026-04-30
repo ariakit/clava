@@ -8,6 +8,9 @@ import type {
 export const MODES = ["jsx", "html", "htmlObj"] as const;
 export type Mode = (typeof MODES)[number];
 
+// eslint-disable-next-line @typescript-eslint/unbound-method
+const hasOwn = Object.prototype.hasOwnProperty;
+
 /**
  * Returns the appropriate class property name based on the mode.
  * @example
@@ -139,6 +142,7 @@ export function htmlStyleToStyleValue(styleString: string) {
 export function htmlObjStyleToStyleValue(style: HTMLCSSProperties) {
   const result: StyleValue = {};
   for (const key in style) {
+    if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     // CSS property names and values are dynamic - cast required for index access
@@ -158,6 +162,7 @@ export function htmlObjStyleToStyleValue(style: HTMLCSSProperties) {
 export function jsxStyleToStyleValue(style: JSXCSSProperties) {
   const result: StyleValue = {};
   for (const key in style) {
+    if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     // CSS property names and values are dynamic - cast required for index access
@@ -177,6 +182,7 @@ export function jsxStyleToStyleValue(style: JSXCSSProperties) {
 export function styleValueToHTMLStyle(style: StyleValue): string {
   let result = "";
   for (const key in style) {
+    if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     if (result) result += "; ";
@@ -197,6 +203,7 @@ export function styleValueToHTMLStyle(style: StyleValue): string {
 export function styleValueToHTMLObjStyle(style: StyleValue) {
   const result: CSS.PropertiesHyphen = {};
   for (const key in style) {
+    if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     (result as Record<string, unknown>)[camelToHyphen(key)] = value;
@@ -224,6 +231,7 @@ export function isHTMLObjStyle(
   style: CSS.Properties<any> | CSS.PropertiesHyphen<any>,
 ): style is CSS.PropertiesHyphen {
   for (const key in style) {
+    if (!hasOwn.call(style, key)) continue;
     // Quick exclusion of CSS custom properties (--foo)
     if (
       key.length >= 2 &&

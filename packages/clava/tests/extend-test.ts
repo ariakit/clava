@@ -249,5 +249,37 @@ for (const config of Object.values(CONFIGS)) {
       const props = component();
       expect(getStyleClass(props)).toEqual({ class: cls("lg") });
     });
+
+    test("extend html modal component preserves style", () => {
+      const base = cv({
+        class: "base",
+        style: { backgroundColor: "red" },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [base.html], class: "extended" }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("base extended"),
+        backgroundColor: "red",
+      });
+    });
+
+    test("extend htmlObj modal component preserves style", () => {
+      const base = cv({
+        class: "base",
+        style: { backgroundColor: "red" },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [base.htmlObj], class: "extended" }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("base extended"),
+        backgroundColor: "red",
+      });
+    });
   });
 }

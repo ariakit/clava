@@ -4,6 +4,7 @@ import type {
   CVComponent,
   ClassValue,
   ComponentProps,
+  ComponentResult,
   Computed,
   ComputedVariants,
   ExtendableVariants,
@@ -456,26 +457,14 @@ interface PrebuiltVariant {
   // Set of value keys that are disabled (value === null in the original variant
   // definition)
   disabledValues: Set<string> | null;
-  // True if the original variant key is disabled (variant === null) - skip
-  // styling entirely
-  disabled: boolean;
 }
 
 function buildPrebuiltVariant(variantDef: unknown): PrebuiltVariant {
-  if (variantDef === null) {
-    return {
-      values: null,
-      shorthand: null,
-      disabledValues: null,
-      disabled: true,
-    };
-  }
   if (!isRecordObject(variantDef)) {
     return {
       values: null,
       shorthand: extractClassAndStylePrebuilt(variantDef),
       disabledValues: null,
-      disabled: false,
     };
   }
   const values: Record<string, PrebuiltValue> = {};
@@ -494,7 +483,6 @@ function buildPrebuiltVariant(variantDef: unknown): PrebuiltVariant {
     values,
     shorthand: null,
     disabledValues,
-    disabled: false,
   };
 }
 
@@ -954,11 +942,10 @@ export function create({
           const extResult = ext(
             propsForExt as ComponentProps<Record<string, unknown>>,
           );
-          // ext is always a default-mode CV component invoked directly here, so
-          // its style is already in normalized StyleValue form (camelCase). No
-          // need to call normalizeStyle.
-          if (extResult.style && typeof extResult.style === "object") {
-            assign(allStyle, extResult.style as StyleValue);
+          // ext may be a modal component (.html / .htmlObj), whose style is a
+          // CSS string or hyphen-keyed object — normalize before merging.
+          if (extResult.style != null) {
+            assign(allStyle, normalizeStyle(extResult.style));
           }
 
           allClasses.push(extBaseClass);
@@ -987,7 +974,6 @@ export function create({
       for (let i = 0; i < variantEntryCount; i++) {
         const variantName = variantEntryNames[i];
         const variant = variantEntryDefs[i];
-        if (variant.disabled) continue;
         if (currentVariantKeys && currentVariantKeys.has(variantName)) continue;
         const selectedValue = resolvedVariants[variantName];
         if (selectedValue === undefined) continue;
@@ -1162,17 +1148,20 @@ export function create({
       resolveDefaults: resolveDefaultsFn,
     };
 
-    const initComponent = <C extends ModalComponent<MergedVariants, never>>(
-      c: C,
+    const initComponent = <
+      R extends ComponentResult,
+      T extends ModalComponent<MergedVariants, R>,
+    >(
+      c: T,
       keys: string[],
-      style: C["style"],
-    ): C => {
+      style: T["style"],
+    ): T => {
       c.class = classFn;
       c.style = style;
       c.getVariants = getVariants;
-      c.keys = keys as never;
-      c.variantKeys = variantKeys as never;
-      c.propKeys = keys as never;
+      c.keys = keys;
+      c.variantKeys = variantKeys;
+      c.propKeys = keys;
       setComponentMeta(c, meta);
       return c;
     };
@@ -1182,13 +1171,9 @@ export function create({
       const { className, style } = computeResult(props);
       return { class: className, style };
     }) as CVComponent<V, CV, E>;
-    initComponent(
-      defaultComponent as unknown as ModalComponent<MergedVariants, never>,
-      inputPropsKeys,
-      ((props: ComponentProps<MergedVariants> = {}) => {
-        return computeResult(props).style;
-      }) as unknown as ModalComponent<MergedVariants, never>["style"],
-    );
+    initComponent(defaultComponent, inputPropsKeys, (props = {}) => {
+      return computeResult(props).style;
+    });
 
     // JSX component
     const jsxComponent = ((props: ComponentProps<MergedVariants> = {}) => {
@@ -1196,11 +1181,9 @@ export function create({
       return { className, style: styleValueToJSXStyle(style) };
     }) as ModalComponent<MergedVariants, JSXProps>;
     initComponent(
-      jsxComponent as unknown as ModalComponent<MergedVariants, never>,
+      jsxComponent,
       ["className", "style", ...variantKeys],
-      ((props: ComponentProps<MergedVariants> = {}) => {
-        return styleValueToJSXStyle(computeResult(props).style);
-      }) as unknown as ModalComponent<MergedVariants, never>["style"],
+      (props = {}) => styleValueToJSXStyle(computeResult(props).style),
     );
 
     // HTML component
@@ -1209,11 +1192,9 @@ export function create({
       return { class: className, style: styleValueToHTMLStyle(style) };
     }) as ModalComponent<MergedVariants, HTMLProps>;
     initComponent(
-      htmlComponent as unknown as ModalComponent<MergedVariants, never>,
+      htmlComponent,
       ["class", "style", ...variantKeys],
-      ((props: ComponentProps<MergedVariants> = {}) => {
-        return styleValueToHTMLStyle(computeResult(props).style);
-      }) as unknown as ModalComponent<MergedVariants, never>["style"],
+      (props = {}) => styleValueToHTMLStyle(computeResult(props).style),
     );
 
     // HTMLObj component
@@ -1222,11 +1203,9 @@ export function create({
       return { class: className, style: styleValueToHTMLObjStyle(style) };
     }) as ModalComponent<MergedVariants, HTMLObjProps>;
     initComponent(
-      htmlObjComponent as unknown as ModalComponent<MergedVariants, never>,
+      htmlObjComponent,
       ["class", "style", ...variantKeys],
-      ((props: ComponentProps<MergedVariants> = {}) => {
-        return styleValueToHTMLObjStyle(computeResult(props).style);
-      }) as unknown as ModalComponent<MergedVariants, never>["style"],
+      (props = {}) => styleValueToHTMLObjStyle(computeResult(props).style),
     );
 
     defaultComponent.jsx = jsxComponent;
