@@ -133,6 +133,54 @@ describe("perf compare", () => {
     expect(markdown).not.toContain("packages/clava/perfs/");
   });
 
+  test("pairs benchmarks when baseline and current report different absolute roots", () => {
+    // In CI, the baseline tree lives under $BASELINE_DIR (e.g. $RUNNER_TEMP)
+    // while the current tree lives under $GITHUB_WORKSPACE. Vitest reports
+    // absolute filepaths, so without anchoring to the workspace root the two
+    // sides would key under different paths and every benchmark would land in
+    // new/removed instead of pairing for comparison.
+    const dir = createTempDir();
+    const outputDir = path.join(dir, resultsDir);
+    mkdirSync(outputDir, { recursive: true });
+
+    const reportFor = (root: string, hz: number) => ({
+      files: [
+        {
+          filepath: path.join(root, "packages/clava/perfs/component.bench.ts"),
+          groups: [
+            {
+              fullName: "packages/clava/perfs/component.bench.ts > cv",
+              benchmarks: [{ name: "split-roots bench", hz, mean: 1 / hz }],
+            },
+          ],
+        },
+      ],
+    });
+
+    writeJson(
+      dir,
+      "baseline.json",
+      reportFor("/runner-temp/perf-baseline", 100),
+    );
+    writeJson(dir, "current.json", reportFor(dir, 80));
+
+    execFileSync(process.execPath, [scriptPath], {
+      cwd: dir,
+      stdio: "pipe",
+    });
+
+    const markdown = readFileSync(
+      path.join(outputDir, "comparison.md"),
+      "utf-8",
+    );
+
+    expect(markdown).toContain(
+      "clava > component.bench.ts > split-roots bench",
+    );
+    expect(markdown).not.toContain("All benchmarks were renamed");
+    expect(markdown).toContain("-20% :warning:");
+  });
+
   test("reports significant regressions", () => {
     const dir = createTempDir();
     const markdown = runCompare({

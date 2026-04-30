@@ -98,6 +98,14 @@ function getNumber(value: unknown): number {
 
 function normalizeFilePath(filePath: string) {
   if (!filePath) return "";
+  // Baseline benches run inside a detached worktree under $BASELINE_DIR, so
+  // vitest's absolute filepath values differ from the current side's paths
+  // even when they refer to the same file. Anchor to the first known
+  // workspace root so both sides produce the same key regardless of where
+  // vitest was invoked from. Fall back to a cwd-relative path when no known
+  // root is present so paths outside a workspace still resolve sensibly.
+  const rooted = filePath.match(/(?:^|[\\/])((?:packages|app)[\\/].+)$/);
+  if (rooted?.[1]) return rooted[1];
   return path.relative(process.cwd(), filePath);
 }
 
