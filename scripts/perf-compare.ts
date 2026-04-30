@@ -272,28 +272,49 @@ function compare(): ComparisonSummary {
       continue;
     }
 
-    const percent =
-      baselineEntry.hz > 0
-        ? ((currentEntry.hz - baselineEntry.hz) / baselineEntry.hz) * 100
-        : 0;
-
     const sharedRounds: number[] = [];
     for (const roundIndex of currentEntry.byRound.keys()) {
       if (baselineEntry.byRound.has(roundIndex)) sharedRounds.push(roundIndex);
     }
     sharedRounds.sort((a, b) => a - b);
 
+    const baselineHzShared: number[] = [];
+    const currentHzShared: number[] = [];
     const perRoundPercents: number[] = [];
     for (const roundIndex of sharedRounds) {
       const baselineRound = baselineEntry.byRound.get(roundIndex);
       const currentRound = currentEntry.byRound.get(roundIndex);
       if (!baselineRound || !currentRound) continue;
-      if (baselineRound.hz <= 0) continue;
       pairedRoundIndices.add(roundIndex);
+      baselineHzShared.push(baselineRound.hz);
+      currentHzShared.push(currentRound.hz);
+      if (baselineRound.hz <= 0) continue;
       perRoundPercents.push(
         ((currentRound.hz - baselineRound.hz) / baselineRound.hz) * 100,
       );
     }
+
+    // Aggregate displayed baseline/current and the percent change from the
+    // shared rounds only. Using each side's independent round-median lets
+    // unpaired rounds skew the comparison and can even flip the sign of the
+    // change relative to perRoundPercents when one side has more rounds for
+    // this benchmark than the other.
+    const baselineHzMedian = median(baselineHzShared);
+    const currentHzMedian = median(currentHzShared);
+    const baselineDisplay: AggregatedBenchmark = {
+      ...baselineEntry,
+      hz: baselineHzMedian,
+      mean: baselineHzMedian > 0 ? 1000 / baselineHzMedian : 0,
+    };
+    const currentDisplay: AggregatedBenchmark = {
+      ...currentEntry,
+      hz: currentHzMedian,
+      mean: currentHzMedian > 0 ? 1000 / currentHzMedian : 0,
+    };
+    const percent =
+      baselineHzMedian > 0
+        ? ((currentHzMedian - baselineHzMedian) / baselineHzMedian) * 100
+        : 0;
 
     const { agreement, significant } = computeSignificance({
       medianPercent: percent,
@@ -303,8 +324,8 @@ function compare(): ComparisonSummary {
     rows.push({
       key,
       label: formatLabel(currentEntry),
-      baseline: baselineEntry,
-      current: currentEntry,
+      baseline: baselineDisplay,
+      current: currentDisplay,
       percent,
       perRoundPercents,
       agreement,

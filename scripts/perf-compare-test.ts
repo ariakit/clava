@@ -284,6 +284,31 @@ describe("perf compare", () => {
     expect(markdown).not.toMatch(/% :warning:/);
   });
 
+  test("aggregates displayed values from shared rounds when round counts differ", () => {
+    const dir = createTempDir();
+    // Baseline ran four rounds for this bench; current only ran two. The
+    // unpaired baseline rounds (3-4) are much faster and would drag the
+    // independent baseline median above the paired rounds, flipping the
+    // sign of the percent change. Aggregating from shared rounds only keeps
+    // the comparison honest.
+    const baselineRounds = [50, 50, 200, 200].map((hz) =>
+      createReport(dir, [{ name: "asymmetric bench", hz, mean: 1 / hz }]),
+    );
+    const currentRounds = [60, 60].map((hz) =>
+      createReport(dir, [{ name: "asymmetric bench", hz, mean: 1 / hz }]),
+    );
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(markdown).toContain("+20% :rocket:");
+    expect(markdown).toContain("50 ops/sec");
+    expect(markdown).toContain("60 ops/sec");
+    expect(markdown).not.toMatch(/% :warning:/);
+  });
+
   test("aligns per-round comparison when a benchmark is missing from a round", () => {
     const dir = createTempDir();
     // Three baseline rounds; bench "b" is missing from baseline round 2 only.
@@ -320,9 +345,10 @@ describe("perf compare", () => {
       current: currentRounds,
     });
 
-    // Bench "b" went from 200 to ~142 in every paired round (rounds 1 and 3),
-    // so the change must be flagged as a regression.
-    expect(markdown).toMatch(/-29% :warning:/);
+    // Bench "b" went from 200 to ~141 in every paired round (rounds 1 and 3),
+    // so the change must be flagged as a regression. Current's round-2 value
+    // (145) is excluded because baseline never produced one to pair with.
+    expect(markdown).toMatch(/-30% :warning:/);
   });
 
   test("requires unanimity with three rounds", () => {
