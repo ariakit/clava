@@ -4,7 +4,6 @@ import type {
   CVComponent,
   ClassValue,
   ComponentProps,
-  ComponentResult,
   Computed,
   ComputedVariants,
   ExtendableVariants,
@@ -21,8 +20,6 @@ import type {
   Variants,
 } from "./types.ts";
 import {
-  type Mode,
-  getClassPropertyName,
   htmlObjStyleToStyleValue,
   htmlStyleToStyleValue,
   isHTMLObjStyle,
@@ -50,6 +47,9 @@ const META_KEY = "__meta";
 const SKIP_STYLE_KEYS = Symbol("skipStyleKeys");
 const SKIP_STYLE_VARIANT_VALUES = Symbol("skipStyleVariantValues");
 
+// eslint-disable-next-line @typescript-eslint/unbound-method
+const hasOwn = Object.prototype.hasOwnProperty;
+
 // Dynamic property access on function requires cast through unknown
 function getComponentMeta(component: AnyComponent): ComponentMeta | undefined {
   return (component as unknown as Record<string, unknown>)[META_KEY] as
@@ -67,7 +67,7 @@ function setComponentMeta(component: AnyComponent, meta: ComponentMeta): void {
  */
 function assign<T extends object>(target: T, source: T): void {
   for (const key in source) {
-    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+    if (!hasOwn.call(source, key)) continue;
     (target as Record<string, unknown>)[key] = (
       source as Record<string, unknown>
     )[key];
@@ -150,30 +150,30 @@ function normalizeStyle(style: unknown): StyleValue {
 }
 
 /**
- * Extracts class and style from a style-class value object.
+ * Pre-extracts the class and (normalized) style from a variant value once at
+ * component creation time. Returns `null` if the value contributes nothing.
  */
-function extractStyleClass(value: StyleClassValue): {
+interface PrebuiltValue {
   class: ClassValue;
-  style: StyleValue;
-} {
-  return { class: value.class, style: normalizeStyle(value.style) };
+  style: StyleValue | null;
 }
 
-/**
- * Extracts class and style from a variant value (either a class value or a
- * style-class object).
- */
-function extractClassAndStyle(value: unknown): {
-  class: ClassValue;
-  style: StyleValue;
-} {
+function extractStyleClassPrebuilt(value: StyleClassValue): PrebuiltValue {
+  const styleNorm = normalizeStyle(value.style);
+  return {
+    class: value.class ?? null,
+    style: styleNorm && Object.keys(styleNorm).length > 0 ? styleNorm : null,
+  };
+}
+
+function extractClassAndStylePrebuilt(value: unknown): PrebuiltValue {
   if (isStyleClassValue(value)) {
-    return extractStyleClass(value);
+    return extractStyleClassPrebuilt(value);
   }
   if (isRecordObject(value)) {
-    return { class: null, style: {} };
+    return { class: null, style: null };
   }
-  return { class: value as ClassValue, style: {} };
+  return { class: value as ClassValue, style: null };
 }
 
 /**
@@ -185,18 +185,19 @@ function collectVariantKeys(
 ): string[] {
   const keys = new Set<string>();
 
-  // Collect from extended components
   if (config.extend) {
     for (const ext of config.extend) {
-      for (const key of ext.variantKeys) {
-        keys.add(key as string);
+      const extKeys = ext.variantKeys as readonly string[];
+      for (let i = 0; i < extKeys.length; i++) {
+        keys.add(extKeys[i]);
       }
     }
   }
 
-  // Collect from variants
   if (config.variants) {
-    for (const [key, variant] of Object.entries(config.variants)) {
+    for (const key in config.variants) {
+      if (!hasOwn.call(config.variants, key)) continue;
+      const variant = (config.variants as Record<string, unknown>)[key];
       if (variant === null) {
         keys.delete(key);
         continue;
@@ -205,9 +206,9 @@ function collectVariantKeys(
     }
   }
 
-  // Collect from computedVariants
   if (config.computedVariants) {
-    for (const key of Object.keys(config.computedVariants)) {
+    for (const key in config.computedVariants) {
+      if (!hasOwn.call(config.computedVariants, key)) continue;
       keys.add(key);
     }
   }
@@ -241,26 +242,14 @@ function isVariantValueDisabled(
   return variant[valueKey] === null;
 }
 
-function filterDisabledVariants(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-  variants: Record<string, unknown>,
-): Record<string, unknown> {
-  const filtered: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(variants)) {
-    if (isVariantDisabled(config, key)) continue;
-    if (isVariantValueDisabled(config, key, value)) continue;
-    filtered[key] = value;
-  }
-  return filtered;
-}
-
 function collectDisabledVariantKeys(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
 ): Set<string> {
   const keys = new Set<string>();
   if (!config.variants) return keys;
-  for (const [key, value] of Object.entries(config.variants)) {
-    if (value === null) {
+  for (const key in config.variants) {
+    if (!hasOwn.call(config.variants, key)) continue;
+    if ((config.variants as Record<string, unknown>)[key] === null) {
       keys.add(key);
     }
   }
@@ -272,160 +261,22 @@ function collectDisabledVariantValues(
 ): Record<string, Set<string>> {
   const values: Record<string, Set<string>> = {};
   if (!config.variants) return values;
-  for (const [key, variant] of Object.entries(config.variants)) {
+  for (const key in config.variants) {
+    if (!hasOwn.call(config.variants, key)) continue;
+    const variant = (config.variants as Record<string, unknown>)[key];
     if (!isRecordObject(variant)) continue;
-    for (const [variantValue, variantEntry] of Object.entries(variant)) {
-      if (variantEntry !== null) continue;
-      if (!values[key]) {
-        values[key] = new Set<string>();
+    let bucket: Set<string> | undefined;
+    for (const variantValue in variant) {
+      if (!hasOwn.call(variant, variantValue)) continue;
+      if (variant[variantValue] !== null) continue;
+      if (!bucket) {
+        bucket = new Set<string>();
+        values[key] = bucket;
       }
-      values[key].add(variantValue);
+      bucket.add(variantValue);
     }
   }
   return values;
-}
-
-function mergeDisabledVariantValues(
-  base: Record<string, Set<string>>,
-  override: Record<string, Set<string>>,
-): Record<string, Set<string>> {
-  const merged: Record<string, Set<string>> = {};
-  for (const [key, values] of Object.entries(base)) {
-    merged[key] = new Set(values);
-  }
-  for (const [key, values] of Object.entries(override)) {
-    if (!merged[key]) {
-      merged[key] = new Set<string>();
-    }
-    for (const value of values) {
-      merged[key].add(value);
-    }
-  }
-  return merged;
-}
-
-/**
- * Collects static default variants from extended components and the current
- * config. Also handles implicit boolean defaults (when only `false` key
- * exists). This does NOT trigger computed functions - use collectDefaultVariants
- * for that.
- */
-function collectStaticDefaults(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-): Record<string, unknown> {
-  const defaults: Record<string, unknown> = {};
-
-  // Collect static defaults from extended components (via metadata to avoid
-  // triggering computed functions)
-  if (config.extend) {
-    for (const ext of config.extend) {
-      const meta = getComponentMeta(ext);
-      if (meta) {
-        Object.assign(defaults, meta.staticDefaults);
-      }
-    }
-  }
-
-  // Handle implicit boolean defaults from variants
-  // If a variant has a `false` key, default to false when no value is provided
-  if (config.variants) {
-    for (const [variantName, variantDef] of Object.entries(config.variants)) {
-      if (!isRecordObject(variantDef)) continue;
-      const keys = Object.keys(variantDef);
-      const hasFalse = keys.includes("false");
-      if (hasFalse && !defaults[variantName]) {
-        defaults[variantName] = false;
-      }
-    }
-  }
-
-  // Override with current config's static defaults
-  if (config.defaultVariants) {
-    Object.assign(defaults, config.defaultVariants);
-  }
-
-  return filterDisabledVariants(config, defaults);
-}
-
-/**
- * Collects default variants from extended components and the current config.
- * This includes both static defaults and computed defaults (from
- * setDefaultVariants in extended components' computed functions). Priority:
- * parent static < child static < parent computed < child computed.
- */
-function collectDefaultVariants(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-  propsVariants: Record<string, unknown> = {},
-): Record<string, unknown> {
-  // Start with static defaults (parent static < child static)
-  const defaults = collectStaticDefaults(config);
-
-  // Apply computed defaults from extended components
-  // Parent's setDefaultVariants should override child's static defaults
-  if (!config.extend) return defaults;
-
-  // Pass full static defaults (not just this config's defaultVariants)
-  // so that intermediate components' defaults are visible to ancestors
-  for (const ext of config.extend) {
-    const meta = getComponentMeta(ext);
-    if (!meta) continue;
-    Object.assign(defaults, meta.resolveDefaults(defaults, propsVariants));
-  }
-
-  return filterDisabledVariants(config, defaults);
-}
-
-/**
- * Filters out keys with undefined values from an object.
- */
-function filterUndefined(
-  obj: Record<string, unknown>,
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined) continue;
-    result[key] = value;
-  }
-  return result;
-}
-
-/**
- * Resolves variant values by merging defaults with provided props. Props with
- * undefined values are filtered out so they don't override defaults.
- */
-function resolveVariants(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-  props: Record<string, unknown> = {},
-): Record<string, unknown> {
-  const defaults = collectDefaultVariants(config, props);
-  return filterDisabledVariants(config, {
-    ...defaults,
-    ...filterUndefined(props),
-  });
-}
-
-/**
- * Gets the value for a single variant based on the variant definition and the
- * selected value.
- */
-function getVariantResult(
-  variantDef: unknown,
-  selectedValue: unknown,
-): { class: ClassValue; style: StyleValue } {
-  // Shorthand variant: `disabled: "disabled-class"` means { true: "..." }
-  if (!isRecordObject(variantDef)) {
-    if (selectedValue === true) {
-      return extractClassAndStyle(variantDef);
-    }
-    return { class: null, style: {} };
-  }
-
-  // Object variant: { sm: "...", lg: "..." }
-  const key = String(selectedValue);
-  const value = variantDef[key];
-  if (value === undefined) return { class: null, style: {} };
-
-  return extractClassAndStyle(value);
 }
 
 /**
@@ -450,206 +301,23 @@ function extractVariantClasses(fullClass: string, baseClass: string): string {
     .join(" ");
 }
 
-function computeExtendedStyles(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-  resolvedVariants: Record<string, unknown>,
-  overrideVariantKeys: Set<string> = new Set(),
-  overrideVariantValues: Record<string, Set<string>> = {},
-): {
-  baseClasses: ClassValue[];
-  variantClasses: ClassValue[];
-  style: StyleValue;
-} {
-  const baseClasses: ClassValue[] = [];
-  const variantClasses: ClassValue[] = [];
-  const style: StyleValue = {};
-
-  if (!config.extend) return { baseClasses, variantClasses, style };
-  const hasOverrideVariantKeys = overrideVariantKeys.size > 0;
-  const hasOverrideVariantValues =
-    Object.keys(overrideVariantValues).length > 0;
-
-  for (const ext of config.extend) {
-    // Pass actual variant values but mark which keys should skip styling.
-    // Using a Symbol property keeps variant values clean for computed functions
-    // while still allowing us to skip styling for overridden keys.
-    const propsForExt: Record<string | symbol, unknown> = {
-      ...resolvedVariants,
-    };
-    if (hasOverrideVariantKeys) {
-      propsForExt[SKIP_STYLE_KEYS] = overrideVariantKeys;
-    }
-    if (hasOverrideVariantValues) {
-      propsForExt[SKIP_STYLE_VARIANT_VALUES] = overrideVariantValues;
-    }
-
-    const extResult = ext(
-      propsForExt as ComponentProps<Record<string, unknown>>,
-    );
-    assign(style, normalizeStyle(extResult.style));
-
-    // Get base class from internal metadata (no variants)
-    const meta = getComponentMeta(ext);
-    const baseClass = meta?.baseClass ?? "";
-    baseClasses.push(baseClass);
-
-    // Get full class with variants
-    const fullClass =
-      "className" in extResult ? extResult.className : extResult.class;
-
-    const variantPortion = extractVariantClasses(fullClass, baseClass);
-    if (variantPortion) {
-      variantClasses.push(variantPortion);
-    }
-  }
-
-  return { baseClasses, variantClasses, style };
-}
-
-/**
- * Computes class and style from the component's own variants and
- * computedVariants (not extended components).
- */
-function computeVariantStyles(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-  resolvedVariants: Record<string | symbol, unknown>,
-  skipStyleKeys: Set<string> = new Set(),
-  skipVariantValues: Record<string, Set<string>> = {},
-): { classes: ClassValue[]; style: StyleValue } {
-  const classes: ClassValue[] = [];
-  const style: StyleValue = {};
-
-  // Process current component's variants
-  if (config.variants) {
-    for (const [variantName, variantDef] of Object.entries(config.variants)) {
-      // Skip styling for variants that are overridden by child's computedVariants
-      if (skipStyleKeys.has(variantName)) continue;
-
-      const selectedValue = resolvedVariants[variantName];
-      if (selectedValue === undefined) continue;
-      const selectedKey = getVariantValueKey(selectedValue);
-      if (selectedKey && skipVariantValues[variantName]?.has(selectedKey)) {
-        continue;
-      }
-
-      const result = getVariantResult(variantDef, selectedValue);
-      classes.push(result.class);
-      assign(style, result.style);
-    }
-  }
-
-  // Process computedVariants
-  if (config.computedVariants) {
-    for (const [variantName, computeFn] of Object.entries(
-      config.computedVariants,
-    )) {
-      // Skip styling for variants that are overridden by child's computedVariants
-      if (skipStyleKeys.has(variantName)) continue;
-
-      const selectedValue = resolvedVariants[variantName];
-      if (selectedValue === undefined) continue;
-      const selectedKey = getVariantValueKey(selectedValue);
-      if (selectedKey && skipVariantValues[variantName]?.has(selectedKey)) {
-        continue;
-      }
-
-      const computedResult = computeFn(selectedValue);
-      const result = extractClassAndStyle(computedResult);
-      classes.push(result.class);
-      assign(style, result.style);
-    }
-  }
-
-  return { classes, style };
-}
-
-/**
- * Runs the computed function if present, returning classes, styles, and updated
- * variants.
- */
-function runComputedFunction(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
-  resolvedVariants: Record<string, unknown>,
-  propsVariants: Record<string, unknown>,
-): {
-  classes: ClassValue[];
-  style: StyleValue;
-  updatedVariants: Record<string, unknown>;
-} {
-  const classes: ClassValue[] = [];
-  const style: StyleValue = {};
-  const updatedVariants = { ...resolvedVariants };
-
-  if (!config.computed) {
-    return { classes, style, updatedVariants };
-  }
-
-  const context = {
-    variants: resolvedVariants,
-    setVariants: (newVariants: VariantValues<Record<string, unknown>>) => {
-      Object.assign(
-        updatedVariants,
-        filterDisabledVariants(config, newVariants),
-      );
-    },
-    setDefaultVariants: (
-      newDefaults: VariantValues<Record<string, unknown>>,
-    ) => {
-      // Only apply defaults for variants not explicitly set in props
-      for (const [key, value] of Object.entries(newDefaults)) {
-        if (propsVariants[key] === undefined) {
-          if (isVariantDisabled(config, key)) continue;
-          if (isVariantValueDisabled(config, key, value)) continue;
-          updatedVariants[key] = value;
-        }
-      }
-    },
-    addClass: (className: ClassValue) => {
-      classes.push(className);
-    },
-    addStyle: (newStyle: StyleValue) => {
-      assign(style, newStyle);
-    },
-  };
-
-  const computedResult = config.computed(context);
-  if (computedResult != null) {
-    const result = extractClassAndStyle(computedResult);
-    classes.push(result.class);
-    assign(style, result.style);
-  }
-
-  return {
-    classes,
-    style,
-    updatedVariants: filterDisabledVariants(config, updatedVariants),
-  };
-}
-
 interface NormalizedSource {
   keys: string[];
   variantKeys: string[];
-  defaults: Record<string, unknown>;
   isComponent: boolean;
 }
 
 const EMPTY_SOURCE: NormalizedSource = {
   keys: [],
   variantKeys: [],
-  defaults: {},
   isComponent: false,
 };
 
-/**
- * Normalizes a key source (array or component) to an object with keys,
- * variantKeys, defaults, and isComponent flag.
- */
 function normalizeKeySource(source: unknown): NormalizedSource {
   if (Array.isArray(source)) {
     return {
       keys: source as string[],
       variantKeys: source as string[],
-      defaults: {},
       isComponent: false,
     };
   }
@@ -661,16 +329,14 @@ function normalizeKeySource(source: unknown): NormalizedSource {
   if (!("keys" in source)) return EMPTY_SOURCE;
   if (!("variantKeys" in source)) return EMPTY_SOURCE;
 
-  // Source is a component with keys and variantKeys properties
+  // Component-provided arrays are immutable metadata — reference directly.
   const typed = source as {
     keys: string[];
     variantKeys: string[];
-    getVariants?: () => Record<string, unknown>;
   };
   return {
-    keys: [...typed.keys],
-    variantKeys: [...typed.variantKeys],
-    defaults: typed.getVariants?.() ?? {},
+    keys: typed.keys,
+    variantKeys: typed.variantKeys,
     isComponent: true,
   };
 }
@@ -687,51 +353,63 @@ function splitPropsImpl(
   props: Record<string, unknown>,
   sources: NormalizedSource[],
 ): Record<string, unknown>[] {
-  const allUsedKeys = new Set<string>(selfKeys);
+  const sourcesLength = sources.length;
   const results: Record<string, unknown>[] = [];
-
-  // Track if styling has been claimed by a component
   let stylingClaimed = selfIsComponent;
 
-  // Self result
   const selfResult: Record<string, unknown> = {};
-  for (const key of selfKeys) {
-    if (key in props) {
+  const selfKeysLength = selfKeys.length;
+  for (let i = 0; i < selfKeysLength; i++) {
+    const key = selfKeys[i];
+    if (key !== undefined && key in props) {
       selfResult[key] = props[key];
     }
   }
   results.push(selfResult);
 
-  // Process each source
-  for (const source of sources) {
+  // Track effective key arrays for the rest computation — for typical inputs
+  // a linear scan beats building a Set up-front.
+  const effectiveKeyArrays: string[][] = [selfKeys];
+
+  for (let s = 0; s < sourcesLength; s++) {
+    const source = sources[s];
+    if (source === undefined) continue;
     const sourceResult: Record<string, unknown> = {};
 
-    // Determine which keys this source should use
-    // Components use variantKeys if styling has already been claimed
-    // Arrays always use their listed keys
     const effectiveKeys =
       source.isComponent && stylingClaimed ? source.variantKeys : source.keys;
 
-    for (const key of effectiveKeys) {
-      allUsedKeys.add(key);
-      if (key in props) {
+    const effectiveKeysLength = effectiveKeys.length;
+    for (let i = 0; i < effectiveKeysLength; i++) {
+      const key = effectiveKeys[i];
+      if (key !== undefined && key in props) {
         sourceResult[key] = props[key];
       }
     }
     results.push(sourceResult);
+    effectiveKeyArrays.push(effectiveKeys);
 
-    // If this is a component that hasn't claimed styling yet, mark styling as claimed
     if (source.isComponent && !stylingClaimed) {
       stylingClaimed = true;
     }
   }
 
-  // Rest - keys not used by anyone
   const rest: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(props)) {
-    if (!allUsedKeys.has(key)) {
-      rest[key] = value;
+  const propKeys = Object.keys(props);
+  const propKeysLength = propKeys.length;
+  const groupCount = sourcesLength + 1;
+  outer: for (let i = 0; i < propKeysLength; i++) {
+    const key = propKeys[i];
+    if (key === undefined) continue;
+    for (let g = 0; g < groupCount; g++) {
+      const arr = effectiveKeyArrays[g];
+      if (arr === undefined) continue;
+      const arrLength = arr.length;
+      for (let j = 0; j < arrLength; j++) {
+        if (arr[j] === key) continue outer;
+      }
     }
+    rest[key] = props[key];
   }
   results.push(rest);
 
@@ -745,16 +423,6 @@ function splitPropsImpl(
  * only receive variant props. Arrays receive their listed keys but don't claim
  * styling props. The last element is always the "rest" containing keys not
  * claimed by any source.
- * @example
- * ```ts
- * const [buttonProps, inputProps, rest] = splitProps(
- *   props,
- *   buttonComponent,
- *   inputComponent,
- * );
- * // buttonProps has class/style + button variants
- * // inputProps has only input variants (no class/style)
- * ```
  */
 export const splitProps: SplitPropsFunction = ((
   props: Record<string, unknown>,
@@ -762,7 +430,11 @@ export const splitProps: SplitPropsFunction = ((
   ...sources: unknown[]
 ) => {
   const normalizedSource1 = normalizeKeySource(source1);
-  const normalizedSources = sources.map(normalizeKeySource);
+  const sourcesLength = sources.length;
+  const normalizedSources: NormalizedSource[] = [];
+  for (let i = 0; i < sourcesLength; i++) {
+    normalizedSources.push(normalizeKeySource(sources[i]));
+  }
   return splitPropsImpl(
     normalizedSource1.keys,
     normalizedSource1.isComponent,
@@ -772,63 +444,122 @@ export const splitProps: SplitPropsFunction = ((
 }) as SplitPropsFunction;
 
 /**
+ * A pre-built variant. Maps variant value keys (or the literal "true"/"false"
+ * strings for boolean variants) to PrebuiltValue. Includes a "shorthand"
+ * fallback when the variant is a single class value (treated as `{ true: ... }`).
+ */
+interface PrebuiltVariant {
+  // For object variants: map of value -> prebuilt class/style
+  values: Record<string, PrebuiltValue> | null;
+  // For shorthand variants: the value to use when selectedValue is true
+  shorthand: PrebuiltValue | null;
+  // Set of value keys that are disabled (value === null in the original variant
+  // definition)
+  disabledValues: Set<string> | null;
+  // True if the original variant key is disabled (variant === null) - skip
+  // styling entirely
+  disabled: boolean;
+}
+
+function buildPrebuiltVariant(variantDef: unknown): PrebuiltVariant {
+  if (variantDef === null) {
+    return {
+      values: null,
+      shorthand: null,
+      disabledValues: null,
+      disabled: true,
+    };
+  }
+  if (!isRecordObject(variantDef)) {
+    return {
+      values: null,
+      shorthand: extractClassAndStylePrebuilt(variantDef),
+      disabledValues: null,
+      disabled: false,
+    };
+  }
+  const values: Record<string, PrebuiltValue> = {};
+  let disabledValues: Set<string> | null = null;
+  for (const key in variantDef) {
+    if (!hasOwn.call(variantDef, key)) continue;
+    const value = variantDef[key];
+    if (value === null) {
+      if (!disabledValues) disabledValues = new Set<string>();
+      disabledValues.add(key);
+      continue;
+    }
+    values[key] = extractClassAndStylePrebuilt(value);
+  }
+  return {
+    values,
+    shorthand: null,
+    disabledValues,
+    disabled: false,
+  };
+}
+
+/**
  * Creates the resolveDefaults function for a component. This function returns
  * only the variants set via setDefaultVariants in the computed function. Used
  * by child components to get parent's computed defaults.
  */
 function createResolveDefaults(
   config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  staticDefaults: Record<string, unknown>,
 ): ComponentMeta["resolveDefaults"] {
+  const computed = config.computed;
+  const extend = config.extend;
   return (childDefaults, userProps = {}) => {
-    // Get static defaults (including from extended components)
-    const staticDefaults = collectStaticDefaults(config);
-
     // Merge: parent static < child static < user props
     // This is what parent's computed will see in `variants`
-    const resolvedVariants = {
-      ...staticDefaults,
-      ...filterUndefined(childDefaults),
-      ...filterUndefined(userProps),
-    };
+    const resolvedVariants: Record<string, unknown> = {};
+    Object.assign(resolvedVariants, staticDefaults);
+    for (const key in childDefaults) {
+      if (!hasOwn.call(childDefaults, key)) continue;
+      const v = childDefaults[key];
+      if (v === undefined) continue;
+      resolvedVariants[key] = v;
+    }
+    for (const key in userProps) {
+      if (!hasOwn.call(userProps, key)) continue;
+      const v = userProps[key];
+      if (v === undefined) continue;
+      resolvedVariants[key] = v;
+    }
 
     // Track which keys are set via setDefaultVariants
     const computedDefaults: Record<string, unknown> = {};
 
     // Propagate to extended components so their computed functions can run
-    // This allows grandparent computed functions to see grandchild defaults
-    if (config.extend) {
-      for (const ext of config.extend) {
+    if (extend) {
+      for (const ext of extend) {
         const meta = getComponentMeta(ext);
         if (!meta) continue;
-        Object.assign(
-          computedDefaults,
-          meta.resolveDefaults(childDefaults, userProps),
-        );
+        const extDefaults = meta.resolveDefaults(childDefaults, userProps);
+        for (const k in extDefaults) {
+          if (hasOwn.call(extDefaults, k)) {
+            computedDefaults[k] = extDefaults[k];
+          }
+        }
       }
     }
 
-    if (config.computed) {
-      config.computed({
+    if (computed) {
+      computed({
         variants: resolvedVariants as VariantValues<Record<string, unknown>>,
-        setVariants: () => {
-          // Not relevant for collecting defaults
-        },
+        setVariants: () => {},
         setDefaultVariants: (newDefaults) => {
-          // Only apply defaults for variants not explicitly set by user
-          // (child's static defaults should not block setDefaultVariants)
-          for (const [key, value] of Object.entries(newDefaults)) {
+          for (const key in newDefaults) {
+            if (!hasOwn.call(newDefaults, key)) continue;
+            const value = (newDefaults as Record<string, unknown>)[key];
             if (userProps[key] !== undefined) continue;
             if (isVariantDisabled(config, key)) continue;
             if (isVariantValueDisabled(config, key, value)) continue;
             computedDefaults[key] = value;
           }
         },
-        addClass: () => {
-          // Not relevant for collecting defaults
-        },
-        addStyle: () => {
-          // Not relevant for collecting defaults
-        },
+        addClass: () => {},
+        addStyle: () => {},
       });
     }
 
@@ -853,115 +584,504 @@ export function create({
   ): CVComponent<V, CV, E> => {
     type MergedVariants = MergeVariants<V, CV, E>;
 
+    // ----- Pre-computed at creation time -----
     const variantKeys = collectVariantKeys(config);
     const disabledVariantKeys = collectDisabledVariantKeys(config);
     const disabledVariantValues = collectDisabledVariantValues(config);
+    const hasDisabledVariantKeys = disabledVariantKeys.size > 0;
+    const hasDisabledVariantValues =
+      Object.keys(disabledVariantValues).length > 0;
+    const hasAnyDisabled = hasDisabledVariantKeys || hasDisabledVariantValues;
+
     const inputPropsKeys = ["class", "className", "style", ...variantKeys];
 
-    const getPropsKeys = (mode: Mode) => [
-      getClassPropertyName(mode),
-      "style",
-      ...variantKeys,
-    ];
+    const extend = config.extend;
+    const hasExtend = !!extend && extend.length > 0;
+    const variants = config.variants;
+    const computedVariantsCfg = config.computedVariants;
+    const computed = config.computed;
+    const baseStyle = config.style;
+    const baseClass: ClassValue =
+      config.class === undefined ? null : (config.class as ClassValue);
 
+    // Pre-build variant entries for fast iteration. For each variant key in
+    // `variants`, we have a name and a PrebuiltVariant with normalized values.
+    const variantEntryNames: string[] = [];
+    const variantEntryDefs: PrebuiltVariant[] = [];
+    if (variants) {
+      for (const name in variants) {
+        if (!hasOwn.call(variants, name)) continue;
+        const variant = (variants as Record<string, unknown>)[name];
+        if (variant === null) continue;
+        variantEntryNames.push(name);
+        variantEntryDefs.push(buildPrebuiltVariant(variant));
+      }
+    }
+    const variantEntryCount = variantEntryNames.length;
+
+    // Pre-built computed-variants entries.
+    const computedVariantNames: string[] = [];
+    const computedVariantFns: Array<(value: unknown) => unknown> = [];
+    if (computedVariantsCfg) {
+      for (const name in computedVariantsCfg) {
+        if (!hasOwn.call(computedVariantsCfg, name)) continue;
+        computedVariantNames.push(name);
+        computedVariantFns.push(
+          (computedVariantsCfg as Record<string, (value: unknown) => unknown>)[
+            name
+          ] as (value: unknown) => unknown,
+        );
+      }
+    }
+    const computedVariantCount = computedVariantNames.length;
+
+    // Pre-compute static defaults. Includes:
+    // - extended components' static defaults
+    // - implicit boolean defaults (variants with a `false` key default to false)
+    // - this config's defaultVariants (overriding the above)
+    // Then filtered through disabled-variants.
+    const staticDefaults: Record<string, unknown> = {};
+    if (extend) {
+      for (const ext of extend) {
+        const meta = getComponentMeta(ext);
+        if (meta) Object.assign(staticDefaults, meta.staticDefaults);
+      }
+    }
+    if (variants) {
+      for (const name in variants) {
+        if (!hasOwn.call(variants, name)) continue;
+        const variantDef = (variants as Record<string, unknown>)[name];
+        if (!isRecordObject(variantDef)) continue;
+        if (
+          hasOwn.call(variantDef, "false") &&
+          staticDefaults[name] === undefined
+        ) {
+          staticDefaults[name] = false;
+        }
+      }
+    }
+    if (config.defaultVariants) {
+      Object.assign(staticDefaults, config.defaultVariants);
+    }
+    if (hasAnyDisabled) {
+      // Filter disabled variants in-place
+      for (const key in staticDefaults) {
+        if (!hasOwn.call(staticDefaults, key)) continue;
+        if (disabledVariantKeys.has(key)) {
+          delete staticDefaults[key];
+          continue;
+        }
+        if (hasDisabledVariantValues) {
+          const value = staticDefaults[key];
+          const valueKey = getVariantValueKey(value);
+          if (valueKey != null && disabledVariantValues[key]?.has(valueKey)) {
+            delete staticDefaults[key];
+          }
+        }
+      }
+    }
+
+    // Pre-build extended component info, so we don't have to call
+    // `getComponentMeta` per render.
+    const extEntries: AnyComponent[] = extend ? (extend as AnyComponent[]) : [];
+    const extBaseClassesArr: string[] = [];
+    const extMetas: (ComponentMeta | undefined)[] = [];
+    if (extend) {
+      for (const ext of extend) {
+        const meta = getComponentMeta(ext);
+        extMetas.push(meta);
+        extBaseClassesArr.push(meta?.baseClass ?? "");
+      }
+    }
+    const extCount = extEntries.length;
+
+    // Inlined "filter disabled" - mutates `out` adding only allowed entries.
+    // Most components have no disabled variants, in which case we can skip
+    // the filter entirely.
+    function filterDisabledInto(
+      input: Record<string, unknown>,
+      out: Record<string, unknown>,
+    ): void {
+      if (!hasAnyDisabled) {
+        for (const key in input) {
+          if (hasOwn.call(input, key)) out[key] = input[key];
+        }
+        return;
+      }
+      for (const key in input) {
+        if (!hasOwn.call(input, key)) continue;
+        if (disabledVariantKeys.has(key)) continue;
+        const value = input[key];
+        if (hasDisabledVariantValues) {
+          const valueKey = getVariantValueKey(value);
+          if (valueKey != null && disabledVariantValues[key]?.has(valueKey)) {
+            continue;
+          }
+        }
+        out[key] = value;
+      }
+    }
+
+    // Pre-create default-variants resolver which is referenced during the hot
+    // path through extended components' meta. The closure captures
+    // staticDefaults, extend, computed, etc.
+    const resolveDefaultsFn = createResolveDefaults(config, staticDefaults);
+
+    // Resolve variants: defaults -> computed defaults from extended -> props.
+    function resolveVariantsHot(
+      propsVariants: Record<string, unknown>,
+    ): Record<string, unknown> {
+      // Start with static defaults
+      const defaults: Record<string, unknown> = {};
+      Object.assign(defaults, staticDefaults);
+
+      // Apply computed defaults from extended components
+      if (hasExtend) {
+        for (let i = 0; i < extCount; i++) {
+          const meta = extMetas[i];
+          if (!meta) continue;
+          const extComputed = meta.resolveDefaults(defaults, propsVariants);
+          for (const k in extComputed) {
+            if (hasOwn.call(extComputed, k)) {
+              defaults[k] = extComputed[k];
+            }
+          }
+        }
+      }
+
+      // Now merge: defaults < propsVariants (filter undefined)
+      // Apply propsVariants on top
+      for (const k in propsVariants) {
+        if (!hasOwn.call(propsVariants, k)) continue;
+        const v = propsVariants[k];
+        if (v === undefined) continue;
+        defaults[k] = v;
+      }
+
+      // Filter disabled
+      const result: Record<string, unknown> = {};
+      filterDisabledInto(defaults, result);
+      return result;
+    }
+
+    // Hot path: build a fresh result.
     const computeResult = (
       props: ComponentProps<MergedVariants> = {},
     ): { className: string; style: StyleValue } => {
+      // Extract skip style keys from props (set by child's computedVariants)
+      const skipStyleKeysIn = (props as Record<symbol, unknown>)[
+        SKIP_STYLE_KEYS
+      ] as Set<string> | undefined;
+      const skipStyleVariantValuesIn = (props as Record<symbol, unknown>)[
+        SKIP_STYLE_VARIANT_VALUES
+      ] as Record<string, Set<string>> | undefined;
+
+      // Extract variant props from input. Also remember the propsVariants for
+      // computed-defaults application.
+      const variantProps: Record<string, unknown> = {};
+      for (let i = 0; i < variantKeys.length; i++) {
+        const key = variantKeys[i];
+        if (key in props) {
+          variantProps[key] = (props as Record<string, unknown>)[key];
+        }
+      }
+
+      // Resolve variants with defaults
+      let resolvedVariants = resolveVariantsHot(variantProps);
+
+      // Run computed function (may update variants and emit class/style)
+      let computedClassesArr: ClassValue[] | null = null;
+      let computedStyleObj: StyleValue | null = null;
+
+      if (computed) {
+        const updatedVariants: Record<string, unknown> = {};
+        Object.assign(updatedVariants, resolvedVariants);
+        const cClasses: ClassValue[] = [];
+        let cStyle: StyleValue | null = null;
+        const ctx = {
+          variants: resolvedVariants as VariantValues<Record<string, unknown>>,
+          setVariants: (
+            newVariants: VariantValues<Record<string, unknown>>,
+          ) => {
+            const filtered: Record<string, unknown> = {};
+            filterDisabledInto(
+              newVariants as Record<string, unknown>,
+              filtered,
+            );
+            Object.assign(updatedVariants, filtered);
+          },
+          setDefaultVariants: (
+            newDefaults: VariantValues<Record<string, unknown>>,
+          ) => {
+            for (const key in newDefaults) {
+              if (!hasOwn.call(newDefaults, key)) continue;
+              if (variantProps[key] !== undefined) continue;
+              if (disabledVariantKeys.has(key)) continue;
+              const value = (newDefaults as Record<string, unknown>)[key];
+              const valueKey = getVariantValueKey(value);
+              if (
+                valueKey != null &&
+                disabledVariantValues[key]?.has(valueKey)
+              ) {
+                continue;
+              }
+              updatedVariants[key] = value;
+            }
+          },
+          addClass: (className: ClassValue) => {
+            cClasses.push(className);
+          },
+          addStyle: (newStyle: StyleValue) => {
+            if (!cStyle) cStyle = {};
+            assign(cStyle, newStyle);
+          },
+        };
+        const result = computed(ctx);
+        if (result != null) {
+          const r = extractClassAndStylePrebuilt(result);
+          if (r.class != null) cClasses.push(r.class);
+          if (r.style) {
+            if (!cStyle) cStyle = {};
+            assign(cStyle, r.style);
+          }
+        }
+        // Apply filterDisabled to updatedVariants
+        const filteredUpdated: Record<string, unknown> = {};
+        filterDisabledInto(updatedVariants, filteredUpdated);
+        resolvedVariants = filteredUpdated;
+        computedClassesArr = cClasses;
+        computedStyleObj = cStyle;
+      }
+
+      // Compute skip-style sets for the extended components and current
+      // component. Only allocate when needed.
+      const hasSkipKeys = !!skipStyleKeysIn || disabledVariantKeys.size > 0;
+      let currentVariantKeys: Set<string> | null = null;
+      if (hasSkipKeys) {
+        currentVariantKeys = new Set<string>();
+        if (skipStyleKeysIn) {
+          for (const k of skipStyleKeysIn) currentVariantKeys.add(k);
+        }
+        for (const k of disabledVariantKeys) currentVariantKeys.add(k);
+      }
+      // computedVariantKeys is currentVariantKeys + computedVariants names
+      let computedVariantKeysSet: Set<string> | null = null;
+      if (hasExtend) {
+        if (currentVariantKeys || computedVariantNames.length > 0) {
+          computedVariantKeysSet = new Set<string>();
+          if (currentVariantKeys) {
+            for (const k of currentVariantKeys) computedVariantKeysSet.add(k);
+          }
+          for (let i = 0; i < computedVariantNames.length; i++) {
+            computedVariantKeysSet.add(computedVariantNames[i]);
+          }
+        }
+      }
+
+      // computedVariantValues = mergeDisabledVariantValues(skipIn, disabledValues)
+      let computedVariantValues: Record<string, Set<string>> | null = null;
+      const hasInValues = !!skipStyleVariantValuesIn;
+      const disabledValuesKeys = Object.keys(disabledVariantValues);
+      const hasDisabledValues = disabledValuesKeys.length > 0;
+      if (hasExtend && (hasInValues || hasDisabledValues)) {
+        computedVariantValues = {};
+        if (hasInValues) {
+          for (const k in skipStyleVariantValuesIn) {
+            if (!hasOwn.call(skipStyleVariantValuesIn, k)) continue;
+            const set = new Set<string>();
+            for (const v of skipStyleVariantValuesIn[k]) {
+              set.add(v);
+            }
+            computedVariantValues[k] = set;
+          }
+        }
+        for (let i = 0; i < disabledValuesKeys.length; i++) {
+          const k = disabledValuesKeys[i];
+          let bucket = computedVariantValues[k];
+          if (!bucket) {
+            bucket = new Set<string>();
+            computedVariantValues[k] = bucket;
+          }
+          for (const v of disabledVariantValues[k]) bucket.add(v);
+        }
+      }
+
+      // ----- Build classes/styles in proper order -----
+      // 1. Extended base classes & their styles (with skip applied)
+      // 2. Current base class & base style
+      // 3. Extended variant classes
+      // 4. Current variants
+      // 5. computed results
+      // 6. props.class / props.className
+      // 7. props.style
       const allClasses: ClassValue[] = [];
       const allStyle: StyleValue = {};
 
-      // Extract skip style keys from props (set by child's computedVariants)
-      const skipStyleKeys =
-        ((props as Record<symbol, unknown>)[SKIP_STYLE_KEYS] as
-          | Set<string>
-          | undefined) ?? new Set<string>();
-      const skipStyleVariantValues =
-        ((props as Record<symbol, unknown>)[SKIP_STYLE_VARIANT_VALUES] as
-          | Record<string, Set<string>>
-          | undefined) ?? {};
+      // Process extended components
+      if (hasExtend) {
+        const hasSkipForExt =
+          (computedVariantKeysSet && computedVariantKeysSet.size > 0) ||
+          (computedVariantValues &&
+            Object.keys(computedVariantValues).length > 0);
 
-      // Extract variant props from input
-      const variantProps: Record<string, unknown> = {};
-      for (const key of variantKeys) {
-        if (key in props) {
-          variantProps[key] = props[key];
+        const extVariantClasses: ClassValue[] = [];
+
+        for (let i = 0; i < extCount; i++) {
+          const ext = extEntries[i];
+          const extBaseClass = extBaseClassesArr[i];
+          let propsForExt: Record<string | symbol, unknown>;
+          if (hasSkipForExt) {
+            propsForExt = {};
+            // Copy resolvedVariants
+            for (const k in resolvedVariants) {
+              if (hasOwn.call(resolvedVariants, k)) {
+                propsForExt[k] = resolvedVariants[k];
+              }
+            }
+            if (computedVariantKeysSet && computedVariantKeysSet.size > 0) {
+              propsForExt[SKIP_STYLE_KEYS] = computedVariantKeysSet;
+            }
+            if (
+              computedVariantValues &&
+              Object.keys(computedVariantValues).length > 0
+            ) {
+              propsForExt[SKIP_STYLE_VARIANT_VALUES] = computedVariantValues;
+            }
+          } else {
+            propsForExt = resolvedVariants as Record<string | symbol, unknown>;
+          }
+
+          const extResult = ext(
+            propsForExt as ComponentProps<Record<string, unknown>>,
+          );
+          // ext is always a default-mode CV component invoked directly here, so
+          // its style is already in normalized StyleValue form (camelCase). No
+          // need to call normalizeStyle.
+          if (extResult.style && typeof extResult.style === "object") {
+            assign(allStyle, extResult.style as StyleValue);
+          }
+
+          allClasses.push(extBaseClass);
+          const fullClass =
+            "className" in extResult ? extResult.className : extResult.class;
+          const variantPortion = extractVariantClasses(fullClass, extBaseClass);
+          if (variantPortion) extVariantClasses.push(variantPortion);
+        }
+
+        // 2. Current base class
+        allClasses.push(baseClass);
+        if (baseStyle) assign(allStyle, baseStyle);
+
+        // 4. Extended variant classes
+        for (let i = 0; i < extVariantClasses.length; i++) {
+          allClasses.push(extVariantClasses[i]);
+        }
+      } else {
+        // No extends: just current base
+        allClasses.push(baseClass);
+        if (baseStyle) assign(allStyle, baseStyle);
+      }
+
+      // 5. Current component's variants (skip keys overridden)
+      // Walk pre-built variant entries
+      for (let i = 0; i < variantEntryCount; i++) {
+        const variantName = variantEntryNames[i];
+        const variant = variantEntryDefs[i];
+        if (variant.disabled) continue;
+        if (currentVariantKeys && currentVariantKeys.has(variantName)) continue;
+        const selectedValue = resolvedVariants[variantName];
+        if (selectedValue === undefined) continue;
+        const selectedKey = getVariantValueKey(selectedValue);
+        // disabled values from current config:
+        if (
+          variant.disabledValues &&
+          selectedKey != null &&
+          variant.disabledValues.has(selectedKey)
+        ) {
+          continue;
+        }
+        // skipVariantValues comes from skipStyleVariantValuesIn (only relevant
+        // if this is being called as an extended component). For top-level it
+        // would be undefined.
+        if (
+          skipStyleVariantValuesIn &&
+          selectedKey != null &&
+          skipStyleVariantValuesIn[variantName]?.has(selectedKey)
+        ) {
+          continue;
+        }
+
+        if (variant.values) {
+          if (selectedKey == null) continue;
+          const v = variant.values[selectedKey];
+          if (!v) continue;
+          if (v.class != null) allClasses.push(v.class);
+          if (v.style) assign(allStyle, v.style);
+        } else if (variant.shorthand) {
+          // shorthand: applies when selectedValue === true
+          if (selectedValue === true) {
+            const v = variant.shorthand;
+            if (v.class != null) allClasses.push(v.class);
+            if (v.style) assign(allStyle, v.style);
+          }
         }
       }
-      // Resolve variants with defaults
-      let resolvedVariants = resolveVariants(config, variantProps);
-      // Process computed first to potentially update variants
-      const computedResult = runComputedFunction(
-        config,
-        resolvedVariants,
-        variantProps,
-      );
-      resolvedVariants = computedResult.updatedVariants;
 
-      // Collect computedVariants keys that will override extended variants.
-      // Combine with incoming skip keys to propagate through the extend chain.
-      const currentVariantKeys = new Set<string>(skipStyleKeys);
-      for (const key of disabledVariantKeys) {
-        currentVariantKeys.add(key);
+      // computedVariants
+      for (let i = 0; i < computedVariantCount; i++) {
+        const variantName = computedVariantNames[i];
+        const fn = computedVariantFns[i];
+        if (currentVariantKeys && currentVariantKeys.has(variantName)) continue;
+        const selectedValue = resolvedVariants[variantName];
+        if (selectedValue === undefined) continue;
+        const selectedKey = getVariantValueKey(selectedValue);
+        if (
+          skipStyleVariantValuesIn &&
+          selectedKey != null &&
+          skipStyleVariantValuesIn[variantName]?.has(selectedKey)
+        ) {
+          continue;
+        }
+        const computedResult = fn(selectedValue);
+        if (computedResult == null) continue;
+        const r = extractClassAndStylePrebuilt(computedResult);
+        if (r.class != null) allClasses.push(r.class);
+        if (r.style) assign(allStyle, r.style);
       }
-      const computedVariantKeys = new Set<string>(currentVariantKeys);
-      if (config.computedVariants) {
-        for (const key of Object.keys(config.computedVariants)) {
-          computedVariantKeys.add(key);
+
+      // computed function results
+      if (computedClassesArr) {
+        for (let i = 0; i < computedClassesArr.length; i++) {
+          allClasses.push(computedClassesArr[i]);
         }
       }
-      const computedVariantValues = mergeDisabledVariantValues(
-        skipStyleVariantValues,
-        disabledVariantValues,
-      );
+      if (computedStyleObj) assign(allStyle, computedStyleObj);
 
-      // Process extended components (separates base and variant classes)
-      const extendedResult = computeExtendedStyles(
-        config,
-        resolvedVariants,
-        computedVariantKeys,
-        computedVariantValues,
-      );
+      // props.class / props.className
+      if ("class" in props)
+        allClasses.push((props as { class: ClassValue }).class);
+      if ("className" in props)
+        allClasses.push((props as { className: ClassValue }).className);
 
-      // 1. Extended base classes first
-      allClasses.push(...extendedResult.baseClasses);
-      assign(allStyle, extendedResult.style);
-
-      // 2. Current component's base class
-      allClasses.push(config.class);
-
-      // 3. Add base style
-      if (config.style) {
-        assign(allStyle, config.style);
-      }
-
-      // 4. Extended variant classes
-      allClasses.push(...extendedResult.variantClasses);
-
-      // 5. Current component's variants (skip keys that are overridden)
-      const variantsResult = computeVariantStyles(
-        config,
-        resolvedVariants,
-        currentVariantKeys,
-        computedVariantValues,
-      );
-      allClasses.push(...variantsResult.classes);
-      assign(allStyle, variantsResult.style);
-
-      // Add computed results
-      allClasses.push(...computedResult.classes);
-      assign(allStyle, computedResult.style);
-
-      // Merge class from props
-      if ("class" in props) {
-        allClasses.push(props.class);
-      }
-      if ("className" in props) {
-        allClasses.push(props.className);
-      }
-
-      // Merge style from props
-      if (props.style != null) {
-        assign(allStyle, normalizeStyle(props.style));
+      // props.style
+      const psv = (props as { style?: unknown }).style;
+      if (psv != null) {
+        // Fast path: if it's an object with no keys, skip
+        if (typeof psv === "string") {
+          if (psv.length > 0) {
+            assign(allStyle, htmlStyleToStyleValue(psv));
+          }
+        } else if (typeof psv === "object") {
+          // Could be HTMLObj or JSX form. Don't allocate when empty.
+          let hasAnyKey = false;
+          for (const _ in psv) {
+            hasAnyKey = true;
+            break;
+          }
+          if (hasAnyKey) {
+            assign(allStyle, normalizeStyle(psv));
+          }
+        }
       }
 
       return {
@@ -971,119 +1091,149 @@ export function create({
     };
 
     const getVariants = (variants?: VariantValues<MergedVariants>) => {
-      const variantProps = variants ?? {};
-      const resolvedVariants = resolveVariants(config, variantProps);
+      const variantProps = (variants ?? {}) as Record<string, unknown>;
+      let resolvedVariants = resolveVariantsHot(variantProps);
       // Run computed function to get variants set via setVariants and
       // setDefaultVariants
-      const { updatedVariants } = runComputedFunction(
-        config,
-        resolvedVariants,
-        variantProps,
-      );
-      return updatedVariants as VariantValues<MergedVariants>;
+      if (computed) {
+        const updatedVariants: Record<string, unknown> = {};
+        Object.assign(updatedVariants, resolvedVariants);
+        const ctx = {
+          variants: resolvedVariants as VariantValues<Record<string, unknown>>,
+          setVariants: (
+            newVariants: VariantValues<Record<string, unknown>>,
+          ) => {
+            const filtered: Record<string, unknown> = {};
+            filterDisabledInto(
+              newVariants as Record<string, unknown>,
+              filtered,
+            );
+            Object.assign(updatedVariants, filtered);
+          },
+          setDefaultVariants: (
+            newDefaults: VariantValues<Record<string, unknown>>,
+          ) => {
+            for (const key in newDefaults) {
+              if (!hasOwn.call(newDefaults, key)) continue;
+              if (variantProps[key] !== undefined) continue;
+              if (disabledVariantKeys.has(key)) continue;
+              const value = (newDefaults as Record<string, unknown>)[key];
+              const valueKey = getVariantValueKey(value);
+              if (
+                valueKey != null &&
+                disabledVariantValues[key]?.has(valueKey)
+              ) {
+                continue;
+              }
+              updatedVariants[key] = value;
+            }
+          },
+          addClass: () => {},
+          addStyle: () => {},
+        };
+        computed(ctx);
+        const filteredUpdated: Record<string, unknown> = {};
+        filterDisabledInto(updatedVariants, filteredUpdated);
+        resolvedVariants = filteredUpdated;
+      }
+      return resolvedVariants as VariantValues<MergedVariants>;
     };
 
     // Compute base class (without variants) - includes extended base classes
     const extendedBaseClasses: ClassValue[] = [];
-    if (config.extend) {
-      for (const ext of config.extend) {
+    if (extend) {
+      for (const ext of extend) {
         const meta = getComponentMeta(ext);
         extendedBaseClasses.push(meta?.baseClass ?? "");
       }
     }
-    const baseClass = cx(
+    const computedBaseClass = cx(
       ...(extendedBaseClasses as ClsxClassValue[]),
       config.class as ClsxClassValue,
     );
 
-    // Compute static defaults once at creation time (without triggering
-    // computed functions)
-    const staticDefaults = collectStaticDefaults(config);
-
-    const initializeComponent = <
-      R extends ComponentResult,
-      T extends ModalComponent<MergedVariants, R>,
-    >(
-      component: T,
-      propsKeys: string[],
-    ): T => {
-      component.class = (props: ComponentProps<MergedVariants> = {}) => {
-        return computeResult(props).className;
-      };
-
-      component.getVariants = getVariants;
-      component.keys = propsKeys;
-      component.variantKeys = variantKeys;
-      component.propKeys = propsKeys;
-
-      // Store internal metadata hidden from public types
-      setComponentMeta(component, {
-        baseClass,
-        staticDefaults,
-        resolveDefaults: createResolveDefaults(config),
-      });
-
-      return component;
+    // Shared closures across the default and modal components.
+    const classFn = (props: ComponentProps<MergedVariants> = {}) => {
+      return computeResult(props).className;
+    };
+    const meta: ComponentMeta = {
+      baseClass: computedBaseClass,
+      staticDefaults,
+      resolveDefaults: resolveDefaultsFn,
     };
 
-    const createDefaultComponent = (): CVComponent<V, CV, E> => {
-      const component = ((props: ComponentProps<MergedVariants> = {}) => {
-        const { className, style } = computeResult(props);
-        return { class: className, style };
-      }) as CVComponent<V, CV, E>;
+    const initComponent = <C extends ModalComponent<MergedVariants, never>>(
+      c: C,
+      keys: string[],
+      style: C["style"],
+    ): C => {
+      c.class = classFn;
+      c.style = style;
+      c.getVariants = getVariants;
+      c.keys = keys as never;
+      c.variantKeys = variantKeys as never;
+      c.propKeys = keys as never;
+      setComponentMeta(c, meta);
+      return c;
+    };
 
-      component.style = (props: ComponentProps<MergedVariants> = {}) => {
+    // Default component
+    const defaultComponent = ((props: ComponentProps<MergedVariants> = {}) => {
+      const { className, style } = computeResult(props);
+      return { class: className, style };
+    }) as CVComponent<V, CV, E>;
+    initComponent(
+      defaultComponent as unknown as ModalComponent<MergedVariants, never>,
+      inputPropsKeys,
+      ((props: ComponentProps<MergedVariants> = {}) => {
         return computeResult(props).style;
-      };
+      }) as unknown as ModalComponent<MergedVariants, never>["style"],
+    );
 
-      return initializeComponent(component, inputPropsKeys);
-    };
+    // JSX component
+    const jsxComponent = ((props: ComponentProps<MergedVariants> = {}) => {
+      const { className, style } = computeResult(props);
+      return { className, style: styleValueToJSXStyle(style) };
+    }) as ModalComponent<MergedVariants, JSXProps>;
+    initComponent(
+      jsxComponent as unknown as ModalComponent<MergedVariants, never>,
+      ["className", "style", ...variantKeys],
+      ((props: ComponentProps<MergedVariants> = {}) => {
+        return styleValueToJSXStyle(computeResult(props).style);
+      }) as unknown as ModalComponent<MergedVariants, never>["style"],
+    );
 
-    const createModalComponent = <R extends ComponentResult>(
-      mode: Mode,
-    ): ModalComponent<MergedVariants, R> => {
-      const propsKeys = getPropsKeys(mode);
+    // HTML component
+    const htmlComponent = ((props: ComponentProps<MergedVariants> = {}) => {
+      const { className, style } = computeResult(props);
+      return { class: className, style: styleValueToHTMLStyle(style) };
+    }) as ModalComponent<MergedVariants, HTMLProps>;
+    initComponent(
+      htmlComponent as unknown as ModalComponent<MergedVariants, never>,
+      ["class", "style", ...variantKeys],
+      ((props: ComponentProps<MergedVariants> = {}) => {
+        return styleValueToHTMLStyle(computeResult(props).style);
+      }) as unknown as ModalComponent<MergedVariants, never>["style"],
+    );
 
-      const component = ((props: ComponentProps<MergedVariants> = {}) => {
-        const { className, style } = computeResult(props);
+    // HTMLObj component
+    const htmlObjComponent = ((props: ComponentProps<MergedVariants> = {}) => {
+      const { className, style } = computeResult(props);
+      return { class: className, style: styleValueToHTMLObjStyle(style) };
+    }) as ModalComponent<MergedVariants, HTMLObjProps>;
+    initComponent(
+      htmlObjComponent as unknown as ModalComponent<MergedVariants, never>,
+      ["class", "style", ...variantKeys],
+      ((props: ComponentProps<MergedVariants> = {}) => {
+        return styleValueToHTMLObjStyle(computeResult(props).style);
+      }) as unknown as ModalComponent<MergedVariants, never>["style"],
+    );
 
-        if (mode === "jsx") {
-          return { className, style: styleValueToJSXStyle(style) };
-        }
-        if (mode === "html") {
-          return { class: className, style: styleValueToHTMLStyle(style) };
-        }
-        // htmlObj
-        return { class: className, style: styleValueToHTMLObjStyle(style) };
-      }) as ModalComponent<MergedVariants, R>;
+    defaultComponent.jsx = jsxComponent;
+    defaultComponent.html = htmlComponent;
+    defaultComponent.htmlObj = htmlObjComponent;
 
-      component.class = (props: ComponentProps<MergedVariants> = {}) => {
-        return computeResult(props).className;
-      };
-
-      component.style = (props: ComponentProps<MergedVariants> = {}) => {
-        const { style } = computeResult(props);
-        if (mode === "jsx") return styleValueToJSXStyle(style);
-        if (mode === "html") return styleValueToHTMLStyle(style);
-        return styleValueToHTMLObjStyle(style);
-      };
-      return initializeComponent(component, propsKeys);
-    };
-
-    const defaultComponent = createDefaultComponent();
-
-    // Create all modal variants
-    const jsxComponent = createModalComponent<JSXProps>("jsx");
-    const htmlComponent = createModalComponent<HTMLProps>("html");
-    const htmlObjComponent = createModalComponent<HTMLObjProps>("htmlObj");
-
-    // Build the final component
-    const component = defaultComponent;
-    component.jsx = jsxComponent;
-    component.html = htmlComponent;
-    component.htmlObj = htmlObjComponent;
-
-    return component;
+    return defaultComponent;
   };
 
   return { cv, cx };

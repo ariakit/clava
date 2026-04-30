@@ -26,9 +26,11 @@ export function getClassPropertyName(mode: Mode) {
  */
 export function hyphenToCamel(str: string) {
   // CSS custom properties (variables) should not be converted
-  if (str.startsWith("--")) {
+  if (str.length >= 2 && str.charCodeAt(0) === 45 && str.charCodeAt(1) === 45) {
     return str;
   }
+  // Fast path: no hyphen -> return as-is
+  if (str.indexOf("-") === -1) return str;
   return str.replace(/-([a-z])/gi, (_, letter) => letter.toUpperCase());
 }
 
@@ -40,7 +42,7 @@ export function hyphenToCamel(str: string) {
  */
 export function camelToHyphen(str: string) {
   // CSS custom properties (variables) should not be converted
-  if (str.startsWith("--")) {
+  if (str.length >= 2 && str.charCodeAt(0) === 45 && str.charCodeAt(1) === 45) {
     return str;
   }
   return str.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
@@ -67,20 +69,60 @@ export function htmlStyleToStyleValue(styleString: string) {
   if (!styleString) return {};
 
   const result: StyleValue = {};
-  const declarations = styleString.split(";");
-
-  for (const declaration of declarations) {
-    const trimmed = declaration.trim();
-    if (!trimmed) continue;
-
-    const colonIndex = trimmed.indexOf(":");
-    if (colonIndex === -1) continue;
-
-    const property = trimmed.slice(0, colonIndex).trim();
-    const value = trimmed.slice(colonIndex + 1).trim();
-    if (!property) continue;
-    if (!value) continue;
-
+  const len = styleString.length;
+  let i = 0;
+  while (i < len) {
+    // Skip leading whitespace and stray semicolons
+    while (i < len) {
+      const c = styleString.charCodeAt(i);
+      if (c !== 32 && c !== 9 && c !== 10 && c !== 13 && c !== 59) break;
+      i++;
+    }
+    if (i >= len) break;
+    // Read property name until ':' or ';'
+    const propStart = i;
+    while (i < len) {
+      const c = styleString.charCodeAt(i);
+      if (c === 58 || c === 59) break;
+      i++;
+    }
+    if (i >= len || styleString.charCodeAt(i) === 59) {
+      // No colon found - skip this declaration
+      if (i < len) i++; // skip ';'
+      continue;
+    }
+    let propEnd = i;
+    // Trim trailing whitespace from property name
+    while (propEnd > propStart) {
+      const c = styleString.charCodeAt(propEnd - 1);
+      if (c !== 32 && c !== 9 && c !== 10 && c !== 13) break;
+      propEnd--;
+    }
+    if (propEnd === propStart) {
+      // Empty property - skip
+      while (i < len && styleString.charCodeAt(i) !== 59) i++;
+      if (i < len) i++;
+      continue;
+    }
+    const property = styleString.slice(propStart, propEnd);
+    i++; // skip ':'
+    // Skip whitespace before value
+    while (i < len) {
+      const c = styleString.charCodeAt(i);
+      if (c !== 32 && c !== 9 && c !== 10 && c !== 13) break;
+      i++;
+    }
+    const valStart = i;
+    while (i < len && styleString.charCodeAt(i) !== 59) i++;
+    let valEnd = i;
+    while (valEnd > valStart) {
+      const c = styleString.charCodeAt(valEnd - 1);
+      if (c !== 32 && c !== 9 && c !== 10 && c !== 13) break;
+      valEnd--;
+    }
+    if (i < len) i++; // skip ';'
+    if (valEnd === valStart) continue;
+    const value = styleString.slice(valStart, valEnd);
     // CSS property names and values are dynamic - cast required for index access
     (result as Record<string, string>)[hyphenToCamel(property)] = value;
   }
@@ -96,11 +138,13 @@ export function htmlStyleToStyleValue(styleString: string) {
  */
 export function htmlObjStyleToStyleValue(style: HTMLCSSProperties) {
   const result: StyleValue = {};
-  for (const [key, value] of Object.entries(style)) {
+  for (const key in style) {
+    const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string>)[hyphenToCamel(key)] =
-      parseLengthValue(value);
+    (result as Record<string, string>)[hyphenToCamel(key)] = parseLengthValue(
+      value as string | number,
+    );
   }
   return result;
 }
@@ -113,10 +157,13 @@ export function htmlObjStyleToStyleValue(style: HTMLCSSProperties) {
  */
 export function jsxStyleToStyleValue(style: JSXCSSProperties) {
   const result: StyleValue = {};
-  for (const [key, value] of Object.entries(style)) {
+  for (const key in style) {
+    const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string>)[key] = parseLengthValue(value);
+    (result as Record<string, string>)[key] = parseLengthValue(
+      value as string | number,
+    );
   }
   return result;
 }
@@ -128,13 +175,17 @@ export function jsxStyleToStyleValue(style: JSXCSSProperties) {
  * // "background-color: red; font-size: 16px;"
  */
 export function styleValueToHTMLStyle(style: StyleValue): string {
-  const parts: string[] = [];
-  for (const [key, value] of Object.entries(style)) {
+  let result = "";
+  for (const key in style) {
+    const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
-    parts.push(`${camelToHyphen(key)}: ${value}`);
+    if (result) result += "; ";
+    result += camelToHyphen(key);
+    result += ": ";
+    result += value as string | number;
   }
-  if (!parts.length) return "";
-  return `${parts.join("; ")};`;
+  if (!result) return "";
+  return `${result};`;
 }
 
 /**
@@ -145,10 +196,10 @@ export function styleValueToHTMLStyle(style: StyleValue): string {
  */
 export function styleValueToHTMLObjStyle(style: StyleValue) {
   const result: CSS.PropertiesHyphen = {};
-  for (const [key, value] of Object.entries(style)) {
+  for (const key in style) {
+    const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
-    const property = camelToHyphen(key) as keyof HTMLCSSProperties;
-    result[property] = value;
+    (result as Record<string, unknown>)[camelToHyphen(key)] = value;
   }
   return result;
 }
@@ -172,7 +223,16 @@ export function styleValueToJSXStyle(style: StyleValue) {
 export function isHTMLObjStyle(
   style: CSS.Properties<any> | CSS.PropertiesHyphen<any>,
 ): style is CSS.PropertiesHyphen {
-  return Object.keys(style).some(
-    (key) => key.includes("-") && !key.startsWith("--"),
-  );
+  for (const key in style) {
+    // Quick exclusion of CSS custom properties (--foo)
+    if (
+      key.length >= 2 &&
+      key.charCodeAt(0) === 45 &&
+      key.charCodeAt(1) === 45
+    ) {
+      continue;
+    }
+    if (key.indexOf("-") !== -1) return true;
+  }
+  return false;
 }
