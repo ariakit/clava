@@ -90,46 +90,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect non-doc changes
-        id: changes
-        run: |
-          if git diff --name-only \
-              ${{ github.event.pull_request.base.sha }} \
-              ${{ github.sha }} \
-            | grep -Ev '^(\.changeset/|.+\.md$|LICENSE$|\.gitignore$)' \
-            | grep -q .; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping perf job: only docs/changeset files changed."
-          fi
-
       - uses: pnpm/action-setup@v6
-        if: steps.changes.outputs.should_run == 'true'
 
       - uses: actions/setup-node@v6
-        if: steps.changes.outputs.should_run == 'true'
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Set up baseline worktree
-        if: steps.changes.outputs.should_run == 'true'
         run: |
           git worktree add --detach "$BASELINE_DIR" \
             ${{ github.event.pull_request.base.sha }}
 
       - name: Install dependencies (current)
-        if: steps.changes.outputs.should_run == 'true'
         run: pnpm install
 
       - name: Install dependencies (baseline)
-        if: steps.changes.outputs.should_run == 'true'
         working-directory: ${{ env.BASELINE_DIR }}
         run: pnpm install
 
       - name: Run interleaved benchmarks
-        if: steps.changes.outputs.should_run == 'true'
         run: |
           mkdir -p .perf-results
           for i in $(seq 1 "$PERF_ROUNDS"); do
@@ -146,11 +126,11 @@ jobs:
           done
 
       - name: Compare results
-        if: always() && steps.changes.outputs.should_run == 'true'
+        if: always()
         run: pnpm perf-compare
 
       - name: Upload performance results
-        if: always() && steps.changes.outputs.should_run == 'true'
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: perf-results
@@ -160,7 +140,7 @@ jobs:
           retention-days: 7
 
       - name: Post or update PR comment
-        if: always() && steps.changes.outputs.should_run == 'true'
+        if: always()
         continue-on-error: true
         uses: actions/github-script@v9
         with:
