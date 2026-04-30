@@ -73,6 +73,31 @@ function runCompare({
   return readFileSync(path.join(outputDir, "comparison.md"), "utf-8");
 }
 
+function runCompareRounds({
+  baseline,
+  current,
+}: {
+  baseline: unknown[];
+  current: unknown[];
+}) {
+  const dir = createTempDir();
+  const outputDir = path.join(dir, resultsDir);
+  mkdirSync(outputDir, { recursive: true });
+  baseline.forEach((report, index) => {
+    writeJson(dir, `baseline-${index + 1}.json`, report);
+  });
+  current.forEach((report, index) => {
+    writeJson(dir, `current-${index + 1}.json`, report);
+  });
+
+  execFileSync(process.execPath, [scriptPath], {
+    cwd: dir,
+    stdio: "pipe",
+  });
+
+  return readFileSync(path.join(outputDir, "comparison.md"), "utf-8");
+}
+
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
@@ -145,6 +170,178 @@ describe("perf compare", () => {
     expect(markdown).toContain(
       "Some benchmarks were removed; no comparable benchmarks remain.",
     );
+  });
+
+  test("does not flag a regression when rounds disagree on direction", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100, 100, 100, 100].map((hz) =>
+      createReport(dir, [{ name: "noisy bench", hz, mean: 1 / hz }]),
+    );
+    // Five rounds with three improvements and two large regressions: median is
+    // a regression but rounds do not agree, so this must not be flagged.
+    const currentRounds = [110, 115, 105, 70, 75].map((hz) =>
+      createReport(dir, [{ name: "noisy bench", hz, mean: 1 / hz }]),
+    );
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(markdown).toContain("No significant performance changes detected.");
+    expect(markdown).not.toMatch(/% :warning:/);
+    expect(markdown).toContain("Aggregated across 5 interleaved rounds");
+  });
+
+  test("flags a consistent regression across rounds", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 102, 99, 101, 100].map((hz) =>
+      createReport(dir, [{ name: "consistent bench", hz, mean: 1 / hz }]),
+    );
+    const currentRounds = [80, 78, 82, 79, 81].map((hz) =>
+      createReport(dir, [{ name: "consistent bench", hz, mean: 1 / hz }]),
+    );
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(markdown).toContain(":warning:");
+    expect(markdown).toMatch(/-2\d% :warning:/);
+  });
+
+  test("tolerates a single dissenting round when there are 5", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100, 100, 100, 100].map((hz) =>
+      createReport(dir, [{ name: "robust bench", hz, mean: 1 / hz }]),
+    );
+    // 4 of 5 rounds show a regression; 1 round shows a tiny noise gain.
+    const currentRounds = [70, 72, 105, 68, 74].map((hz) =>
+      createReport(dir, [{ name: "robust bench", hz, mean: 1 / hz }]),
+    );
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(markdown).toContain(":warning:");
+  });
+
+  test("does not flag with two dissenters at five rounds", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100, 100, 100, 100].map((hz) =>
+      createReport(dir, [{ name: "two-dissent bench", hz, mean: 1 / hz }]),
+    );
+    // 3 of 5 regress, 2 disagree — beyond the single-dissenter tolerance.
+    const currentRounds = [70, 72, 74, 105, 108].map((hz) =>
+      createReport(dir, [{ name: "two-dissent bench", hz, mean: 1 / hz }]),
+    );
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(markdown).toContain("No significant performance changes detected.");
+    expect(markdown).not.toMatch(/% :warning:/);
+  });
+
+  test("flags an unanimous regression with four rounds", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100, 100, 100].map((hz) =>
+      createReport(dir, [{ name: "four-round bench", hz, mean: 1 / hz }]),
+    );
+    const currentRounds = [78, 80, 82, 79].map((hz) =>
+      createReport(dir, [{ name: "four-round bench", hz, mean: 1 / hz }]),
+    );
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(markdown).toMatch(/-2\d% :warning:/);
+  });
+
+  test("requires unanimity with four rounds", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100, 100, 100].map((hz) =>
+      createReport(dir, [{ name: "four-round dissent", hz, mean: 1 / hz }]),
+    );
+    // 3 of 4 regress; with N=4 we still require unanimity, so this is noise.
+    const currentRounds = [70, 72, 74, 105].map((hz) =>
+      createReport(dir, [{ name: "four-round dissent", hz, mean: 1 / hz }]),
+    );
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(markdown).toContain("No significant performance changes detected.");
+    expect(markdown).not.toMatch(/% :warning:/);
+  });
+
+  test("aligns per-round comparison when a benchmark is missing from a round", () => {
+    const dir = createTempDir();
+    // Three baseline rounds; bench "b" is missing from baseline round 2 only.
+    const baselineRounds = [
+      createReport(dir, [
+        { name: "a", hz: 100, mean: 1 / 100 },
+        { name: "b", hz: 200, mean: 1 / 200 },
+      ]),
+      createReport(dir, [{ name: "a", hz: 100, mean: 1 / 100 }]),
+      createReport(dir, [
+        { name: "a", hz: 100, mean: 1 / 100 },
+        { name: "b", hz: 200, mean: 1 / 200 },
+      ]),
+    ];
+    // Three current rounds; bench "b" present everywhere.
+    // Per-round baseline values for "b" exist in rounds 1 and 3.
+    const currentRounds = [
+      createReport(dir, [
+        { name: "a", hz: 100, mean: 1 / 100 },
+        { name: "b", hz: 140, mean: 1 / 140 },
+      ]),
+      createReport(dir, [
+        { name: "a", hz: 100, mean: 1 / 100 },
+        { name: "b", hz: 145, mean: 1 / 145 },
+      ]),
+      createReport(dir, [
+        { name: "a", hz: 100, mean: 1 / 100 },
+        { name: "b", hz: 142, mean: 1 / 142 },
+      ]),
+    ];
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    // Bench "b" went from 200 to ~142 in every paired round (rounds 1 and 3),
+    // so the change must be flagged as a regression.
+    expect(markdown).toMatch(/-29% :warning:/);
+  });
+
+  test("requires unanimity with three rounds", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100, 100].map((hz) =>
+      createReport(dir, [{ name: "small-n bench", hz, mean: 1 / hz }]),
+    );
+    // 2 of 3 regress, but with only three rounds we require unanimity.
+    const currentRounds = [70, 72, 105].map((hz) =>
+      createReport(dir, [{ name: "small-n bench", hz, mean: 1 / hz }]),
+    );
+
+    const markdown = runCompareRounds({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(markdown).toContain("No significant performance changes detected.");
+    expect(markdown).not.toMatch(/% :warning:/);
   });
 
   test("falls back to empty results for malformed JSON", () => {

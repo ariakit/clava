@@ -78,67 +78,79 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      PERF_ROUNDS: 5
+      BASELINE_DIR: ${{ runner.temp }}/perf-baseline
+      # Skip husky's `prepare` script: linked worktrees share `.git/hooks` with
+      # the main checkout, so installing in the baseline tree would otherwise
+      # rewrite the main repo's hooks.
+      HUSKY: 0
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Checkout base branch
+      - name: Detect non-doc changes
+        id: changes
         run: |
-          git checkout -f ${{ github.event.pull_request.base.sha }}
-          git clean -fdx
+          if git diff --name-only \
+              ${{ github.event.pull_request.base.sha }} \
+              ${{ github.sha }} \
+            | grep -Ev '^(\.changeset/|.+\.md$|LICENSE$|\.gitignore$)' \
+            | grep -q .; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping perf job: only docs/changeset files changed."
+          fi
 
       - uses: pnpm/action-setup@v6
+        if: steps.changes.outputs.should_run == 'true'
+
       - uses: actions/setup-node@v6
+        if: steps.changes.outputs.should_run == 'true'
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
-      - name: Install base dependencies
+      - name: Set up baseline worktree
+        if: steps.changes.outputs.should_run == 'true'
+        run: |
+          git worktree add --detach "$BASELINE_DIR" \
+            ${{ github.event.pull_request.base.sha }}
+
+      - name: Install dependencies (current)
+        if: steps.changes.outputs.should_run == 'true'
         run: pnpm install
 
-      - name: Run baseline perf tests
-        run: |
-          pnpm exec vitest bench \
-            --outputJson .perf-results/baseline.json \
-            --passWithNoTests
-
-      - name: Save baseline results
-        run: |
-          mkdir -p /tmp/perf-baseline
-          cp .perf-results/baseline.json /tmp/perf-baseline/ 2>/dev/null || true
-
-      - name: Checkout merge commit
-        run: |
-          git checkout -f ${{ github.sha }}
-          git clean -fdx
-
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
-
-      - name: Install PR dependencies
+      - name: Install dependencies (baseline)
+        if: steps.changes.outputs.should_run == 'true'
+        working-directory: ${{ env.BASELINE_DIR }}
         run: pnpm install
 
-      - name: Restore baseline results
+      - name: Run interleaved benchmarks
+        if: steps.changes.outputs.should_run == 'true'
         run: |
           mkdir -p .perf-results
-          cp /tmp/perf-baseline/baseline.json .perf-results/ 2>/dev/null || true
-
-      - name: Run current perf tests
-        run: |
-          pnpm exec vitest bench \
-            --outputJson .perf-results/current.json \
-            --passWithNoTests
+          for i in $(seq 1 "$PERF_ROUNDS"); do
+            echo "::group::Round $i — baseline"
+            (cd "$BASELINE_DIR" && pnpm exec vitest bench \
+              --outputJson "$GITHUB_WORKSPACE/.perf-results/baseline-$i.json" \
+              --passWithNoTests)
+            echo "::endgroup::"
+            echo "::group::Round $i — current"
+            pnpm exec vitest bench \
+              --outputJson ".perf-results/current-$i.json" \
+              --passWithNoTests
+            echo "::endgroup::"
+          done
 
       - name: Compare results
-        if: always()
+        if: always() && steps.changes.outputs.should_run == 'true'
         run: pnpm perf-compare
 
       - name: Upload performance results
-        if: always()
+        if: always() && steps.changes.outputs.should_run == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: perf-results
@@ -148,7 +160,7 @@ jobs:
           retention-days: 7
 
       - name: Post or update PR comment
-        if: always()
+        if: always() && steps.changes.outputs.should_run == 'true'
         continue-on-error: true
         uses: actions/github-script@v9
         with:

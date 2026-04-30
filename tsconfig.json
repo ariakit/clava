@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "composite": false,
-    "emitDeclarationOnly": false
+    "emitDeclarationOnly": false,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
   "include": ["**/*.ts", "**/*.js"],
   "references": [{ "path": "./packages/clava" }, { "path": "./app" }]

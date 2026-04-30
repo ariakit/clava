@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 const RESULTS_DIR = path.join(process.cwd(), ".perf-results");
@@ -22,11 +28,6 @@ interface ReportBenchmark {
   name?: string;
   hz?: number;
   mean?: number;
-  median?: number;
-  min?: number;
-  max?: number;
-  rme?: number;
-  sampleCount?: number;
 }
 
 interface BenchmarkEntry {
@@ -36,27 +37,44 @@ interface BenchmarkEntry {
   name: string;
   hz: number;
   mean: number;
-  median: number;
-  min: number;
-  max: number;
-  rme: number;
-  sampleCount: number;
+}
+
+interface RoundEntry {
+  roundIndex: number;
+  entry: BenchmarkEntry;
+}
+
+interface AggregatedBenchmark {
+  key: string;
+  file: string;
+  group: string;
+  name: string;
+  // Indexed by roundIndex so we can pair baseline and current entries from the
+  // same round even when one tree is missing a benchmark in some rounds.
+  byRound: Map<number, BenchmarkEntry>;
+  hz: number;
+  mean: number;
 }
 
 interface ComparisonRow {
   key: string;
   label: string;
-  baseline: BenchmarkEntry;
-  current: BenchmarkEntry;
+  baseline: AggregatedBenchmark;
+  current: AggregatedBenchmark;
   percent: number;
+  perRoundPercents: number[];
+  agreement: number;
   significant: boolean;
 }
 
 interface ComparisonSummary {
   rows: ComparisonRow[];
-  newBenchmarks: BenchmarkEntry[];
-  removedBenchmarks: BenchmarkEntry[];
+  newBenchmarks: AggregatedBenchmark[];
+  removedBenchmarks: AggregatedBenchmark[];
   hasSignificantChanges: boolean;
+  // Number of rounds where both baseline and current produced data (i.e. the
+  // count actually used for comparison), not the larger of the two raw counts.
+  pairedRoundsCount: number;
 }
 
 function readJsonFile(filePath: string): unknown {
@@ -89,21 +107,15 @@ function getPackageName(filePath: string) {
   return workspace ?? "";
 }
 
-function formatLabel(entry: BenchmarkEntry): string {
-  const parts = [
-    getPackageName(entry.file),
-    path.basename(entry.file),
-    entry.name,
-  ].filter(Boolean);
+function formatLabel({ file, name }: { file: string; name: string }): string {
+  const parts = [getPackageName(file), path.basename(file), name].filter(
+    Boolean,
+  );
   return parts.join(" > ");
 }
 
-function loadEntries(prefix: string): BenchmarkEntry[] {
-  const report = readJsonFile(
-    path.join(RESULTS_DIR, `${prefix}.json`),
-  ) as BenchmarkReport;
+function entriesFromReport(report: BenchmarkReport): BenchmarkEntry[] {
   const entries: BenchmarkEntry[] = [];
-
   for (const file of report.files ?? []) {
     const filePath = normalizeFilePath(file.filepath ?? "");
     for (const group of file.groups ?? []) {
@@ -118,59 +130,190 @@ function loadEntries(prefix: string): BenchmarkEntry[] {
           name,
           hz: getNumber(benchmark.hz),
           mean: getNumber(benchmark.mean),
-          median: getNumber(benchmark.median),
-          min: getNumber(benchmark.min),
-          max: getNumber(benchmark.max),
-          rme: getNumber(benchmark.rme),
-          sampleCount: getNumber(benchmark.sampleCount),
         });
       }
     }
   }
-
   return entries;
 }
 
-function compare(): ComparisonSummary {
-  const baseline = loadEntries("baseline");
-  const current = loadEntries("current");
-  const baselineByKey = new Map<string, BenchmarkEntry>();
-  const currentByKey = new Map<string, BenchmarkEntry>();
+interface DiscoveredRoundFile {
+  filePath: string;
+  roundIndex: number;
+}
 
-  for (const entry of baseline) {
-    baselineByKey.set(entry.key, entry);
+// Discover round files like `baseline-1.json`, `baseline-2.json`, ... and
+// expose each one's round number so per-round comparisons stay aligned across
+// baseline and current even if a round is missing on one side. Falls back to
+// single-round `baseline.json` (assigned roundIndex 1) so existing single-run
+// setups keep working.
+function discoverRoundFiles(prefix: string): DiscoveredRoundFile[] {
+  if (!existsSync(RESULTS_DIR)) return [];
+  const numbered: DiscoveredRoundFile[] = [];
+  for (const name of readdirSync(RESULTS_DIR)) {
+    const match = name.match(/^(.+)-(\d+)\.json$/);
+    if (!match) continue;
+    if (match[1] !== prefix) continue;
+    numbered.push({
+      filePath: path.join(RESULTS_DIR, name),
+      roundIndex: Number(match[2] ?? 0),
+    });
   }
-  for (const entry of current) {
-    currentByKey.set(entry.key, entry);
+  if (numbered.length > 0) {
+    return numbered.toSorted((a, b) => a.roundIndex - b.roundIndex);
   }
+
+  const fallback = path.join(RESULTS_DIR, `${prefix}.json`);
+  if (existsSync(fallback)) return [{ filePath: fallback, roundIndex: 1 }];
+  return [];
+}
+
+function loadRounds(prefix: string): RoundEntry[] {
+  const discovered = discoverRoundFiles(prefix);
+  const out: RoundEntry[] = [];
+  for (const { filePath, roundIndex } of discovered) {
+    const report = readJsonFile(filePath) as BenchmarkReport;
+    for (const entry of entriesFromReport(report)) {
+      out.push({ roundIndex, entry });
+    }
+  }
+  return out;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].toSorted((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[middle] ?? 0;
+  const left = sorted[middle - 1] ?? 0;
+  const right = sorted[middle] ?? 0;
+  return (left + right) / 2;
+}
+
+function aggregateByKey(
+  roundEntries: RoundEntry[],
+): Map<string, AggregatedBenchmark> {
+  const grouped = new Map<string, Map<number, BenchmarkEntry>>();
+  for (const { roundIndex, entry } of roundEntries) {
+    let inner = grouped.get(entry.key);
+    if (!inner) {
+      inner = new Map();
+      grouped.set(entry.key, inner);
+    }
+    inner.set(roundIndex, entry);
+  }
+
+  const aggregated = new Map<string, AggregatedBenchmark>();
+  for (const [key, byRound] of grouped) {
+    const entries = [...byRound.values()];
+    const first = entries[0];
+    if (!first) continue;
+    const medianHz = median(entries.map((entry) => entry.hz));
+    // Derive the displayed mean from the same median hz so the two cells in a
+    // row never come from different rounds.
+    const meanFromMedianHz = medianHz > 0 ? 1000 / medianHz : 0;
+    aggregated.set(key, {
+      key,
+      file: first.file,
+      group: first.group,
+      name: first.name,
+      byRound,
+      hz: medianHz,
+      mean: meanFromMedianHz,
+    });
+  }
+  return aggregated;
+}
+
+// Direction-of-change agreement check across rounds. Up to two rounds we
+// fall back to magnitude only — with so few samples a noise round would
+// otherwise veto every flag, which is the failure mode this script exists to
+// avoid. Three or four rounds require unanimity. Five or more rounds tolerate
+// a single dissenter so a one-off CI hiccup cannot block an alert.
+function requiredAgreement(roundsCount: number) {
+  if (roundsCount <= 2) return 1;
+  if (roundsCount <= 4) return roundsCount;
+  return roundsCount - 1;
+}
+
+function computeSignificance({
+  medianPercent,
+  perRoundPercents,
+}: {
+  medianPercent: number;
+  perRoundPercents: number[];
+}): { agreement: number; significant: boolean } {
+  if (perRoundPercents.length === 0) {
+    return { agreement: 0, significant: false };
+  }
+  const direction = Math.sign(medianPercent);
+  let agreement = 0;
+  for (const percent of perRoundPercents) {
+    if (Math.sign(percent) === direction) agreement += 1;
+  }
+  const magnitudeOk = Math.abs(medianPercent) > THRESHOLD_PERCENT;
+  const agreementOk = agreement >= requiredAgreement(perRoundPercents.length);
+  return { agreement, significant: magnitudeOk && agreementOk };
+}
+
+function compare(): ComparisonSummary {
+  const baseline = aggregateByKey(loadRounds("baseline"));
+  const current = aggregateByKey(loadRounds("current"));
 
   const rows: ComparisonRow[] = [];
-  const newBenchmarks: BenchmarkEntry[] = [];
-  const removedBenchmarks: BenchmarkEntry[] = [];
+  const newBenchmarks: AggregatedBenchmark[] = [];
+  const removedBenchmarks: AggregatedBenchmark[] = [];
+  const pairedRoundIndices = new Set<number>();
 
-  for (const currentEntry of current) {
-    const baselineEntry = baselineByKey.get(currentEntry.key);
+  for (const [key, currentEntry] of current) {
+    const baselineEntry = baseline.get(key);
     if (!baselineEntry) {
       newBenchmarks.push(currentEntry);
       continue;
     }
+
     const percent =
       baselineEntry.hz > 0
         ? ((currentEntry.hz - baselineEntry.hz) / baselineEntry.hz) * 100
         : 0;
-    const significant = Math.abs(percent) > THRESHOLD_PERCENT;
+
+    const sharedRounds: number[] = [];
+    for (const roundIndex of currentEntry.byRound.keys()) {
+      if (baselineEntry.byRound.has(roundIndex)) sharedRounds.push(roundIndex);
+    }
+    sharedRounds.sort((a, b) => a - b);
+
+    const perRoundPercents: number[] = [];
+    for (const roundIndex of sharedRounds) {
+      const baselineRound = baselineEntry.byRound.get(roundIndex);
+      const currentRound = currentEntry.byRound.get(roundIndex);
+      if (!baselineRound || !currentRound) continue;
+      if (baselineRound.hz <= 0) continue;
+      pairedRoundIndices.add(roundIndex);
+      perRoundPercents.push(
+        ((currentRound.hz - baselineRound.hz) / baselineRound.hz) * 100,
+      );
+    }
+
+    const { agreement, significant } = computeSignificance({
+      medianPercent: percent,
+      perRoundPercents,
+    });
+
     rows.push({
-      key: currentEntry.key,
+      key,
       label: formatLabel(currentEntry),
       baseline: baselineEntry,
       current: currentEntry,
       percent,
+      perRoundPercents,
+      agreement,
       significant,
     });
   }
 
-  for (const baselineEntry of baseline) {
-    if (!currentByKey.has(baselineEntry.key)) {
+  for (const [key, baselineEntry] of baseline) {
+    if (!current.has(key)) {
       removedBenchmarks.push(baselineEntry);
     }
   }
@@ -180,6 +323,7 @@ function compare(): ComparisonSummary {
     newBenchmarks,
     removedBenchmarks,
     hasSignificantChanges: rows.some((row) => row.significant),
+    pairedRoundsCount: pairedRoundIndices.size,
   };
 }
 
@@ -227,7 +371,7 @@ function formatBenchmarkRows(rows: ComparisonRow[]) {
   return lines;
 }
 
-function formatNewBenchmarks(entries: BenchmarkEntry[]) {
+function formatNewBenchmarks(entries: AggregatedBenchmark[]) {
   const lines: string[] = [];
   lines.push("### New benchmarks");
   lines.push("");
@@ -244,7 +388,7 @@ function formatNewBenchmarks(entries: BenchmarkEntry[]) {
   return lines;
 }
 
-function formatRemovedBenchmarks(entries: BenchmarkEntry[]) {
+function formatRemovedBenchmarks(entries: AggregatedBenchmark[]) {
   const lines: string[] = [];
   lines.push("### Removed benchmarks");
   lines.push("");
@@ -258,8 +402,13 @@ function formatRemovedBenchmarks(entries: BenchmarkEntry[]) {
 }
 
 function formatMarkdown(summary: ComparisonSummary) {
-  const { rows, newBenchmarks, removedBenchmarks, hasSignificantChanges } =
-    summary;
+  const {
+    rows,
+    newBenchmarks,
+    removedBenchmarks,
+    hasSignificantChanges,
+    pairedRoundsCount,
+  } = summary;
   const lines: string[] = [];
   const significantRows = rows.filter((row) => row.significant);
   const totalBenchmarks =
@@ -307,6 +456,12 @@ function formatMarkdown(summary: ComparisonSummary) {
   lines.push(
     `:warning: = regression above ${THRESHOLD_PERCENT}% - :rocket: = improvement above ${THRESHOLD_PERCENT}%`,
   );
+  if (pairedRoundsCount > 1) {
+    lines.push("");
+    lines.push(
+      `Aggregated across ${pairedRoundsCount} interleaved rounds; a change is flagged only when the median exceeds the threshold and rounds agree on direction.`,
+    );
+  }
 
   return lines.join("\n");
 }
@@ -317,7 +472,11 @@ const markdown = formatMarkdown(summary);
 mkdirSync(RESULTS_DIR, { recursive: true });
 writeFileSync(
   path.join(RESULTS_DIR, "comparison.json"),
-  JSON.stringify(summary, null, 2),
+  JSON.stringify(
+    summary,
+    (_key, value) => (value instanceof Map ? [...value.entries()] : value),
+    2,
+  ),
 );
 writeFileSync(path.join(RESULTS_DIR, "comparison.md"), markdown);
 
