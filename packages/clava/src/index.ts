@@ -352,7 +352,7 @@ function splitPropsImpl(
   selfKeys: string[],
   selfIsComponent: boolean,
   props: Record<string, unknown>,
-  sources: NormalizedSource[],
+  sources: unknown[],
 ): Record<string, unknown>[] {
   const sourcesLength = sources.length;
   const results: Record<string, unknown>[] = [];
@@ -373,8 +373,7 @@ function splitPropsImpl(
   const effectiveKeyArrays: string[][] = [selfKeys];
 
   for (let s = 0; s < sourcesLength; s++) {
-    const source = sources[s];
-    if (source === undefined) continue;
+    const source = normalizeKeySource(sources[s]);
     const sourceResult: Record<string, unknown> = {};
 
     const effectiveKeys =
@@ -431,16 +430,11 @@ export const splitProps: SplitPropsFunction = ((
   ...sources: unknown[]
 ) => {
   const normalizedSource1 = normalizeKeySource(source1);
-  const sourcesLength = sources.length;
-  const normalizedSources: NormalizedSource[] = [];
-  for (let i = 0; i < sourcesLength; i++) {
-    normalizedSources.push(normalizeKeySource(sources[i]));
-  }
   return splitPropsImpl(
     normalizedSource1.keys,
     normalizedSource1.isComponent,
     props,
-    normalizedSources,
+    sources,
   );
 }) as SplitPropsFunction;
 
@@ -577,8 +571,8 @@ export function create({
     const disabledVariantKeys = collectDisabledVariantKeys(config);
     const disabledVariantValues = collectDisabledVariantValues(config);
     const hasDisabledVariantKeys = disabledVariantKeys.size > 0;
-    const hasDisabledVariantValues =
-      Object.keys(disabledVariantValues).length > 0;
+    const disabledVariantValueKeys = Object.keys(disabledVariantValues);
+    const hasDisabledVariantValues = disabledVariantValueKeys.length > 0;
     const hasAnyDisabled = hasDisabledVariantKeys || hasDisabledVariantValues;
 
     const inputPropsKeys = ["class", "className", "style", ...variantKeys];
@@ -746,6 +740,8 @@ export function create({
         defaults[k] = v;
       }
 
+      if (!hasAnyDisabled) return defaults;
+
       // Filter disabled
       const result: Record<string, unknown> = {};
       filterDisabledInto(defaults, result);
@@ -791,12 +787,16 @@ export function create({
           setVariants: (
             newVariants: VariantValues<Record<string, unknown>>,
           ) => {
-            const filtered: Record<string, unknown> = {};
-            filterDisabledInto(
-              newVariants as Record<string, unknown>,
-              filtered,
-            );
-            Object.assign(updatedVariants, filtered);
+            if (!hasAnyDisabled) {
+              Object.assign(updatedVariants, newVariants);
+            } else {
+              const filtered: Record<string, unknown> = {};
+              filterDisabledInto(
+                newVariants as Record<string, unknown>,
+                filtered,
+              );
+              Object.assign(updatedVariants, filtered);
+            }
           },
           setDefaultVariants: (
             newDefaults: VariantValues<Record<string, unknown>>,
@@ -804,14 +804,16 @@ export function create({
             for (const key in newDefaults) {
               if (!hasOwn.call(newDefaults, key)) continue;
               if (variantProps[key] !== undefined) continue;
-              if (disabledVariantKeys.has(key)) continue;
               const value = (newDefaults as Record<string, unknown>)[key];
-              const valueKey = getVariantValueKey(value);
-              if (
-                valueKey != null &&
-                disabledVariantValues[key]?.has(valueKey)
-              ) {
-                continue;
+              if (hasAnyDisabled) {
+                if (disabledVariantKeys.has(key)) continue;
+                const valueKey = getVariantValueKey(value);
+                if (
+                  valueKey != null &&
+                  disabledVariantValues[key]?.has(valueKey)
+                ) {
+                  continue;
+                }
               }
               updatedVariants[key] = value;
             }
@@ -833,17 +835,20 @@ export function create({
             assign(cStyle, r.style);
           }
         }
-        // Apply filterDisabled to updatedVariants
-        const filteredUpdated: Record<string, unknown> = {};
-        filterDisabledInto(updatedVariants, filteredUpdated);
-        resolvedVariants = filteredUpdated;
+        if (hasAnyDisabled) {
+          const filteredUpdated: Record<string, unknown> = {};
+          filterDisabledInto(updatedVariants, filteredUpdated);
+          resolvedVariants = filteredUpdated;
+        } else {
+          resolvedVariants = updatedVariants;
+        }
         computedClassesArr = cClasses;
         computedStyleObj = cStyle;
       }
 
       // Compute skip-style sets for the extended components and current
       // component. Only allocate when needed.
-      const hasSkipKeys = !!skipStyleKeysIn || disabledVariantKeys.size > 0;
+      const hasSkipKeys = !!skipStyleKeysIn || hasDisabledVariantKeys;
       let currentVariantKeys: Set<string> | null = null;
       if (hasSkipKeys) {
         currentVariantKeys = new Set<string>();
@@ -869,8 +874,7 @@ export function create({
       // computedVariantValues = mergeDisabledVariantValues(skipIn, disabledValues)
       let computedVariantValues: Record<string, Set<string>> | null = null;
       const hasInValues = !!skipStyleVariantValuesIn;
-      const disabledValuesKeys = Object.keys(disabledVariantValues);
-      const hasDisabledValues = disabledValuesKeys.length > 0;
+      const hasDisabledValues = hasDisabledVariantValues;
       if (hasExtend && (hasInValues || hasDisabledValues)) {
         computedVariantValues = {};
         if (hasInValues) {
@@ -883,8 +887,8 @@ export function create({
             computedVariantValues[k] = set;
           }
         }
-        for (let i = 0; i < disabledValuesKeys.length; i++) {
-          const k = disabledValuesKeys[i];
+        for (let i = 0; i < disabledVariantValueKeys.length; i++) {
+          const k = disabledVariantValueKeys[i];
           let bucket = computedVariantValues[k];
           if (!bucket) {
             bucket = new Set<string>();
@@ -1089,12 +1093,16 @@ export function create({
           setVariants: (
             newVariants: VariantValues<Record<string, unknown>>,
           ) => {
-            const filtered: Record<string, unknown> = {};
-            filterDisabledInto(
-              newVariants as Record<string, unknown>,
-              filtered,
-            );
-            Object.assign(updatedVariants, filtered);
+            if (!hasAnyDisabled) {
+              Object.assign(updatedVariants, newVariants);
+            } else {
+              const filtered: Record<string, unknown> = {};
+              filterDisabledInto(
+                newVariants as Record<string, unknown>,
+                filtered,
+              );
+              Object.assign(updatedVariants, filtered);
+            }
           },
           setDefaultVariants: (
             newDefaults: VariantValues<Record<string, unknown>>,
@@ -1102,14 +1110,16 @@ export function create({
             for (const key in newDefaults) {
               if (!hasOwn.call(newDefaults, key)) continue;
               if (variantProps[key] !== undefined) continue;
-              if (disabledVariantKeys.has(key)) continue;
               const value = (newDefaults as Record<string, unknown>)[key];
-              const valueKey = getVariantValueKey(value);
-              if (
-                valueKey != null &&
-                disabledVariantValues[key]?.has(valueKey)
-              ) {
-                continue;
+              if (hasAnyDisabled) {
+                if (disabledVariantKeys.has(key)) continue;
+                const valueKey = getVariantValueKey(value);
+                if (
+                  valueKey != null &&
+                  disabledVariantValues[key]?.has(valueKey)
+                ) {
+                  continue;
+                }
               }
               updatedVariants[key] = value;
             }
@@ -1118,9 +1128,13 @@ export function create({
           addStyle: () => {},
         };
         computed(ctx);
-        const filteredUpdated: Record<string, unknown> = {};
-        filterDisabledInto(updatedVariants, filteredUpdated);
-        resolvedVariants = filteredUpdated;
+        if (hasAnyDisabled) {
+          const filteredUpdated: Record<string, unknown> = {};
+          filterDisabledInto(updatedVariants, filteredUpdated);
+          resolvedVariants = filteredUpdated;
+        } else {
+          resolvedVariants = updatedVariants;
+        }
       }
       return resolvedVariants as VariantValues<MergedVariants>;
     };

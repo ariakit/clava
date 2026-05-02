@@ -11,6 +11,11 @@ export type Mode = (typeof MODES)[number];
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const hasOwn = Object.prototype.hasOwnProperty;
 
+function isAsciiLetter(code: number) {
+  if (code >= 65 && code <= 90) return true;
+  return code >= 97 && code <= 122;
+}
+
 /**
  * Returns the appropriate class property name based on the mode.
  * @example
@@ -33,8 +38,34 @@ export function hyphenToCamel(str: string) {
     return str;
   }
   // Fast path: no hyphen -> return as-is
-  if (str.indexOf("-") === -1) return str;
-  return str.replace(/-([a-z])/gi, (_, letter) => letter.toUpperCase());
+  let hyphenIndex = str.indexOf("-");
+  if (hyphenIndex === -1) return str;
+
+  let result = "";
+  let lastIndex = 0;
+  while (hyphenIndex !== -1) {
+    result += str.slice(lastIndex, hyphenIndex);
+
+    const nextIndex = hyphenIndex + 1;
+    if (nextIndex >= str.length) {
+      result += "-";
+      lastIndex = nextIndex;
+      break;
+    }
+
+    const code = str.charCodeAt(nextIndex);
+    if (isAsciiLetter(code)) {
+      result += str[nextIndex].toUpperCase();
+      lastIndex = nextIndex + 1;
+    } else {
+      result += "-";
+      lastIndex = nextIndex;
+    }
+
+    hyphenIndex = str.indexOf("-", lastIndex);
+  }
+
+  return result + str.slice(lastIndex);
 }
 
 /**
@@ -48,7 +79,20 @@ export function camelToHyphen(str: string) {
   if (str.length >= 2 && str.charCodeAt(0) === 45 && str.charCodeAt(1) === 45) {
     return str;
   }
-  return str.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+
+  let result = "";
+  let lastIndex = 0;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code < 65 || code > 90) continue;
+    result += str.slice(lastIndex, i);
+    result += "-";
+    result += str[i].toLowerCase();
+    lastIndex = i + 1;
+  }
+
+  if (lastIndex === 0) return str;
+  return result + str.slice(lastIndex);
 }
 
 /**
