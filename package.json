@@ -12,6 +12,7 @@
     "build": "pnpm -r --filter './packages/**' build",
     "test": "vitest",
     "perf": "vitest bench",
+    "perf:alternatives": "pnpm build && vitest bench --config vitest.alternatives.config.ts",
     "perf-compare": "node scripts/perf-compare.ts",
     "tsc": "tsc -b",
     "lint": "oxlint --type-aware --type-check . && oxfmt --check .",
