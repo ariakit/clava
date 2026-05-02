@@ -13,6 +13,7 @@
     "test": "vitest",
     "perf": "vitest bench",
     "perf-compare": "node scripts/perf-compare.ts",
+    "perf:compare": "vitest bench --config vitest.config.compare.ts",
     "tsc": "tsc -b",
     "lint": "oxlint --type-aware --type-check . && oxfmt --check .",
     "lint-fix": "oxlint --type-aware --type-check --fix . && oxfmt .",
