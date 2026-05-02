@@ -31,10 +31,10 @@ function createReport(dir: string, benchmarks: Benchmark[]) {
   return {
     files: [
       {
-        filepath: path.join(dir, "packages/clava/perfs/component.bench.ts"),
+        filepath: path.join(dir, "benchmark/clava.bench.ts"),
         groups: [
           {
-            fullName: "packages/clava/perfs/component.bench.ts > cv",
+            fullName: "benchmark/clava.bench.ts > cv",
             benchmarks,
           },
         ],
@@ -128,9 +128,9 @@ describe("perf compare", () => {
     );
 
     expect(markdown).toContain(
-      "clava > component.bench.ts > create component with variants",
+      "benchmark > clava.bench.ts > create component with variants",
     );
-    expect(markdown).not.toContain("packages/clava/perfs/");
+    expect(markdown).not.toContain("benchmark/");
   });
 
   test("pairs benchmarks when baseline and current report different absolute roots", () => {
@@ -146,10 +146,10 @@ describe("perf compare", () => {
     const reportFor = (root: string, hz: number) => ({
       files: [
         {
-          filepath: path.join(root, "packages/clava/perfs/component.bench.ts"),
+          filepath: path.join(root, "benchmark/clava.bench.ts"),
           groups: [
             {
-              fullName: "packages/clava/perfs/component.bench.ts > cv",
+              fullName: "benchmark/clava.bench.ts > cv",
               benchmarks: [{ name: "split-roots bench", hz, mean: 1 / hz }],
             },
           ],
@@ -175,7 +175,7 @@ describe("perf compare", () => {
     );
 
     expect(markdown).toContain(
-      "clava > component.bench.ts > split-roots bench",
+      "benchmark > clava.bench.ts > split-roots bench",
     );
     expect(markdown).not.toContain("All benchmarks were renamed");
     expect(markdown).toContain("-20% :warning:");

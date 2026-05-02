@@ -112,6 +112,13 @@ jobs:
         working-directory: ${{ env.BASELINE_DIR }}
         run: pnpm install
 
+      - name: Build packages (current)
+        run: pnpm build
+
+      - name: Build packages (baseline)
+        working-directory: ${{ env.BASELINE_DIR }}
+        run: pnpm build
+
       - name: Run interleaved benchmarks
         run: |
           mkdir -p .perf-results
