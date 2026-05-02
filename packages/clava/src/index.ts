@@ -687,11 +687,13 @@ export function create({
             const resolvedVariants: Record<string, unknown> = {};
             Object.assign(resolvedVariants, staticDefaults);
             for (const key in childDefaults) {
+              if (!hasOwn.call(childDefaults, key)) continue;
               const v = childDefaults[key];
               if (v === undefined) continue;
               resolvedVariants[key] = v;
             }
             for (const key in userProps) {
+              if (!hasOwn.call(userProps, key)) continue;
               const v = userProps[key];
               if (v === undefined) continue;
               resolvedVariants[key] = v;
@@ -703,6 +705,7 @@ export function create({
               const extDefaults = extMetasWithResolveDefaults[i]
                 .resolveDefaults!(childDefaults, userProps);
               for (const k in extDefaults) {
+                if (!hasOwn.call(extDefaults, k)) continue;
                 computedDefaults[k] = extDefaults[k];
               }
             }
@@ -715,13 +718,16 @@ export function create({
               const ownVariants: Record<string, unknown> = {};
               for (let i = 0; i < variantKeysLength; i++) {
                 const k = variantKeys[i];
-                if (k in resolvedVariants) ownVariants[k] = resolvedVariants[k];
+                if (hasOwn.call(resolvedVariants, k)) {
+                  ownVariants[k] = resolvedVariants[k];
+                }
               }
               computed({
                 variants: ownVariants as VariantValues<Record<string, unknown>>,
                 setVariants: noop,
                 setDefaultVariants: (newDefaults) => {
                   for (const key in newDefaults) {
+                    if (!hasOwn.call(newDefaults, key)) continue;
                     const value = (newDefaults as Record<string, unknown>)[key];
                     if (userProps[key] !== undefined) continue;
                     if (isVariantDisabled(config, key)) continue;
@@ -753,6 +759,7 @@ export function create({
         const meta = extMetasWithResolveDefaults[i];
         const extComputed = meta.resolveDefaults!(defaults, propsVariants);
         for (const k in extComputed) {
+          if (!hasOwn.call(extComputed, k)) continue;
           defaults[k] = extComputed[k];
         }
       }
@@ -761,6 +768,7 @@ export function create({
       // contractually variant-only here — callers building from a full props
       // object filter to variant keys before calling.
       for (const k in propsVariants) {
+        if (!hasOwn.call(propsVariants, k)) continue;
         const v = propsVariants[k];
         if (v === undefined) continue;
         defaults[k] = v;
@@ -800,7 +808,7 @@ export function create({
         const ownVariants: Record<string, unknown> = {};
         for (let i = 0; i < variantKeysLength; i++) {
           const k = variantKeys[i];
-          if (k in resolved) ownVariants[k] = resolved[k];
+          if (hasOwn.call(resolved, k)) ownVariants[k] = resolved[k];
         }
         // Lazy-init updatedVariants — many computeds only inspect `variants`
         // or call setDefaultVariants for keys the user already set, so the
@@ -825,6 +833,7 @@ export function create({
               return;
             }
             for (const key in newVariants) {
+              if (!hasOwn.call(newVariants, key)) continue;
               if (disabledVariantKeys.has(key)) continue;
               const value = (newVariants as Record<string, unknown>)[key];
               if (hasDisabledVariantValues) {
@@ -843,6 +852,7 @@ export function create({
             newDefaults: VariantValues<Record<string, unknown>>,
           ) => {
             for (const key in newDefaults) {
+              if (!hasOwn.call(newDefaults, key)) continue;
               if (userVariantProps[key] !== undefined) continue;
               const value = (newDefaults as Record<string, unknown>)[key];
               if (hasAnyDisabled) {
@@ -1069,24 +1079,32 @@ export function create({
         const variantProps: Record<string, unknown> = {};
         for (let i = 0; i < variantKeysLength; i++) {
           const key = variantKeys[i];
-          if (key in propsRecord) variantProps[key] = propsRecord[key];
+          if (hasOwn.call(propsRecord, key)) {
+            variantProps[key] = propsRecord[key];
+          }
         }
         for (let i = 0; i < extMetasWithResolveDefaultsCount; i++) {
           const meta = extMetasWithResolveDefaults[i];
           const extComputed = meta.resolveDefaults!(resolved, variantProps);
-          for (const k in extComputed) resolved[k] = extComputed[k];
+          for (const k in extComputed) {
+            if (!hasOwn.call(extComputed, k)) continue;
+            resolved[k] = extComputed[k];
+          }
         }
         for (const k in variantProps) {
+          if (!hasOwn.call(variantProps, k)) continue;
           const v = variantProps[k];
           if (v === undefined) continue;
           resolved[k] = v;
         }
         userVariantProps = variantProps;
       } else {
-        // Fast path: walk variantKeys directly against propsRecord.
+        // Fast path: walk variantKeys directly against propsRecord. Use
+        // hasOwn so a polluted Object.prototype can't introduce variant
+        // values the user didn't pass.
         for (let i = 0; i < variantKeysLength; i++) {
           const key = variantKeys[i];
-          if (!(key in propsRecord)) continue;
+          if (!hasOwn.call(propsRecord, key)) continue;
           const v = propsRecord[key];
           if (v === undefined) continue;
           resolved[key] = v;
@@ -1159,6 +1177,7 @@ export function create({
               return;
             }
             for (const key in newVariants) {
+              if (!hasOwn.call(newVariants, key)) continue;
               if (disabledVariantKeys.has(key)) continue;
               const value = (newVariants as Record<string, unknown>)[key];
               if (hasDisabledVariantValues) {
@@ -1177,6 +1196,7 @@ export function create({
             newDefaults: VariantValues<Record<string, unknown>>,
           ) => {
             for (const key in newDefaults) {
+              if (!hasOwn.call(newDefaults, key)) continue;
               if (variantProps[key] !== undefined) continue;
               const value = (newDefaults as Record<string, unknown>)[key];
               if (hasAnyDisabled) {
