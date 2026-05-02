@@ -1,5 +1,9 @@
 # clava
 
+## 0.2.2
+
+- Improved runtime prop resolution, style normalization, and [`splitProps`](https://clava.style/docs/reference/split-props) performance.
+
 ## 0.2.1
 
 ### Improved runtime performance of `cv` and `splitProps`
