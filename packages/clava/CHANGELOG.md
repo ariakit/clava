@@ -1,5 +1,21 @@
 # clava
 
+## 0.2.3
+
+### Improved runtime performance of `extend` chains and `getVariants` in `cv`
+
+Extending components no longer round-trips through the public component (`clsx` join → regex split to recover variant classes) — extends now contribute classes and styles directly via an internal compute path, avoiding intermediate string parsing and array allocations on every render.
+
+Per-render benchmarks improve roughly 2.5× for extended components and 2.7× for `getVariants`, with no public API changes.
+
+### Fixed `computed`'s `ctx.variants` leaking foreign variant keys when extended
+
+When the same `cv` was used as an `extend` by a parent component that defined additional variant keys, the `computed` callback's `ctx.variants` could include those parent-only keys. It is now filtered to the component's own `variantKeys`, matching the public `VariantValues<V>` contract — both during render and during the `setDefaultVariants` pass that backs `getVariants`.
+
+### Fixed non-idempotent `transformClass` compounding across `extend` chains
+
+A non-idempotent `transformClass` (e.g. one that prefixes every class word) was applied multiple times to base classes contributed by extended components — once per level in the extend chain. It now runs exactly once per render, so prefixing transforms no longer compound across `extend`. The fix also covers cross-factory extends: when a component from one `create()` factory is extended by a component from another, the extend's transform applies to its own contribution before the parent's transform runs on the joined string.
+
 ## 0.2.2
 
 - Improved runtime prop resolution, style normalization, and [`splitProps`](https://clava.style/docs/reference/split-props) performance.
