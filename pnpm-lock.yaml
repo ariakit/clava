@@ -71,20 +71,14 @@ importers:
         specifier: workspace:*
         version: link:../packages/clava
 
-  packages/clava:
-    dependencies:
-      clsx:
-        specifier: ^2.0.0
-        version: 2.1.1
-      csstype:
-        specifier: ^3.0.0
-        version: 3.2.3
-
-  packages/perf-comparison:
+  benchmark:
     dependencies:
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
+      clava:
+        specifier: workspace:*
+        version: link:../packages/clava
       cva:
         specifier: 1.0.0-beta.4
         version: 1.0.0-beta.4(typescript@6.0.3)
@@ -94,6 +88,15 @@ importers:
       tailwind-variants:
         specifier: 3.2.2
         version: 3.2.2(tailwind-merge@3.5.0)(tailwindcss@4.2.4)
+
+  packages/clava:
+    dependencies:
+      clsx:
+        specifier: ^2.0.0
+        version: 2.1.1
+      csstype:
+        specifier: ^3.0.0
+        version: 3.2.3
 
 packages:
 

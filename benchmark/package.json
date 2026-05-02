@@ -1,11 +1,12 @@
 {
-  "name": "perf-comparison",
+  "name": "benchmark",
   "version": "0.0.0",
   "private": true,
-  "description": "Local-only perf comparisons between clava and other class-variant libraries",
+  "description": "Local-only benchmarks comparing clava with other class-variant libraries",
   "type": "module",
   "dependencies": {
     "class-variance-authority": "0.7.1",
+    "clava": "workspace:*",
     "cva": "1.0.0-beta.4",
     "tailwind-merge": "3.5.0",
     "tailwind-variants": "3.2.2"
