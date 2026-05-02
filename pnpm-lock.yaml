@@ -71,6 +71,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/clava
 
+  benchmark: {}
+
   packages/clava:
     dependencies:
       clsx:

@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "app"
+  - "benchmark"
 
 minimumReleaseAge: 4320
 
