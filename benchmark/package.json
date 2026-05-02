@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "clava": "workspace:*"
+    "clava": "workspace:*",
+    "cva": "1.0.0-beta.4",
+    "tailwind-variants": "3.2.2"
   }
 }
