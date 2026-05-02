@@ -1,5 +1,5 @@
+import { cv, splitProps } from "clava";
 import { bench, describe } from "vitest";
-import { cv, splitProps } from "../packages/clava/src/index.ts";
 
 const options = {
   time: 2000,
