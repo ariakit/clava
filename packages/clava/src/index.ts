@@ -945,7 +945,7 @@ export function create({
       // re-running their own defaults and emitting a different class).
       // Replacing this with the original `userVariantProps` looks cleaner but
       // breaks "child computed setDefaultVariants overrides parent computed
-      // setDefaultVariants" in `tests/computed-test.ts` — extends would then
+      // setDefaultVariants" in `tests/computed.test.ts` — extends would then
       // overwrite values the descendant already resolved.
       if (hasExtend) {
         for (let i = 0; i < extCount; i++) {
