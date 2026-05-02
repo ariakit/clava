@@ -358,7 +358,7 @@ describe("alternatives: resolve composed tailwind variants", () => {
   );
 
   bench(
-    "cva 1.0.0-beta.4",
+    "cva",
     () => {
       consume(cvaProduct(resolveProps));
     },
