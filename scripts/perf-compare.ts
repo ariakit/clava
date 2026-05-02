@@ -105,7 +105,7 @@ function normalizeFilePath(filePath: string) {
   // vitest was invoked from. Fall back to a cwd-relative path when no known
   // root is present so paths outside a workspace still resolve sensibly.
   const rooted = filePath.match(
-    /(?:^|[\\/])((?:packages|app|benchmark)(?:[\\/].+)?)$/,
+    /(?:^|[\\/])((?:packages|app|benchmark)[\\/].+)$/,
   );
   if (rooted?.[1]) return rooted[1];
   return path.relative(process.cwd(), filePath);
