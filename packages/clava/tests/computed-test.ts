@@ -295,6 +295,35 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
+    test("setDefaultVariants in extended component does not branch on foreign variant keys", () => {
+      // Same shape as the test above, but the base's `computed` reaches
+      // `setDefaultVariants` — covers the resolveDefaults pass (driving
+      // both class output and `getVariants`) rather than the render-time
+      // compute path.
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+        computed: ({ variants, setDefaultVariants }) => {
+          if ("color" in (variants as Record<string, unknown>)) {
+            setDefaultVariants({ size: "lg" });
+          }
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+        }),
+      );
+      const props = component({ color: "red" });
+      expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
+      expect(component.getVariants({ color: "red" })).toEqual({
+        size: "sm",
+        color: "red",
+      });
+    });
+
     test("child setDefaultVariants receives computed variants from parent", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" }, small: "" },

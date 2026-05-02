@@ -686,10 +686,17 @@ export function create({
             }
 
             if (computed) {
+              // Filter to own variant keys so `computed.ctx.variants` matches
+              // `VariantValues<V>` when this component is used as an extend by
+              // a parent that adds extra variant keys (those keys would
+              // otherwise leak through `userProps`).
+              const ownVariants: Record<string, unknown> = {};
+              for (let i = 0; i < variantKeysLength; i++) {
+                const k = variantKeys[i];
+                if (k in resolvedVariants) ownVariants[k] = resolvedVariants[k];
+              }
               computed({
-                variants: resolvedVariants as VariantValues<
-                  Record<string, unknown>
-                >,
+                variants: ownVariants as VariantValues<Record<string, unknown>>,
                 setVariants: noop,
                 setDefaultVariants: (newDefaults) => {
                   for (const key in newDefaults) {
