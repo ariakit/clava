@@ -267,6 +267,34 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
     });
 
+    test("computed in extended component does not see foreign variant keys", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+        computed: ({ variants, addClass }) => {
+          // `color` is added by the parent component below — it must not
+          // leak into base's `ctx.variants`, whose shape is declared as
+          // `{ size }` only.
+          if ("color" in (variants as Record<string, unknown>)) {
+            addClass("base-saw-foreign");
+          } else {
+            addClass("base-no-foreign");
+          }
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+        }),
+      );
+      const props = component({ color: "red" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("sm base-no-foreign red"),
+      });
+    });
+
     test("child setDefaultVariants receives computed variants from parent", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" }, small: "" },

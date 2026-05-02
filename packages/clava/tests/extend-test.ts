@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { create } from "../src/index.ts";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -299,3 +300,35 @@ for (const config of Object.values(CONFIGS)) {
     });
   });
 }
+
+describe("non-idempotent transformClass", () => {
+  // A non-idempotent transform: prefixing each word with `tw-`. Applying it
+  // twice yields `tw-tw-foo`, so the engine must invoke it exactly once per
+  // class word — even when extend chains pipe extended base classes back into
+  // a parent's `clsx` and through the same transform at render time.
+  const { cv } = create({
+    transformClass: (className) =>
+      className
+        .split(" ")
+        .filter(Boolean)
+        .map((word) => `tw-${word}`)
+        .join(" "),
+  });
+
+  test("base class is transformed exactly once across single extend", () => {
+    const base = cv({ class: "base" });
+    const component = cv({ extend: [base], class: "extended" });
+    expect(component().class).toBe("tw-base tw-extended");
+  });
+
+  test("base class is transformed exactly once across multi-level extend", () => {
+    const base = cv({ class: "base" });
+    const middle = cv({ extend: [base], class: "middle" });
+    const top = cv({
+      extend: [middle],
+      class: "top",
+      variants: { size: { sm: "sm" } },
+    });
+    expect(top({ size: "sm" }).class).toBe("tw-base tw-middle tw-top tw-sm");
+  });
+});
