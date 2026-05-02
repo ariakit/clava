@@ -332,3 +332,51 @@ describe("non-idempotent transformClass", () => {
     expect(top({ size: "sm" }).class).toBe("tw-base tw-middle tw-top tw-sm");
   });
 });
+
+const toUpperCase = (className: string) => className.toUpperCase();
+const toLowerCase = (className: string) => className.toLowerCase();
+
+describe("extend across `create()` factories", () => {
+  // The extend's own `transformClass` must apply to its own classes even when
+  // the extending component comes from a different `create()` call. The
+  // optimized compute path bypasses the public-component round-trip, so it
+  // detects mixed-factory extends by reference identity and runs the extend's
+  // transform on its contribution before joining.
+  const { cv: cvUpper } = create({ transformClass: toUpperCase });
+  const { cv: cvDefault } = create();
+
+  test("extend's transformClass applies to its base class", () => {
+    const base = cvUpper({ class: "base" });
+    const component = cvDefault({ extend: [base], class: "extended" });
+    expect(component().class).toBe("BASE extended");
+  });
+
+  test("extend's transformClass applies to its variant classes", () => {
+    const base = cvUpper({
+      class: "base",
+      variants: { size: { sm: "sm", lg: "lg" } },
+    });
+    const component = cvDefault({ extend: [base], class: "extended" });
+    expect(component({ size: "sm" }).class).toBe("BASE extended SM");
+  });
+
+  test("extend's transformClass cascades through grandparent chain", () => {
+    const grandparent = cvUpper({ class: "grandparent" });
+    const parent = cvUpper({ extend: [grandparent], class: "parent" });
+    const component = cvDefault({ extend: [parent], class: "child" });
+    expect(component().class).toBe("GRANDPARENT PARENT child");
+  });
+
+  test("parent's transformClass applies on top of extend's transformed output", () => {
+    const { cv: cvLower } = create({ transformClass: toLowerCase });
+    const base = cvUpper({
+      class: "base",
+      variants: { size: { sm: "sm" } },
+    });
+    const component = cvLower({ extend: [base], class: "child" });
+    // The extend uppercases its own contribution, then the parent's
+    // transformClass runs on the joined string and lowercases everything —
+    // mirrors main's `parentTransform(clsx(extTransform(extOutput), …))`.
+    expect(component({ size: "sm" }).class).toBe("base child sm");
+  });
+});

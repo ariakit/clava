@@ -60,6 +60,11 @@ interface ComponentMeta {
   // Returns variant classes + style for this component, used by extending
   // components. Top-level rendering also routes through this.
   compute: ComputeFn;
+  // Reference identity is used to detect mixed-factory `extend`. When a
+  // component is extended by a parent from a different `create()` call, the
+  // parent applies this transform to the extend's contribution before joining,
+  // preserving each factory's transform boundary.
+  transformClass: (className: string) => string;
 }
 
 const META_KEY = "__meta";
@@ -581,15 +586,32 @@ export function create({
     }
 
     // Pre-build extended component info, so we don't have to call
-    // `getComponentMeta` per render.
+    // `getComponentMeta` per render. Extends from a different `create()`
+    // factory (different `transformClass` identity) need their contribution
+    // transformed by their own `transformClass` before being joined into our
+    // class string — otherwise our outer `transformClass(clsx(allClasses))`
+    // would be the only transform that runs, and the extend's factory would
+    // be silently bypassed for any base coming from `extend: [otherFactoryCv]`.
     const extMetas: ComponentMeta[] = [];
     const extBaseClassesArr: string[] = [];
+    const extIsolated: boolean[] = [];
+    let hasIsolatedExt = false;
     if (extend) {
       for (const ext of extend) {
         const meta = getComponentMeta(ext);
         if (!meta) continue;
         extMetas.push(meta);
-        extBaseClassesArr.push(meta.baseClass);
+        const isolated = meta.transformClass !== transformClass;
+        extIsolated.push(isolated);
+        if (isolated) {
+          hasIsolatedExt = true;
+          // Apply the extend's own transformClass to its base class so it
+          // survives our outer transform (which still applies on top, matching
+          // the original public-component round-trip behavior).
+          extBaseClassesArr.push(meta.transformClass(meta.baseClass));
+        } else {
+          extBaseClassesArr.push(meta.baseClass);
+        }
       }
     }
     const extCount = extMetas.length;
@@ -917,14 +939,37 @@ export function create({
       // overwrite values the descendant already resolved.
       if (hasExtend) {
         for (let i = 0; i < extCount; i++) {
-          extMetas[i].compute(
-            workingResolved,
-            workingResolved,
-            extSkipKeys,
-            extSkipVals,
-            classesOut,
-            styleOut,
-          );
+          if (hasIsolatedExt && extIsolated[i]) {
+            // Isolated extend (different factory): gather its variant classes
+            // into a scratch array, then push the joined string after applying
+            // its own transformClass. Our outer transform applies on top.
+            const extClasses: ClsxClassValue[] = [];
+            extMetas[i].compute(
+              workingResolved,
+              workingResolved,
+              extSkipKeys,
+              extSkipVals,
+              extClasses,
+              styleOut,
+            );
+            if (extClasses.length > 0) {
+              const joined = clsx(extClasses);
+              if (joined.length > 0) {
+                classesOut.push(
+                  extMetas[i].transformClass(joined) as ClsxClassValue,
+                );
+              }
+            }
+          } else {
+            extMetas[i].compute(
+              workingResolved,
+              workingResolved,
+              extSkipKeys,
+              extSkipVals,
+              classesOut,
+              styleOut,
+            );
+          }
         }
       }
 
@@ -1182,6 +1227,7 @@ export function create({
       staticDefaults,
       resolveDefaults: resolveDefaultsFn,
       compute,
+      transformClass,
     };
 
     const initComponent = <
