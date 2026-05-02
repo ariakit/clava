@@ -6,6 +6,7 @@
   "dependencies": {
     "clava": "workspace:*",
     "cva": "1.0.0-beta.4",
-    "tailwind-variants": "3.2.2"
+    "tailwind-variants": "3.2.2",
+    "tailwindcss": "4.2.4"
   }
 }

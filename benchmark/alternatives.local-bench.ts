@@ -3,6 +3,7 @@ import { compose, cva } from "cva";
 import { tv } from "tailwind-variants/lite";
 import { bench, describe } from "vitest";
 
+// CVA v1 is currently published as a beta under the `cva` package.
 const options = {
   time: 2000,
   warmupTime: 500,
@@ -357,7 +358,7 @@ describe("alternatives: resolve composed tailwind variants", () => {
   );
 
   bench(
-    "cva v1",
+    "cva 1.0.0-beta.4",
     () => {
       consume(cvaProduct(resolveProps));
     },
@@ -365,7 +366,7 @@ describe("alternatives: resolve composed tailwind variants", () => {
   );
 
   bench(
-    "tailwind-variants",
+    "tailwind-variants/lite",
     () => {
       consume(tailwindVariantsProduct(resolveProps));
     },
