@@ -131,6 +131,45 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ color: "blue" });
     });
 
+    test("getVariants picks up setDefaultVariants from extended component", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ size: "lg" });
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toEqual({ size: "lg", color: "red" });
+    });
+
+    test("getVariants picks up setDefaultVariants from grandparent component", () => {
+      const grandparent = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ size: "lg" });
+        },
+      });
+      const parent = cv({ extend: [grandparent] });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [parent],
+          variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { color: "red" },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toEqual({ size: "lg", color: "red" });
+    });
+
     test("keys returns props keys", () => {
       const component = getModeComponent(
         mode,
