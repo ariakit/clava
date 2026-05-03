@@ -111,6 +111,10 @@ function normalizeFilePath(filePath: string) {
   return path.relative(process.cwd(), filePath);
 }
 
+function normalizeBenchmarkName(name: string) {
+  return name.replace(/@\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/, "");
+}
+
 function getPackageName(filePath: string) {
   const [workspace, packageName] = filePath.split(/[\\/]/);
   if (workspace === "packages" && packageName) return packageName;
@@ -132,7 +136,7 @@ function entriesFromReport(report: BenchmarkReport): BenchmarkEntry[] {
       const groupName = group.fullName ?? "";
       for (const benchmark of group.benchmarks ?? []) {
         const name = benchmark.name ?? "";
-        const key = `${filePath}::${groupName}::${name}`;
+        const key = `${filePath}::${groupName}::${normalizeBenchmarkName(name)}`;
         entries.push({
           key,
           file: filePath,
