@@ -181,6 +181,31 @@ describe("perf compare", () => {
     expect(markdown).toContain("-20% :warning:");
   });
 
+  test("pairs versioned benchmark names with unversioned baselines", () => {
+    const dir = createTempDir();
+    const markdown = runCompare({
+      baseline: createReport(dir, [
+        { name: "clava", hz: 100, mean: 1 / 100 },
+        { name: "cva", hz: 100, mean: 1 / 100 },
+      ]),
+      current: createReport(dir, [
+        { name: "clava@0.2.3", hz: 80, mean: 1 / 80 },
+        { name: "cva@1.0.0-beta.4", hz: 120, mean: 1 / 120 },
+        { name: "tailwind-variants@3.2.2", hz: 100, mean: 1 / 100 },
+      ]),
+    });
+
+    expect(markdown).toContain("benchmark > clava.bench.ts > clava@0.2.3");
+    expect(markdown).toContain("benchmark > clava.bench.ts > cva@1.0.0-beta.4");
+    expect(markdown).toContain("-20% :warning:");
+    expect(markdown).toContain("+20% :rocket:");
+    expect(markdown).toContain("### New benchmarks");
+    expect(markdown).toContain(
+      "benchmark > clava.bench.ts > tailwind-variants@3.2.2",
+    );
+    expect(markdown).not.toContain("All benchmarks were renamed");
+  });
+
   test("reports significant regressions", () => {
     const dir = createTempDir();
     const markdown = runCompare({
