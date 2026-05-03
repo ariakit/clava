@@ -1,9 +1,12 @@
+import { cva as cvaLegacy } from "class-variance-authority";
 import { cv } from "clava";
 import { compose, cva } from "cva";
 import { tv } from "tailwind-variants/lite";
 import { bench, describe } from "vitest";
 
 // CVA v1 is currently published as a beta under the `cva` package.
+// CVA v0 is published as `class-variance-authority` and lacks a compose
+// helper, so the equivalent benchmark merges every layer into a single config.
 const options = {
   time: 2000,
   warmupTime: 500,
@@ -239,6 +242,89 @@ const cvaProductOnly = cva({
 
 const cvaProduct = compose(cvaSurface, cvaInteraction, cvaProductOnly);
 
+const cvaLegacyProduct = cvaLegacy(
+  [surfaceBase, interactionBase, productBase].join(" "),
+  {
+    variants: {
+      size: {
+        sm: "h-8 gap-1.5 rounded-md px-3 text-xs",
+        md: "h-10 gap-2 rounded-lg px-4 text-sm",
+        lg: "h-12 gap-2.5 rounded-xl px-5 text-base",
+      },
+      intent: {
+        primary:
+          "border-blue-600 bg-blue-600 text-white hover:bg-blue-700 " +
+          "focus-visible:ring-blue-500",
+        neutral:
+          "border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-50 " +
+          "focus-visible:ring-zinc-400",
+        danger:
+          "border-red-600 bg-red-600 text-white hover:bg-red-700 " +
+          "focus-visible:ring-red-500",
+      },
+      density: {
+        compact: "min-w-20",
+        comfortable: "min-w-28",
+        spacious: "min-w-36",
+      },
+      disabled: {
+        true: "cursor-not-allowed opacity-50",
+        false: "cursor-pointer",
+      },
+      pressed: {
+        true: "translate-y-px shadow-inner",
+        false: "translate-y-0",
+      },
+      emphasis: {
+        low: "shadow-none",
+        medium: "shadow",
+        high: "shadow-lg ring-1 ring-black/5",
+      },
+      loading: {
+        true: "text-transparent before:absolute before:inset-2 before:animate-pulse before:rounded-full before:bg-current/20",
+        false: "",
+      },
+      icon: {
+        none: "",
+        start: "pl-3",
+        end: "pr-3",
+        only: "aspect-square px-0",
+      },
+    },
+    compoundVariants: [
+      { disabled: true, class: "hover:bg-current hover:text-current" },
+      {
+        pressed: true,
+        intent: "primary",
+        class: "bg-blue-800 ring-1 ring-blue-900",
+      },
+      {
+        pressed: true,
+        intent: "danger",
+        class: "bg-red-800 ring-1 ring-red-900",
+      },
+      { size: "lg", emphasis: "high", class: "tracking-wide" },
+      {
+        intent: "neutral",
+        emphasis: "high",
+        class: "bg-zinc-100 ring-zinc-300",
+      },
+      { loading: true, class: "pointer-events-none" },
+      { icon: "only", class: "justify-center" },
+    ],
+    defaultVariants: {
+      size: "md",
+      intent: "primary",
+      density: "comfortable",
+      disabled: false,
+      pressed: false,
+      emphasis: "medium",
+      loading: false,
+      icon: "none",
+    },
+  },
+);
+
 const tailwindVariantsSurface = tv({
   base: surfaceBase,
   variants: {
@@ -361,6 +447,14 @@ describe("alternatives: resolve composed tailwind variants", () => {
     "cva",
     () => {
       consume(cvaProduct(resolveProps));
+    },
+    options,
+  );
+
+  bench(
+    "class-variance-authority",
+    () => {
+      consume(cvaLegacyProduct(resolveProps));
     },
     options,
   );
