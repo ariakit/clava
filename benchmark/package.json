@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "class-variance-authority": "0.7.1",
     "clava": "workspace:*",
     "cva": "1.0.0-beta.4",
     "tailwind-variants": "3.2.2",
