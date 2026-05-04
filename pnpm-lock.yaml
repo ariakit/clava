@@ -50,8 +50,8 @@ importers:
         specifier: 1.0.0-rc.18
         version: 1.0.0-rc.18
       rolldown-plugin-dts:
-        specifier: 0.24.0
-        version: 0.24.0(rolldown@1.0.0-rc.18)(typescript@6.0.3)
+        specifier: 0.24.1
+        version: 0.24.1(rolldown@1.0.0-rc.18)(typescript@6.0.3)
       solid-js:
         specifier: 1.9.12
         version: 1.9.12
@@ -1567,9 +1567,9 @@ packages:
   rfdc@1.4.1:
     resolution: {integrity: sha512-q1b3N5QkRUWUl7iyylaaj3kOpIT0N2i9MqIEQXP73GVsN9cw3fdx8X63cEmWhJGi2PPCF23Ijp7ktmd39rawIA==}
 
-  rolldown-plugin-dts@0.24.0:
-    resolution: {integrity: sha512-liB3IEQKijJoNmSDJt9GU4aRD/Xu6BUzO/xdc71NC4TtbZ6Fr0PauVEhAhP4KR4EalkevBOiJHdiHFNHLjtB2Q==}
-    engines: {node: '>=22.18.0'}
+  rolldown-plugin-dts@0.24.1:
+    resolution: {integrity: sha512-mh0oL67i6vJvpHsPtPutVE0CzHb2RvaEmU/JXPrTPnXx7yAUd/b9B2gCMLdW2yDylbJyPZMZIssXPkOLxMuYHA==}
+    engines: {node: ^22.18.0 || >=24.0.0}
     peerDependencies:
       '@ts-macro/tsc': ^0.3.6
       '@typescript/native-preview': '>=7.0.0-dev.20260325.1'
@@ -3174,7 +3174,7 @@ snapshots:
 
   rfdc@1.4.1: {}
 
-  rolldown-plugin-dts@0.24.0(rolldown@1.0.0-rc.18)(typescript@6.0.3):
+  rolldown-plugin-dts@0.24.1(rolldown@1.0.0-rc.18)(typescript@6.0.3):
     dependencies:
       '@babel/generator': 8.0.0-rc.4
       '@babel/helper-validator-identifier': 8.0.0-rc.4
