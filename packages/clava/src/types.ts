@@ -248,11 +248,13 @@ type ExtractVariantValue<T> = T extends null
   ? never
   : T extends (value: infer V) => any
     ? V
-    : T extends Record<string, any>
-      ? StringToBoolean<NonNullKeys<T>>
-      : T extends ClassValue
-        ? boolean
-        : never;
+    : T extends readonly unknown[]
+      ? boolean
+      : T extends Record<string, any>
+        ? StringToBoolean<NonNullKeys<T>>
+        : T extends ClassValue
+          ? boolean
+          : never;
 
 export type VariantValues<V> = {
   [K in keyof V]?: ExtractVariantValue<V[K]>;
