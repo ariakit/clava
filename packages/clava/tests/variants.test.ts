@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "vitest";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -208,6 +208,34 @@ for (const config of Object.values(CONFIGS)) {
         cv({ variants: { disabled: "disabled" } }),
       );
       const props = component({ disabled: false });
+      expect(getStyleClass(props)).toEqual({ class: "" });
+    });
+
+    test("array variant shorthand", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            interactive: ["interactive", "focusable"],
+          },
+          defaultVariants: { interactive: true },
+        }),
+      );
+      expectTypeOf(component.getVariants()).branded.toEqualTypeOf<{
+        interactive?: boolean;
+      }>();
+      expect(getStyleClass(component())).toEqual({
+        class: cls("interactive focusable"),
+      });
+      expect(getStyleClass(component({ interactive: false }))).toEqual({
+        class: "",
+      });
+      const props = component({
+        // @ts-expect-error array shorthand variants are boolean
+        interactive:
+          // no error
+          "interactive",
+      });
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
