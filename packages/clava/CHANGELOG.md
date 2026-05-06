@@ -1,5 +1,9 @@
 # clava
 
+## 0.2.4
+
+- Fixed [`cv`](https://clava.style/docs/reference/cv) variant props inferred from array class values to use boolean shorthand props.
+
 ## 0.2.3
 
 ### Improved runtime performance of `extend` chains and `getVariants` in `cv`
