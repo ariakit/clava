@@ -476,7 +476,7 @@ describe("perf compare", () => {
     expect(summary.hasConfirmableChanges).toBe(false);
     expect(summary.pairedRoundsCount).toBe(2);
     expect(markdown).toContain(
-      "Aggregated across 2 interleaved rounds; use confirmation rounds before treating threshold-crossing changes as final.",
+      "Aggregated across 2 interleaved rounds (preliminary).",
     );
   });
 

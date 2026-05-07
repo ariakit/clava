@@ -454,7 +454,7 @@ function formatRemovedBenchmarks(entries: AggregatedBenchmark[]) {
 
 function formatRoundsSummary(pairedRoundsCount: number) {
   if (pairedRoundsCount <= 2) {
-    return `Aggregated across ${pairedRoundsCount} interleaved rounds; use confirmation rounds before treating threshold-crossing changes as final.`;
+    return `Aggregated across ${pairedRoundsCount} interleaved rounds (preliminary).`;
   }
   return `Aggregated across ${pairedRoundsCount} interleaved rounds; a change is flagged only when the median exceeds the threshold and rounds agree on direction.`;
 }
