@@ -1,6 +1,6 @@
 # Clava
 
-Type-safe class and style variants for framework components. Clava turns variant props into class/style prop objects, works with any class naming system, and keeps the generated API easy for TypeScript, editors, and LLMs to understand.
+Type-safe class and style variants for framework components. Clava turns variant props into class/style prop objects, works with any class naming system, and keeps the generated API easy for TypeScript and editors to understand.
 
 Clava is an ESM package. Import from the package root:
 
@@ -8,6 +8,23 @@ Clava is an ESM package. Import from the package root:
 import { cv, cx, create, splitProps } from "clava";
 import type { Variant, VariantProps } from "clava";
 ```
+
+## Contents
+
+- [Install](#install)
+- [Quick Start](#quick-start)
+- [Output Modes](#output-modes)
+- [Classes And Styles](#classes-and-styles)
+- [Variants](#variants)
+- [Extending Components](#extending-components)
+- [Computed Variants](#computed-variants)
+- [Computed Logic](#computed-logic)
+- [Splitting Props](#splitting-props)
+- [React](#react)
+- [Solid](#solid)
+- [`create()` And `cx()`](#create-and-cx)
+- [Type Helpers](#type-helpers)
+- [API Summary](#api-summary)
 
 ## Install
 
@@ -529,23 +546,3 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 `cx(...classes)` joins class values with `clsx` and applies the factory's `transformClass`.
 
 `create(options?)` returns isolated `{ cv, cx }` helpers. The only option is `transformClass?: (className: string) => string`.
-
-## LLM Usage Guide
-
-Import only from `"clava"`. Do not import from `clava/src`, `clava/dist`, or internal utility files.
-
-Use Clava's config keys exactly: `class`, `style`, `variants`, `computedVariants`, `defaultVariants`, `computed`, and `extend`. Do not use CVA-style keys such as `base`, `compoundVariants`, or `slots`.
-
-For React, call or store the `.jsx` mode. For Solid or DOM-style object props, use `.htmlObj`. For HTML strings, use `.html`. The default callable component returns `{ class, style }`, not `{ className, style }`.
-
-Use `computed` for compound variants and dependent defaults. Use `computedVariants` for prop values whose output is dynamic or not representable as a fixed object map.
-
-Put style output inside `{ style: { ... } }`. For config, variant, and computed styles, prefer camelCase CSS property names and string values such as `"16px"`. CSS custom properties like `"--gap"` are valid.
-
-Use `splitProps(props, component)` inside framework wrappers so `class`, `className`, `style`, and variant props are routed to the Clava component and remaining props are passed to the DOM element.
-
-Use `VariantProps<typeof component>` for public component prop types. Use `Variant<typeof component, "variantName">` when a child component should mirror an inherited variant's allowed values.
-
-Use `null` in an extending component's `variants` config to disable inherited variants or inherited variant values. Do not use `null` as a normal variant prop value unless a `computedVariants` function explicitly accepts `null`.
-
-Passing `undefined` for a variant means "use the default". Passing user `class`, `className`, or `style` appends/merges those values after generated output.
