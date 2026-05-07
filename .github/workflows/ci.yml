@@ -79,7 +79,11 @@ jobs:
       contents: read
       pull-requests: write
     env:
-      PERF_ROUNDS: 5
+      # Clean runs stop after two paired rounds. Significant deltas get one
+      # extra confirmation round, which makes the final comparison require
+      # three-round unanimity before reporting the change.
+      PERF_INITIAL_ROUNDS: 2
+      PERF_CONFIRMATION_ROUNDS: 1
       # Skip husky's `prepare` script: linked worktrees share `.git/hooks` with
       # the main checkout, so installing in the baseline tree would otherwise
       # rewrite the main repo's hooks.
@@ -122,18 +126,54 @@ jobs:
       - name: Run interleaved benchmarks
         run: |
           mkdir -p .perf-results
-          for i in $(seq 1 "$PERF_ROUNDS"); do
-            echo "::group::Round $i — baseline"
+
+          run_perf_round() {
+            local i="$1"
+
+            echo "::group::Round $i - baseline"
             (cd "$BASELINE_DIR" && pnpm exec vitest bench \
               --outputJson "$GITHUB_WORKSPACE/.perf-results/baseline-$i.json" \
               --passWithNoTests)
             echo "::endgroup::"
-            echo "::group::Round $i — current"
+            echo "::group::Round $i - current"
             pnpm exec vitest bench \
               --outputJson ".perf-results/current-$i.json" \
               --passWithNoTests
             echo "::endgroup::"
+          }
+
+          for i in $(seq 1 "$PERF_INITIAL_ROUNDS"); do
+            run_perf_round "$i"
           done
+
+          echo "::group::Preliminary comparison"
+          pnpm perf-compare
+          needs_confirmation=$(
+            node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+
+          const summary = JSON.parse(
+            readFileSync(".perf-results/comparison.json", "utf-8"),
+          );
+
+          const needsConfirmation =
+            summary.hasSignificantChanges || summary.hasConfirmableChanges;
+
+          console.log(needsConfirmation ? "true" : "false");
+          NODE
+          )
+          echo "::endgroup::"
+
+          if [ "$needs_confirmation" = "true" ]; then
+            echo "Potential performance changes detected; running confirmation rounds."
+            start_round=$((PERF_INITIAL_ROUNDS + 1))
+            end_round=$((PERF_INITIAL_ROUNDS + PERF_CONFIRMATION_ROUNDS))
+            for i in $(seq "$start_round" "$end_round"); do
+              run_perf_round "$i"
+            done
+          else
+            echo "No significant changes detected; skipping confirmation rounds."
+          fi
 
       - name: Compare results
         if: always()
