@@ -51,7 +51,7 @@
       "oxlint --type-aware --type-check"
     ]
   },
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@10.33.3",
   "pnpm": {
     "patchedDependencies": {
       "@changesets/apply-release-plan@7.1.1": "patches/@changesets__apply-release-plan@7.1.1.patch"
