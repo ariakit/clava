@@ -80,6 +80,8 @@ button({ size: "lg", disabled: true, fluid: true, className: "mt-2" });
 
 Variant prop types are inferred from the `variants`, `computedVariants`, `defaultVariants`, and `extend` configuration. Invalid variant keys and values are TypeScript errors and are ignored at runtime.
 
+Input props may use `class` or `className` in any output mode. Both are appended to the generated class string.
+
 ## Output Modes
 
 Every Clava component has four output modes:
@@ -118,6 +120,9 @@ button.getVariants({ size: "lg" });
 // { disabled: false, size: "lg", intent: "primary" }
 
 button.keys;
+// ["class", "className", "style", "size", "intent", "disabled", "fluid"]
+
+button.propKeys;
 // ["class", "className", "style", "size", "intent", "disabled", "fluid"]
 
 button.variantKeys;
