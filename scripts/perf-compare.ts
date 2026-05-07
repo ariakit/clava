@@ -72,6 +72,9 @@ interface ComparisonSummary {
   newBenchmarks: AggregatedBenchmark[];
   removedBenchmarks: AggregatedBenchmark[];
   hasSignificantChanges: boolean;
+  // Preliminary comparisons use this to decide whether one more round could
+  // turn a near-threshold, same-direction result into a final significant row.
+  hasConfirmableChanges: boolean;
   // Number of rounds where both baseline and current produced data (i.e. the
   // count actually used for comparison), not the larger of the two raw counts.
   pairedRoundsCount: number;
@@ -239,13 +242,11 @@ function aggregateByKey(
   return aggregated;
 }
 
-// Direction-of-change agreement check across rounds. Up to two rounds we
-// fall back to magnitude only — with so few samples a noise round would
-// otherwise veto every flag, which is the failure mode this script exists to
-// avoid. Three or four rounds require unanimity. Five or more rounds tolerate
-// a single dissenter so a one-off CI hiccup cannot block an alert.
+// Direction-of-change agreement check across rounds. Up to four rounds require
+// unanimity. Five or more rounds tolerate a single dissenter so a one-off CI
+// hiccup cannot block an alert.
 function requiredAgreement(roundsCount: number) {
-  if (roundsCount <= 2) return 1;
+  if (roundsCount <= 1) return 1;
   if (roundsCount <= 4) return roundsCount;
   return roundsCount - 1;
 }
@@ -268,6 +269,20 @@ function computeSignificance({
   const magnitudeOk = Math.abs(medianPercent) > THRESHOLD_PERCENT;
   const agreementOk = agreement >= requiredAgreement(perRoundPercents.length);
   return { agreement, significant: magnitudeOk && agreementOk };
+}
+
+function isConfirmableChange(row: ComparisonRow) {
+  if (row.significant) return false;
+  if (row.perRoundPercents.length <= 1) return false;
+  if (row.agreement !== row.perRoundPercents.length) return false;
+
+  const direction = Math.sign(row.percent);
+  if (direction === 0) return false;
+
+  return row.perRoundPercents.some((percent) => {
+    if (Math.sign(percent) !== direction) return false;
+    return Math.abs(percent) > THRESHOLD_PERCENT;
+  });
 }
 
 function compare(): ComparisonSummary {
@@ -358,6 +373,7 @@ function compare(): ComparisonSummary {
     newBenchmarks,
     removedBenchmarks,
     hasSignificantChanges: rows.some((row) => row.significant),
+    hasConfirmableChanges: rows.some(isConfirmableChange),
     pairedRoundsCount: pairedRoundIndices.size,
   };
 }
@@ -436,6 +452,13 @@ function formatRemovedBenchmarks(entries: AggregatedBenchmark[]) {
   return lines;
 }
 
+function formatRoundsSummary(pairedRoundsCount: number) {
+  if (pairedRoundsCount <= 2) {
+    return `Aggregated across ${pairedRoundsCount} interleaved rounds; use confirmation rounds before treating threshold-crossing changes as final.`;
+  }
+  return `Aggregated across ${pairedRoundsCount} interleaved rounds; a change is flagged only when the median exceeds the threshold and rounds agree on direction.`;
+}
+
 function formatMarkdown(summary: ComparisonSummary) {
   const {
     rows,
@@ -493,9 +516,7 @@ function formatMarkdown(summary: ComparisonSummary) {
   );
   if (pairedRoundsCount > 1) {
     lines.push("");
-    lines.push(
-      `Aggregated across ${pairedRoundsCount} interleaved rounds; a change is flagged only when the median exceeds the threshold and rounds agree on direction.`,
-    );
+    lines.push(formatRoundsSummary(pairedRoundsCount));
   }
 
   return lines.join("\n");

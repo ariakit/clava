@@ -21,6 +21,12 @@ interface Benchmark {
   mean?: number;
 }
 
+interface ComparisonSummary {
+  hasSignificantChanges: boolean;
+  hasConfirmableChanges: boolean;
+  pairedRoundsCount: number;
+}
+
 function createTempDir() {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "clava-perf-")));
   tempDirs.push(dir);
@@ -73,7 +79,7 @@ function runCompare({
   return readFileSync(path.join(outputDir, "comparison.md"), "utf-8");
 }
 
-function runCompareRounds({
+function runCompareRoundsResult({
   baseline,
   current,
 }: {
@@ -95,7 +101,16 @@ function runCompareRounds({
     stdio: "pipe",
   });
 
-  return readFileSync(path.join(outputDir, "comparison.md"), "utf-8");
+  return {
+    markdown: readFileSync(path.join(outputDir, "comparison.md"), "utf-8"),
+    summary: JSON.parse(
+      readFileSync(path.join(outputDir, "comparison.json"), "utf-8"),
+    ) as ComparisonSummary,
+  };
+}
+
+function runCompareRounds(args: { baseline: unknown[]; current: unknown[] }) {
+  return runCompareRoundsResult(args).markdown;
 }
 
 afterEach(() => {
@@ -441,6 +456,72 @@ describe("perf compare", () => {
 
     expect(markdown).toContain("No significant performance changes detected.");
     expect(markdown).not.toMatch(/% :warning:/);
+  });
+
+  test("marks two-round threshold changes as preliminary", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100].map((hz) =>
+      createReport(dir, [{ name: "preliminary bench", hz, mean: 1 / hz }]),
+    );
+    const currentRounds = [70, 72].map((hz) =>
+      createReport(dir, [{ name: "preliminary bench", hz, mean: 1 / hz }]),
+    );
+
+    const { markdown, summary } = runCompareRoundsResult({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(summary.hasSignificantChanges).toBe(true);
+    expect(summary.hasConfirmableChanges).toBe(false);
+    expect(summary.pairedRoundsCount).toBe(2);
+    expect(markdown).toContain(
+      "Aggregated across 2 interleaved rounds; use confirmation rounds before treating threshold-crossing changes as final.",
+    );
+  });
+
+  test("does not confirm split two-round changes", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100].map((hz) =>
+      createReport(dir, [
+        { name: "split preliminary bench", hz, mean: 1 / hz },
+      ]),
+    );
+    const currentRounds = [70, 105].map((hz) =>
+      createReport(dir, [
+        { name: "split preliminary bench", hz, mean: 1 / hz },
+      ]),
+    );
+
+    const { markdown, summary } = runCompareRoundsResult({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(summary.hasSignificantChanges).toBe(false);
+    expect(summary.hasConfirmableChanges).toBe(false);
+    expect(summary.pairedRoundsCount).toBe(2);
+    expect(markdown).toContain("No significant performance changes detected.");
+  });
+
+  test("confirms near-threshold unanimous two-round changes", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100].map((hz) =>
+      createReport(dir, [{ name: "borderline bench", hz, mean: 1 / hz }]),
+    );
+    const currentRounds = [89, 91].map((hz) =>
+      createReport(dir, [{ name: "borderline bench", hz, mean: 1 / hz }]),
+    );
+
+    const { markdown, summary } = runCompareRoundsResult({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(summary.hasSignificantChanges).toBe(false);
+    expect(summary.hasConfirmableChanges).toBe(true);
+    expect(summary.pairedRoundsCount).toBe(2);
+    expect(markdown).toContain("No significant performance changes detected.");
   });
 
   test("falls back to empty results for malformed JSON", () => {
