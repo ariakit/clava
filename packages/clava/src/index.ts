@@ -702,23 +702,18 @@ export function create({
     }
     const extCount = extMetas.length;
 
-    // Filter to only extends whose `resolveDefaults` actually does work
-    // (config.computed exists, transitively). Iterating these in
-    // `resolveVariantsHot` skips empty work.
-    const extMetasWithResolveDefaults: ComponentMeta[] = [];
-    const extMetasWithResolveComputed: ComponentMeta[] = [];
+    // Filter to only extends with computed work in their chain. `resolveDefaults`
+    // and `resolveComputed` are populated from the same transitive condition,
+    // so one bucket is enough for both resolver paths.
+    const extMetasWithComputed: ComponentMeta[] = [];
     for (let i = 0; i < extCount; i++) {
       const meta = extMetas[i];
       if (meta.resolveDefaults) {
-        extMetasWithResolveDefaults.push(meta);
-      }
-      if (meta.resolveComputed) {
-        extMetasWithResolveComputed.push(meta);
+        extMetasWithComputed.push(meta);
       }
     }
-    const extMetasWithResolveDefaultsCount = extMetasWithResolveDefaults.length;
-    const extMetasWithResolveComputedCount = extMetasWithResolveComputed.length;
-    const shouldCollectChangedVariants = extMetasWithResolveComputedCount > 0;
+    const extMetasWithComputedCount = extMetasWithComputed.length;
+    const shouldCollectChangedVariants = extMetasWithComputedCount > 0;
 
     // Pre-compute static skip key/value sets to pass to extends. These never
     // change across calls — when caller passes no skip sets, we reuse the same
@@ -770,7 +765,7 @@ export function create({
     // When this component has no `computed` and no `extend` with work, the
     // function is null — callers can skip iterating it entirely.
     const resolveDefaultsFn: ComponentMeta["resolveDefaults"] =
-      computed || extMetasWithResolveDefaultsCount > 0
+      computed || extMetasWithComputedCount > 0
         ? (
             childDefaults: Record<string, unknown>,
             userProps: Record<string, unknown> = EMPTY_DEFAULTS,
@@ -794,9 +789,11 @@ export function create({
 
             const computedDefaults: Record<string, unknown> = {};
 
-            for (let i = 0; i < extMetasWithResolveDefaultsCount; i++) {
-              const extDefaults = extMetasWithResolveDefaults[i]
-                .resolveDefaults!(childDefaults, userProps);
+            for (let i = 0; i < extMetasWithComputedCount; i++) {
+              const extDefaults = extMetasWithComputed[i].resolveDefaults!(
+                childDefaults,
+                userProps,
+              );
               for (const k in extDefaults) {
                 if (!Object.hasOwn(extDefaults, k)) continue;
                 computedDefaults[k] = extDefaults[k];
@@ -848,8 +845,8 @@ export function create({
 
       // Apply computed defaults from extended components (only those that have
       // actual work to do).
-      for (let i = 0; i < extMetasWithResolveDefaultsCount; i++) {
-        const meta = extMetasWithResolveDefaults[i];
+      for (let i = 0; i < extMetasWithComputedCount; i++) {
+        const meta = extMetasWithComputed[i];
         const extComputed = meta.resolveDefaults!(defaults, propsVariants);
         for (const k in extComputed) {
           if (!Object.hasOwn(extComputed, k)) continue;
@@ -1121,7 +1118,7 @@ export function create({
         }
 
         const extUserVariantProps =
-          extMetasWithResolveComputedCount > 0
+          extMetasWithComputedCount > 0
             ? getExtUserVariantProps(
                 userVariantProps,
                 protectedVariants ?? null,
@@ -1170,7 +1167,7 @@ export function create({
           }
           // Only sync protected variants when a child computed resolver can
           // observe them. Otherwise extUserVariantProps may alias caller props.
-          if (protectedVariants && extMetasWithResolveComputedCount > 0) {
+          if (protectedVariants && extMetasWithComputedCount > 0) {
             Object.assign(extUserVariantProps, protectedVariants);
           }
         }
@@ -1254,7 +1251,7 @@ export function create({
     };
 
     const compute: ComputeFn =
-      !computed && extMetasWithResolveDefaultsCount === 0
+      !computed && extMetasWithComputedCount === 0
         ? (
             resolved,
             userVariantProps,
@@ -1416,14 +1413,14 @@ export function create({
         changedVariants = computedResult.changedVariants;
       }
 
-      if (extMetasWithResolveComputedCount > 0) {
+      if (extMetasWithComputedCount > 0) {
         const extUserVariantProps = getExtUserVariantProps(
           userVariantProps,
           protectedVariants ?? null,
           changedVariants,
         );
-        for (let i = 0; i < extMetasWithResolveComputedCount; i++) {
-          const meta = extMetasWithResolveComputed[i];
+        for (let i = 0; i < extMetasWithComputedCount; i++) {
+          const meta = extMetasWithComputed[i];
           const resolveComputed = meta.resolveComputed;
           if (!resolveComputed) continue;
           workingResolved = resolveComputed(
@@ -1445,7 +1442,7 @@ export function create({
     };
 
     const resolveComputed: ResolveComputedFn | null =
-      computed || extMetasWithResolveComputedCount > 0
+      computed || extMetasWithComputedCount > 0
         ? (
             resolved,
             userVariantProps,
@@ -1524,7 +1521,7 @@ export function create({
       Object.assign(resolved, staticDefaults);
 
       let userVariantProps: Record<string, unknown>;
-      if (extMetasWithResolveDefaultsCount > 0) {
+      if (extMetasWithComputedCount > 0) {
         // Some extends need a resolveDefaults pass. They expect a variant-only
         // object as `userProps`, so we extract one.
         const variantProps: Record<string, unknown> = {};
@@ -1534,8 +1531,8 @@ export function create({
             variantProps[key] = propsRecord[key];
           }
         }
-        for (let i = 0; i < extMetasWithResolveDefaultsCount; i++) {
-          const meta = extMetasWithResolveDefaults[i];
+        for (let i = 0; i < extMetasWithComputedCount; i++) {
+          const meta = extMetasWithComputed[i];
           const extComputed = meta.resolveDefaults!(resolved, variantProps);
           for (const k in extComputed) {
             if (!Object.hasOwn(extComputed, k)) continue;
