@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -45,6 +45,55 @@ for (const config of Object.values(CONFIGS)) {
       );
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
+    });
+
+    test("computed re-runs when it changes variants", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ variants, setVariants, addClass }) => {
+            if (variants.size === "lg") {
+              setVariants({ color: "red" });
+            }
+            if (variants.color === "red") {
+              addClass("computed-red");
+            }
+          },
+        }),
+      );
+      const props = component({ size: "lg" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg red computed-red"),
+      });
+    });
+
+    test("computed re-runs when setDefaultVariants changes variants", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ variants, setDefaultVariants, addClass }) => {
+            setDefaultVariants({ color: "red" });
+            if (variants.color === "red") {
+              setDefaultVariants({ size: "lg" });
+            }
+            if (variants.size === "lg") {
+              addClass("computed-lg");
+            }
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("lg red computed-lg"),
+      });
     });
 
     test("computed with setDefaultVariants", () => {
@@ -346,6 +395,374 @@ for (const config of Object.values(CONFIGS)) {
       );
       const props = component();
       expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
+    });
+
+    test("computed re-runs when base component computed changes variants", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" }, active: "" },
+        defaultVariants: { size: "sm" },
+        computed: ({ variants, setVariants }) => {
+          if (variants.active) {
+            setVariants({ size: "lg" });
+          }
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+          computed: ({ variants, setVariants }) => {
+            if (variants.size === "lg") {
+              setVariants({ color: "red" });
+            }
+          },
+        }),
+      );
+      const props = component({ active: true });
+      expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
+    });
+
+    test("base computed setDefaultVariants works after its own setVariants re-run", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          active: "",
+          mode: { on: "on" },
+        },
+        defaultVariants: { size: "sm" },
+        computed: ({ variants, setVariants, setDefaultVariants }) => {
+          if (variants.active) {
+            setVariants({ mode: "on" });
+          }
+          if (variants.mode === "on") {
+            setDefaultVariants({ size: "lg" });
+          }
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [base] }));
+      const props = component({ active: true });
+      expect(getStyleClass(props)).toEqual({ class: cls("lg on") });
+    });
+
+    test("computed setVariants uses the latest pending value", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ setVariants }) => {
+            setVariants({ size: "lg" });
+            setVariants({ size: "sm" });
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("sm") });
+    });
+
+    test("child setVariants keeps overriding base setDefaultVariants across re-runs", () => {
+      const base = cv({
+        variants: { color: { red: "red", blue: "blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "blue" });
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ variants, setVariants }) => {
+            if (variants.size === "sm") {
+              setVariants({ color: "red" });
+            }
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("red sm") });
+    });
+
+    test("computed setVariants sticks across re-runs", () => {
+      const base = cv({
+        variants: { color: { red: "red", blue: "blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "blue" });
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "", blue: "" }, done: "" },
+          computed: ({ variants, setVariants }) => {
+            if (!variants.done) {
+              setVariants({ color: "red", done: true });
+            }
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("red") });
+    });
+
+    test("base computed setDefaultVariants can override child static defaults after a re-run", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          active: "",
+          mode: { on: "on" },
+        },
+        computed: ({ variants, setVariants, setDefaultVariants }) => {
+          if (variants.active) {
+            setVariants({ mode: "on" });
+          }
+          if (variants.mode === "on") {
+            setDefaultVariants({ size: "lg" });
+          }
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [base], defaultVariants: { size: "sm" } }),
+      );
+      const props = component({ active: true });
+      expect(getStyleClass(props)).toEqual({ class: cls("lg on") });
+    });
+
+    test("setVariants from earlier extends overrides setDefaultVariants from later extends", () => {
+      const first = cv({
+        variants: { color: { red: "first-red", blue: "first-blue" } },
+        computed: ({ setVariants }) => {
+          setVariants({ color: "red" });
+        },
+      });
+      const second = cv({
+        variants: { color: { red: "second-red", blue: "second-blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "blue" });
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [first, second] }));
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("first-red second-red"),
+      });
+    });
+
+    test("setDefaultVariants from later extends overrides setDefaultVariants from earlier extends", () => {
+      const first = cv({
+        variants: { color: { red: "first-red", blue: "first-blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "red" });
+        },
+      });
+      const second = cv({
+        variants: { color: { red: "second-red", blue: "second-blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "blue" });
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [first, second] }));
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("first-blue second-blue"),
+      });
+    });
+
+    test("setDefaultVariants does not override stable setVariants on later passes", () => {
+      const base = cv({
+        variants: { color: { red: "base-red", blue: "base-blue" } },
+        computed: ({ setVariants }) => {
+          setVariants({ color: "red" });
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "child-red", blue: "child-blue" } },
+          computed: ({ variants, setDefaultVariants }) => {
+            if (variants.color === "red") {
+              setDefaultVariants({ color: "blue" });
+            }
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("base-red child-red"),
+      });
+    });
+
+    test("setDefaultVariants does not override setVariants from a previous pass", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            color: { red: "red", blue: "blue" },
+            done: "",
+          },
+          computed: ({ variants, setVariants, setDefaultVariants }) => {
+            if (!variants.done) {
+              setVariants({ color: "red", done: true });
+            }
+            if (variants.done) {
+              setDefaultVariants({ color: "blue" });
+            }
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("red") });
+    });
+
+    test("computed warns when variants keep changing", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        component();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "Maximum computed update iterations exceeded",
+          ),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("computed warning is shared across extended components", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+        computed: ({ variants, setVariants }) => {
+          setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [base] }));
+
+      try {
+        component();
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "Maximum computed update iterations exceeded",
+          ),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("getVariants warns when variants keep changing", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        component.getVariants();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "Maximum computed update iterations exceeded",
+          ),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("computed warning is omitted in production", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const nodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "production";
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        component();
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        process.env.NODE_ENV = nodeEnv;
+        warn.mockRestore();
+      }
+    });
+
+    test("computed warning is omitted without process", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const originalProcess = globalThis.process;
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        vi.stubGlobal("process", undefined);
+        component();
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        vi.stubGlobal("process", originalProcess);
+        warn.mockRestore();
+      }
+    });
+
+    test("computed warning is omitted without process.env", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const originalProcess = globalThis.process;
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        vi.stubGlobal("process", {});
+        component();
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        vi.stubGlobal("process", originalProcess);
+        warn.mockRestore();
+      }
     });
 
     test("computed setDefaultVariants when explicitly passing undefined", () => {

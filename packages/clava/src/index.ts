@@ -42,7 +42,26 @@ type ComputeFn = (
   skipValues: Record<string, Set<string>> | null,
   classesOut: ClsxClassValue[],
   styleOut: StyleValue,
-) => void;
+  runState?: ComputedRunState,
+  protectedVariants?: Record<string, unknown> | null,
+  pendingProtectedVariants?: Record<string, unknown> | null,
+  protectedVariantKeys?: Set<string> | null,
+) => Record<string, unknown>;
+
+type ResolveComputedFn = (
+  resolved: Record<string, unknown>,
+  userVariantProps: Record<string, unknown>,
+  filterOwnVariants?: boolean,
+  runState?: ComputedRunState,
+  protectedVariants?: Record<string, unknown> | null,
+  pendingProtectedVariants?: Record<string, unknown> | null,
+  protectedVariantKeys?: Set<string> | null,
+) => Record<string, unknown>;
+
+interface ComputedRunState {
+  remaining: number;
+  warned: boolean;
+}
 
 // Internal metadata stored on components but hidden from public types.
 interface ComponentMeta {
@@ -60,6 +79,7 @@ interface ComponentMeta {
   // Returns variant classes + style for this component, used by extending
   // components. Top-level rendering also routes through this.
   compute: ComputeFn;
+  resolveComputed: ResolveComputedFn | null;
   // Reference identity is used to detect mixed-factory `extend`. When a
   // component is extended by a parent from a different `create()` call, the
   // parent applies this transform to the extend's contribution before joining,
@@ -76,6 +96,68 @@ const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
   string,
   unknown
 >;
+
+const MAX_COMPUTED_RUNS = 50;
+
+function areVariantsEqual(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
+  for (const key in a) {
+    if (!hasOwn.call(a, key)) continue;
+    if (a[key] !== b[key]) return false;
+  }
+  for (const key in b) {
+    if (!hasOwn.call(b, key)) continue;
+    if (!hasOwn.call(a, key)) return false;
+  }
+  return true;
+}
+
+function warnComputedLimit(runState: ComputedRunState): void {
+  if (runState.warned) return;
+  runState.warned = true;
+  if (typeof process !== "undefined" && process.env) {
+    if (process.env.NODE_ENV === "production") return;
+    console.warn(
+      "Clava: Maximum computed update iterations exceeded. This can happen " +
+        "when a computed callback calls setVariants or setDefaultVariants, " +
+        "but one of the variants changes on every run.",
+    );
+  }
+}
+
+function getExtUserVariantProps(
+  userVariantProps: Record<string, unknown>,
+  protectedVariants: Record<string, unknown> | null,
+  changedVariants: Record<string, unknown> | null,
+): Record<string, unknown> {
+  const extUserVariantProps: Record<string, unknown> = {};
+  Object.assign(extUserVariantProps, userVariantProps);
+  if (protectedVariants) {
+    Object.assign(extUserVariantProps, protectedVariants);
+  }
+  if (changedVariants) {
+    Object.assign(extUserVariantProps, changedVariants);
+  }
+  return extUserVariantProps;
+}
+
+function mergeVariants(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  skipKeys?: Set<string> | null,
+): boolean {
+  let changed = false;
+  for (const key in source) {
+    if (!hasOwn.call(source, key)) continue;
+    if (skipKeys?.has(key)) continue;
+    const value = source[key];
+    if (target[key] !== value) changed = true;
+    target[key] = value;
+  }
+  return changed;
+}
 
 // Dynamic property access on function requires cast through unknown.
 function getComponentMeta(component: AnyComponent): ComponentMeta | undefined {
@@ -785,19 +867,24 @@ export function create({
     // `computeResult`) and recursively when this component is used as an
     // `extend` target by another component. Pushes variant classes (excluding
     // base class) into `classesOut` and merges styles into `styleOut`.
-    const compute: ComputeFn = (
+    const computeOnce: ComputeFn = (
       resolved,
       userVariantProps,
       skipKeys,
       skipValues,
       classesOut,
       styleOut,
+      runState,
+      protectedVariants,
+      pendingProtectedVariants,
+      protectedVariantKeys,
     ) => {
       // Run `computed` (if any). May modify resolved variants and emit classes
       // and styles.
       let workingResolved = resolved;
       let cClasses: ClassValue[] | null = null;
       let cStyle: StyleValue | null = null;
+      let changedVariants: Record<string, unknown> | null = null;
 
       if (computed) {
         // When this component is being extended, `resolved` is the parent's
@@ -822,13 +909,34 @@ export function create({
           updatedVariants = u;
           return u;
         };
+        const setChangedVariant = (
+          key: string,
+          value: unknown,
+          protect = false,
+        ) => {
+          if (!changedVariants) changedVariants = {};
+          changedVariants[key] = value;
+          if (protect && protectedVariants) {
+            protectedVariants[key] = value;
+            protectedVariantKeys?.add(key);
+          }
+        };
+        const getCurrentVariantValue = (key: string) => {
+          return updatedVariants ? updatedVariants[key] : ownVariants[key];
+        };
         const ctx = {
           variants: ownVariants as VariantValues<Record<string, unknown>>,
           setVariants: (
             newVariants: VariantValues<Record<string, unknown>>,
           ) => {
             if (!hasAnyDisabled) {
-              Object.assign(ensureUpdated(), newVariants);
+              for (const key in newVariants) {
+                if (!hasOwn.call(newVariants, key)) continue;
+                const value = (newVariants as Record<string, unknown>)[key];
+                setChangedVariant(key, value, true);
+                if (getCurrentVariantValue(key) === value) continue;
+                ensureUpdated()[key] = value;
+              }
               return;
             }
             for (const key in newVariants) {
@@ -844,6 +952,8 @@ export function create({
                   continue;
                 }
               }
+              setChangedVariant(key, value, true);
+              if (getCurrentVariantValue(key) === value) continue;
               ensureUpdated()[key] = value;
             }
           },
@@ -853,6 +963,7 @@ export function create({
             for (const key in newDefaults) {
               if (!hasOwn.call(newDefaults, key)) continue;
               if (userVariantProps[key] !== undefined) continue;
+              if (protectedVariantKeys?.has(key)) continue;
               const value = (newDefaults as Record<string, unknown>)[key];
               if (hasAnyDisabled) {
                 if (disabledVariantKeys.has(key)) continue;
@@ -864,6 +975,11 @@ export function create({
                   continue;
                 }
               }
+              setChangedVariant(key, value);
+              if (pendingProtectedVariants) {
+                pendingProtectedVariants[key] = value;
+              }
+              if (getCurrentVariantValue(key) === value) continue;
               ensureUpdated()[key] = value;
             }
           },
@@ -887,13 +1003,16 @@ export function create({
         cClasses = localCClasses;
         cStyle = localCStyle;
         if (updatedVariants) {
+          const nextResolved: Record<string, unknown> = {};
+          Object.assign(nextResolved, workingResolved);
           if (hasAnyDisabled) {
             const filteredUpdated: Record<string, unknown> = {};
             filterDisabledInto(updatedVariants, filteredUpdated);
-            workingResolved = filteredUpdated;
+            Object.assign(nextResolved, filteredUpdated);
           } else {
-            workingResolved = updatedVariants;
+            Object.assign(nextResolved, updatedVariants);
           }
+          workingResolved = nextResolved;
         }
       }
 
@@ -935,31 +1054,33 @@ export function create({
       // own base style and variants apply on top, matching the original
       // ext1 → ext2 → … → current ordering.
       //
-      // `workingResolved` is passed as the extends' `userVariantProps`. This
-      // is deliberate — by the time `compute` runs, the resolveDefaults chain
-      // and our own `computed`'s `setDefaultVariants` have already produced
-      // the most-specific resolution for every key. Treating those values as
-      // "user-provided" makes extends' own `setDefaultVariants` skip them, so
-      // extends emit variant classes that match what we resolved (rather than
-      // re-running their own defaults and emitting a different class).
-      // Replacing this with the original `userVariantProps` looks cleaner but
-      // breaks "child computed setDefaultVariants overrides parent computed
-      // setDefaultVariants" in `tests/computed.test.ts` — extends would then
-      // overwrite values the descendant already resolved.
+      // Pass explicit user values plus computed changes as the extends'
+      // `userVariantProps`. This lets more-specific computed decisions stick
+      // across re-runs while inherited static defaults can still be refined by
+      // the extended component's own computed chain.
       if (hasExtend) {
+        const extUserVariantProps = getExtUserVariantProps(
+          userVariantProps,
+          protectedVariants ?? null,
+          changedVariants,
+        );
         for (let i = 0; i < extCount; i++) {
           if (hasIsolatedExt && extIsolated[i]) {
             // Isolated extend (different factory): gather its variant classes
             // into a scratch array, then push the joined string after applying
             // its own transformClass. Our outer transform applies on top.
             const extClasses: ClsxClassValue[] = [];
-            extMetas[i].compute(
+            workingResolved = extMetas[i].compute(
               workingResolved,
-              workingResolved,
+              extUserVariantProps,
               extSkipKeys,
               extSkipVals,
               extClasses,
               styleOut,
+              runState,
+              protectedVariants,
+              pendingProtectedVariants,
+              protectedVariantKeys,
             );
             if (extClasses.length > 0) {
               const joined = clsx(extClasses);
@@ -970,14 +1091,21 @@ export function create({
               }
             }
           } else {
-            extMetas[i].compute(
+            workingResolved = extMetas[i].compute(
               workingResolved,
-              workingResolved,
+              extUserVariantProps,
               extSkipKeys,
               extSkipVals,
               classesOut,
               styleOut,
+              runState,
+              protectedVariants,
+              pendingProtectedVariants,
+              protectedVariantKeys,
             );
+          }
+          if (protectedVariants) {
+            Object.assign(extUserVariantProps, protectedVariants);
           }
         }
       }
@@ -1055,7 +1183,319 @@ export function create({
         }
       }
       if (cStyle) Object.assign(styleOut, cStyle);
+
+      return workingResolved;
     };
+
+    const compute: ComputeFn = (
+      resolved,
+      userVariantProps,
+      skipKeys,
+      skipValues,
+      classesOut,
+      styleOut,
+      runState,
+      protectedVariants,
+      pendingProtectedVariants,
+      protectedVariantKeys,
+    ) => {
+      if (!computed && extMetasWithResolveDefaultsCount === 0) {
+        return computeOnce(
+          resolved,
+          userVariantProps,
+          skipKeys,
+          skipValues,
+          classesOut,
+          styleOut,
+          runState,
+          protectedVariants,
+          pendingProtectedVariants,
+          protectedVariantKeys,
+        );
+      }
+
+      runState ??= { remaining: MAX_COMPUTED_RUNS, warned: false };
+      protectedVariants ??= {};
+      protectedVariantKeys ??= new Set<string>();
+      let workingResolved = resolved;
+      let lastClasses: ClsxClassValue[] = [];
+      let lastStyle: StyleValue = {};
+      let reachedLimit = true;
+
+      while (runState.remaining > 0) {
+        runState.remaining -= 1;
+        const nextPendingProtectedVariants: Record<string, unknown> = {};
+        const nextClasses: ClsxClassValue[] = [];
+        const nextStyle: StyleValue = {};
+        const nextResolved = computeOnce(
+          workingResolved,
+          userVariantProps,
+          skipKeys,
+          skipValues,
+          nextClasses,
+          nextStyle,
+          runState,
+          protectedVariants,
+          nextPendingProtectedVariants,
+          protectedVariantKeys,
+        );
+
+        lastClasses = nextClasses;
+        lastStyle = nextStyle;
+        let protectedChanged: boolean;
+        if (pendingProtectedVariants) {
+          protectedChanged = mergeVariants(
+            pendingProtectedVariants,
+            nextPendingProtectedVariants,
+            protectedVariantKeys,
+          );
+        } else {
+          protectedChanged = mergeVariants(
+            protectedVariants,
+            nextPendingProtectedVariants,
+            protectedVariantKeys,
+          );
+        }
+
+        if (
+          !protectedChanged &&
+          (nextResolved === workingResolved ||
+            areVariantsEqual(workingResolved, nextResolved))
+        ) {
+          workingResolved = nextResolved;
+          reachedLimit = false;
+          break;
+        }
+
+        workingResolved = nextResolved;
+      }
+
+      if (reachedLimit) {
+        warnComputedLimit(runState);
+      }
+
+      for (let i = 0; i < lastClasses.length; i++) {
+        classesOut.push(lastClasses[i]);
+      }
+      Object.assign(styleOut, lastStyle);
+      return workingResolved;
+    };
+
+    const resolveComputedOnce: ResolveComputedFn = (
+      resolved,
+      userVariantProps,
+      filterOwnVariants = true,
+      runState,
+      protectedVariants,
+      pendingProtectedVariants,
+      protectedVariantKeys,
+    ) => {
+      let workingResolved = resolved;
+      let changedVariants: Record<string, unknown> | null = null;
+
+      if (computed) {
+        let ownVariants = resolved;
+        if (filterOwnVariants) {
+          const filteredVariants: Record<string, unknown> = {};
+          for (let i = 0; i < variantKeysLength; i++) {
+            const k = variantKeys[i];
+            if (hasOwn.call(resolved, k)) filteredVariants[k] = resolved[k];
+          }
+          ownVariants = filteredVariants;
+        }
+
+        let updatedVariants: Record<string, unknown> | null = null;
+        const ensureUpdated = (): Record<string, unknown> => {
+          if (updatedVariants) return updatedVariants;
+          const u: Record<string, unknown> = {};
+          Object.assign(u, ownVariants);
+          updatedVariants = u;
+          return u;
+        };
+        const setChangedVariant = (
+          key: string,
+          value: unknown,
+          protect = false,
+        ) => {
+          if (!changedVariants) changedVariants = {};
+          changedVariants[key] = value;
+          if (protect && protectedVariants) {
+            protectedVariants[key] = value;
+            protectedVariantKeys?.add(key);
+          }
+        };
+        const getCurrentVariantValue = (key: string) => {
+          return updatedVariants ? updatedVariants[key] : ownVariants[key];
+        };
+        const ctx = {
+          variants: ownVariants as VariantValues<Record<string, unknown>>,
+          setVariants: (
+            newVariants: VariantValues<Record<string, unknown>>,
+          ) => {
+            if (!hasAnyDisabled) {
+              for (const key in newVariants) {
+                if (!hasOwn.call(newVariants, key)) continue;
+                const value = (newVariants as Record<string, unknown>)[key];
+                setChangedVariant(key, value, true);
+                if (getCurrentVariantValue(key) === value) continue;
+                ensureUpdated()[key] = value;
+              }
+              return;
+            }
+            for (const key in newVariants) {
+              if (!hasOwn.call(newVariants, key)) continue;
+              if (disabledVariantKeys.has(key)) continue;
+              const value = (newVariants as Record<string, unknown>)[key];
+              if (hasDisabledVariantValues) {
+                const valueKey = getVariantValueKey(value);
+                if (
+                  valueKey != null &&
+                  disabledVariantValues[key]?.has(valueKey)
+                ) {
+                  continue;
+                }
+              }
+              setChangedVariant(key, value, true);
+              if (getCurrentVariantValue(key) === value) continue;
+              ensureUpdated()[key] = value;
+            }
+          },
+          setDefaultVariants: (
+            newDefaults: VariantValues<Record<string, unknown>>,
+          ) => {
+            for (const key in newDefaults) {
+              if (!hasOwn.call(newDefaults, key)) continue;
+              if (userVariantProps[key] !== undefined) continue;
+              if (protectedVariantKeys?.has(key)) continue;
+              const value = (newDefaults as Record<string, unknown>)[key];
+              if (hasAnyDisabled) {
+                if (disabledVariantKeys.has(key)) continue;
+                const valueKey = getVariantValueKey(value);
+                if (
+                  valueKey != null &&
+                  disabledVariantValues[key]?.has(valueKey)
+                ) {
+                  continue;
+                }
+              }
+              setChangedVariant(key, value);
+              if (pendingProtectedVariants) {
+                pendingProtectedVariants[key] = value;
+              }
+              if (getCurrentVariantValue(key) === value) continue;
+              ensureUpdated()[key] = value;
+            }
+          },
+          addClass: noop,
+          addStyle: noop,
+        };
+        computed(ctx);
+
+        if (updatedVariants) {
+          const nextResolved: Record<string, unknown> = {};
+          Object.assign(nextResolved, workingResolved);
+          if (hasAnyDisabled) {
+            const filteredUpdated: Record<string, unknown> = {};
+            filterDisabledInto(updatedVariants, filteredUpdated);
+            Object.assign(nextResolved, filteredUpdated);
+          } else {
+            Object.assign(nextResolved, updatedVariants);
+          }
+          workingResolved = nextResolved;
+        }
+      }
+
+      if (hasExtend) {
+        const extUserVariantProps = getExtUserVariantProps(
+          userVariantProps,
+          protectedVariants ?? null,
+          changedVariants,
+        );
+        for (let i = 0; i < extCount; i++) {
+          const resolveComputed = extMetas[i].resolveComputed;
+          if (!resolveComputed) continue;
+          workingResolved = resolveComputed(
+            workingResolved,
+            extUserVariantProps,
+            true,
+            runState,
+            protectedVariants,
+            pendingProtectedVariants,
+            protectedVariantKeys,
+          );
+          if (protectedVariants) {
+            Object.assign(extUserVariantProps, protectedVariants);
+          }
+        }
+      }
+
+      return workingResolved;
+    };
+
+    const resolveComputed: ResolveComputedFn | null =
+      computed || extMetasWithResolveDefaultsCount > 0
+        ? (
+            resolved,
+            userVariantProps,
+            filterOwnVariants = true,
+            runState,
+            protectedVariants,
+            pendingProtectedVariants,
+            protectedVariantKeys,
+          ) => {
+            runState ??= { remaining: MAX_COMPUTED_RUNS, warned: false };
+            protectedVariants ??= {};
+            protectedVariantKeys ??= new Set<string>();
+            let workingResolved = resolved;
+            let reachedLimit = true;
+
+            while (runState.remaining > 0) {
+              runState.remaining -= 1;
+              const nextPendingProtectedVariants: Record<string, unknown> = {};
+              const nextResolved = resolveComputedOnce(
+                workingResolved,
+                userVariantProps,
+                filterOwnVariants,
+                runState,
+                protectedVariants,
+                nextPendingProtectedVariants,
+                protectedVariantKeys,
+              );
+              let protectedChanged: boolean;
+              if (pendingProtectedVariants) {
+                protectedChanged = mergeVariants(
+                  pendingProtectedVariants,
+                  nextPendingProtectedVariants,
+                  protectedVariantKeys,
+                );
+              } else {
+                protectedChanged = mergeVariants(
+                  protectedVariants,
+                  nextPendingProtectedVariants,
+                  protectedVariantKeys,
+                );
+              }
+
+              if (
+                !protectedChanged &&
+                (nextResolved === workingResolved ||
+                  areVariantsEqual(workingResolved, nextResolved))
+              ) {
+                workingResolved = nextResolved;
+                reachedLimit = false;
+                break;
+              }
+
+              workingResolved = nextResolved;
+            }
+
+            if (reachedLimit) {
+              warnComputedLimit(runState);
+            }
+
+            return workingResolved;
+          }
+        : null;
 
     // Top-level: resolves variants from user props, calls compute, then
     // assembles className and style with user-provided class/style overrides.
@@ -1161,67 +1601,12 @@ export function create({
     const getVariants = (variants?: VariantValues<MergedVariants>) => {
       const variantProps = variants ?? EMPTY_DEFAULTS;
       let resolvedVariants = resolveVariantsHot(variantProps);
-      // Run computed function to get variants set via setVariants and
-      // setDefaultVariants
-      if (computed) {
-        const updatedVariants: Record<string, unknown> = {};
-        Object.assign(updatedVariants, resolvedVariants);
-        const ctx = {
-          variants: resolvedVariants as VariantValues<Record<string, unknown>>,
-          setVariants: (
-            newVariants: VariantValues<Record<string, unknown>>,
-          ) => {
-            if (!hasAnyDisabled) {
-              Object.assign(updatedVariants, newVariants);
-              return;
-            }
-            for (const key in newVariants) {
-              if (!hasOwn.call(newVariants, key)) continue;
-              if (disabledVariantKeys.has(key)) continue;
-              const value = (newVariants as Record<string, unknown>)[key];
-              if (hasDisabledVariantValues) {
-                const valueKey = getVariantValueKey(value);
-                if (
-                  valueKey != null &&
-                  disabledVariantValues[key]?.has(valueKey)
-                ) {
-                  continue;
-                }
-              }
-              updatedVariants[key] = value;
-            }
-          },
-          setDefaultVariants: (
-            newDefaults: VariantValues<Record<string, unknown>>,
-          ) => {
-            for (const key in newDefaults) {
-              if (!hasOwn.call(newDefaults, key)) continue;
-              if (variantProps[key] !== undefined) continue;
-              const value = (newDefaults as Record<string, unknown>)[key];
-              if (hasAnyDisabled) {
-                if (disabledVariantKeys.has(key)) continue;
-                const valueKey = getVariantValueKey(value);
-                if (
-                  valueKey != null &&
-                  disabledVariantValues[key]?.has(valueKey)
-                ) {
-                  continue;
-                }
-              }
-              updatedVariants[key] = value;
-            }
-          },
-          addClass: noop,
-          addStyle: noop,
-        };
-        computed(ctx);
-        if (hasAnyDisabled) {
-          const filteredUpdated: Record<string, unknown> = {};
-          filterDisabledInto(updatedVariants, filteredUpdated);
-          resolvedVariants = filteredUpdated;
-        } else {
-          resolvedVariants = updatedVariants;
-        }
+      if (resolveComputed) {
+        resolvedVariants = resolveComputed(
+          resolvedVariants,
+          variantProps,
+          false,
+        );
       }
       return resolvedVariants as VariantValues<MergedVariants>;
     };
@@ -1246,6 +1631,7 @@ export function create({
       staticDefaults,
       resolveDefaults: resolveDefaultsFn,
       compute,
+      resolveComputed,
       transformClass,
     };
 
