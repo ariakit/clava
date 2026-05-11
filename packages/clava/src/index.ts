@@ -5,7 +5,6 @@ import type {
   ClassValue,
   ComponentProps,
   ComponentResult,
-  ComputedVariants,
   ExtendableVariants,
   HTMLObjProps,
   HTMLProps,
@@ -85,6 +84,12 @@ interface ComponentMeta {
   // parent applies this transform to the extend's contribution before joining,
   // preserving each factory's transform boundary.
   transformClass: (className: string) => string;
+  // Variant keys whose effective definition in this component's chain is a
+  // function. An extending component that supplies a non-function variant for
+  // the same key uses this to tell us to skip that key (matching the
+  // type-level "function variant is replaced by anything in the child" rule).
+  // Empty when no key in this chain is a function variant.
+  functionVariantKeys: Set<string>;
 }
 
 const META_KEY = "__meta";
@@ -202,16 +207,14 @@ export type Variant<
 
 export interface CVConfig<
   V extends Variants = {},
-  CV extends ComputedVariants = {},
   E extends AnyComponent[] = [],
 > {
   extend?: E;
   class?: ClassValue;
   style?: StyleValue;
   variants?: ExtendableVariants<V, E>;
-  computedVariants?: CV;
-  defaultVariants?: VariantValues<MergeVariants<V, CV, E>>;
-  refine?: Refine<MergeVariants<V, CV, E>>;
+  defaultVariants?: VariantValues<MergeVariants<V, E>>;
+  refine?: Refine<MergeVariants<V, E>>;
 }
 
 interface CreateParams {
@@ -282,7 +285,7 @@ function extractClassAndStylePrebuilt(value: unknown): PrebuiltValue {
  * components.
  */
 function collectVariantKeys(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  config: CVConfig<Variants, AnyComponent[]>,
 ): string[] {
   const keys = new Set<string>();
 
@@ -307,18 +310,11 @@ function collectVariantKeys(
     }
   }
 
-  if (config.computedVariants) {
-    for (const key in config.computedVariants) {
-      if (!Object.hasOwn(config.computedVariants, key)) continue;
-      keys.add(key);
-    }
-  }
-
   return Array.from(keys);
 }
 
 function isVariantDisabled(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  config: CVConfig<Variants, AnyComponent[]>,
   key: string,
 ): boolean {
   return config.variants?.[key] === null;
@@ -332,7 +328,7 @@ function getVariantValueKey(value: unknown): string | undefined {
 }
 
 function isVariantValueDisabled(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  config: CVConfig<Variants, AnyComponent[]>,
   key: string,
   value: unknown,
 ): boolean {
@@ -344,7 +340,7 @@ function isVariantValueDisabled(
 }
 
 function collectDisabledVariantKeys(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  config: CVConfig<Variants, AnyComponent[]>,
 ): Set<string> {
   const keys = new Set<string>();
   if (!config.variants) return keys;
@@ -358,7 +354,7 @@ function collectDisabledVariantKeys(
 }
 
 function collectDisabledVariantValues(
-  config: CVConfig<Variants, ComputedVariants, AnyComponent[]>,
+  config: CVConfig<Variants, AnyComponent[]>,
 ): Record<string, Set<string>> {
   const values: Record<string, Set<string>> = {};
   if (!config.variants) return values;
@@ -565,14 +561,10 @@ export function create({
 }: CreateParams = {}) {
   const cx = (...classes: ClsxClassValue[]) => transformClass(clsx(...classes));
 
-  const cv = <
-    V extends Variants = {},
-    CV extends ComputedVariants = {},
-    const E extends AnyComponent[] = [],
-  >(
-    config: CVConfig<V, CV, E> = {},
-  ): CVComponent<V, CV, E> => {
-    type MergedVariants = MergeVariants<V, CV, E>;
+  const cv = <V extends Variants = {}, const E extends AnyComponent[] = []>(
+    config: CVConfig<V, E> = {},
+  ): CVComponent<V, E> => {
+    type MergedVariants = MergeVariants<V, E>;
 
     // ----- Pre-computed at creation time -----
     const variantKeys = collectVariantKeys(config);
@@ -589,41 +581,34 @@ export function create({
     const extend = config.extend;
     const hasExtend = !!extend && extend.length > 0;
     const variants = config.variants;
-    const computedVariantsCfg = config.computedVariants;
     const refine = config.refine;
     const baseStyle = config.style;
     const hasBaseStyle = !!baseStyle;
 
-    // Pre-build variant entries for fast iteration. For each variant key in
-    // `variants`, we have a name and a PrebuiltVariant with normalized values.
+    // Split `variants` entries into static entries (object/shorthand) and
+    // function-variant entries. Static entries are pre-built into
+    // PrebuiltVariant for fast iteration. Function-variant entries override
+    // any same-key inherited variant (see `staticExtSkipKeys`).
     const variantEntryNames: string[] = [];
     const variantEntryDefs: PrebuiltVariant[] = [];
+    const functionVariantNames: string[] = [];
+    const functionVariantFns: Array<(value: unknown) => unknown> = [];
     if (variants) {
       for (const name in variants) {
         if (!Object.hasOwn(variants, name)) continue;
         const variant = (variants as Record<string, unknown>)[name];
         if (variant === null) continue;
+        if (typeof variant === "function") {
+          functionVariantNames.push(name);
+          functionVariantFns.push(variant as (value: unknown) => unknown);
+          continue;
+        }
         variantEntryNames.push(name);
         variantEntryDefs.push(buildPrebuiltVariant(variant));
       }
     }
     const variantEntryCount = variantEntryNames.length;
-
-    // Pre-built computed-variants entries.
-    const computedVariantNames: string[] = [];
-    const computedVariantFns: Array<(value: unknown) => unknown> = [];
-    if (computedVariantsCfg) {
-      for (const name in computedVariantsCfg) {
-        if (!Object.hasOwn(computedVariantsCfg, name)) continue;
-        computedVariantNames.push(name);
-        computedVariantFns.push(
-          (computedVariantsCfg as Record<string, (value: unknown) => unknown>)[
-            name
-          ] as (value: unknown) => unknown,
-        );
-      }
-    }
-    const computedVariantCount = computedVariantNames.length;
+    const functionVariantCount = functionVariantNames.length;
 
     // Pre-compute static defaults. Includes:
     // - extended components' static defaults
@@ -715,15 +700,67 @@ export function create({
     const extMetasWithRefineCount = extMetasWithRefine.length;
     const shouldCollectChangedVariants = extMetasWithRefineCount > 0;
 
+    // Function variant keys inherited from extends, filtered through this
+    // component's own variants: a static (object/shorthand) variant in this
+    // component replaces an inherited function variant for the same key.
+    // The closure is exposed on `ComponentMeta` so any further extending
+    // component can detect "ancestor's effective variant for K is a function"
+    // and skip it when overriding K with a non-function.
+    const functionVariantKeys = new Set<string>();
+    for (let i = 0; i < extCount; i++) {
+      const fnKeys = extMetas[i].functionVariantKeys;
+      for (const k of fnKeys) {
+        if (disabledVariantKeys.has(k)) continue;
+        functionVariantKeys.add(k);
+      }
+    }
+    for (let i = 0; i < functionVariantCount; i++) {
+      functionVariantKeys.add(functionVariantNames[i]);
+    }
+    for (let i = 0; i < variantEntryCount; i++) {
+      // A static variant in this component replaces an inherited function
+      // variant for the same key; from this component onward, the key is no
+      // longer a function variant.
+      functionVariantKeys.delete(variantEntryNames[i]);
+    }
+
+    // Static-variant keys in this component that override an inherited
+    // function variant. Type-level merge says child fully replaces, so the
+    // ancestor's function must not run with the child's (object-typed) value.
+    let staticVariantsOverridingExtFn: string[] | null = null;
+    if (variantEntryCount > 0 && extCount > 0) {
+      for (let i = 0; i < variantEntryCount; i++) {
+        const name = variantEntryNames[i];
+        for (let j = 0; j < extCount; j++) {
+          if (extMetas[j].functionVariantKeys.has(name)) {
+            if (!staticVariantsOverridingExtFn) {
+              staticVariantsOverridingExtFn = [];
+            }
+            staticVariantsOverridingExtFn.push(name);
+            break;
+          }
+        }
+      }
+    }
+
     // Pre-compute static skip key/value sets to pass to extends. These never
     // change across calls — when caller passes no skip sets, we reuse the same
     // object and avoid Set allocation.
     let staticExtSkipKeys: Set<string> | null = null;
-    if (hasDisabledVariantKeys || computedVariantCount > 0) {
+    if (
+      hasDisabledVariantKeys ||
+      functionVariantCount > 0 ||
+      staticVariantsOverridingExtFn !== null
+    ) {
       staticExtSkipKeys = new Set<string>();
       for (const k of disabledVariantKeys) staticExtSkipKeys.add(k);
-      for (let i = 0; i < computedVariantCount; i++) {
-        staticExtSkipKeys.add(computedVariantNames[i]);
+      for (let i = 0; i < functionVariantCount; i++) {
+        staticExtSkipKeys.add(functionVariantNames[i]);
+      }
+      if (staticVariantsOverridingExtFn) {
+        for (const k of staticVariantsOverridingExtFn) {
+          staticExtSkipKeys.add(k);
+        }
       }
     }
     // Skip values are passed directly to extends. We can reuse the same object
@@ -1177,9 +1214,10 @@ export function create({
       if (hasBaseStyle) Object.assign(styleOut, baseStyle);
 
       // Apply own variants. Skip keys/values come from caller (e.g., parent
-      // wants its own computedVariants to override this variant).
+      // wants its own function variant to override this variant).
       // `variantEntryNames` already excludes disabled keys (those with `null`
-      // value in config), so we don't re-check `disabledVariantKeys` here.
+      // value in config) and function variants, so we don't re-check
+      // `disabledVariantKeys` here.
       const ownSkipKeys = skipKeys;
       const ownSkipValues = skipValues;
       for (let i = 0; i < variantEntryCount; i++) {
@@ -1217,9 +1255,11 @@ export function create({
         }
       }
 
-      // Apply computedVariants.
-      for (let i = 0; i < computedVariantCount; i++) {
-        const variantName = computedVariantNames[i];
+      // Apply function variants — entries in `variants` whose value is a
+      // function. They run after static variants and override any same-key
+      // inherited variant via `staticExtSkipKeys`.
+      for (let i = 0; i < functionVariantCount; i++) {
+        const variantName = functionVariantNames[i];
         if (ownSkipKeys && ownSkipKeys.has(variantName)) continue;
         const selectedValue = workingResolved[variantName];
         if (selectedValue === undefined) continue;
@@ -1231,7 +1271,7 @@ export function create({
         ) {
           continue;
         }
-        const fn = computedVariantFns[i];
+        const fn = functionVariantFns[i];
         const computedResult = fn(selectedValue);
         if (computedResult == null) continue;
         const r = extractClassAndStylePrebuilt(computedResult);
@@ -1239,7 +1279,8 @@ export function create({
         if (r.style) Object.assign(styleOut, r.style);
       }
 
-      // Apply `refine` results — must come after own variants/computedVariants.
+      // Apply `refine` results — must come after own variants (static and
+      // function).
       if (cClasses) {
         for (let i = 0; i < cClasses.length; i++) {
           classesOut.push(cClasses[i] as ClsxClassValue);
@@ -1640,6 +1681,7 @@ export function create({
       compute,
       resolveRefine,
       transformClass,
+      functionVariantKeys,
     };
 
     const initComponent = <
@@ -1663,7 +1705,7 @@ export function create({
     const defaultComponent = ((props: ComponentProps<MergedVariants> = {}) => {
       const { className, style } = computeResult(props);
       return { class: className, style };
-    }) as CVComponent<V, CV, E>;
+    }) as CVComponent<V, E>;
     initComponent(defaultComponent, inputPropsKeys, (props = {}) => {
       return computeResult(props).style;
     });

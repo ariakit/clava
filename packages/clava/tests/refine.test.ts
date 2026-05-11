@@ -101,7 +101,7 @@ for (const config of Object.values(CONFIGS)) {
       const component = getModeComponent(
         mode,
         cv({
-          computedVariants: {
+          variants: {
             value: (value: number) => (Number.isNaN(value) ? "nan" : null),
           },
           refine: ({ variants, setDefaultVariants, addClass }) => {
@@ -834,7 +834,7 @@ for (const config of Object.values(CONFIGS)) {
         mode,
         cv({
           extend: [base],
-          computedVariants: {
+          variants: {
             border: (_: boolean) => {},
           },
           defaultVariants: { border: false },
@@ -863,7 +863,7 @@ for (const config of Object.values(CONFIGS)) {
         mode,
         cv({
           extend: [base2],
-          computedVariants: {
+          variants: {
             border: (_: boolean) => {},
           },
           defaultVariants: { border: false },
@@ -891,7 +891,7 @@ for (const config of Object.values(CONFIGS)) {
         mode,
         cv({
           extend: [base],
-          computedVariants: {
+          variants: {
             border: (_: boolean) => {},
           },
         }),
@@ -918,7 +918,7 @@ for (const config of Object.values(CONFIGS)) {
         mode,
         cv({
           extend: [base],
-          computedVariants: {
+          variants: {
             border: (_: boolean) => {},
           },
         }),
@@ -946,7 +946,7 @@ for (const config of Object.values(CONFIGS)) {
         mode,
         cv({
           extend: [base2],
-          computedVariants: {
+          variants: {
             border: (_: boolean) => {},
           },
         }),

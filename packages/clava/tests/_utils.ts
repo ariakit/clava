@@ -4,7 +4,6 @@ import type {
   AnyComponent,
   CVComponent,
   ComponentResult,
-  ComputedVariants,
   HTMLObjProps,
   HTMLProps,
   JSXProps,
@@ -86,9 +85,8 @@ export function createCVFromConfig(
 export function getModeComponent<
   M extends Mode,
   V extends Variants = {},
-  CV extends ComputedVariants = {},
   const E extends AnyComponent[] = [],
->(mode: M, component: CVComponent<V, CV, E>) {
+>(mode: M, component: CVComponent<V, E>) {
   if (!mode) return component;
   return component[mode];
 }
