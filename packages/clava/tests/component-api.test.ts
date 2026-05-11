@@ -78,6 +78,48 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
+    test("getVariants re-runs when computed changes variants", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ variants, setVariants }) => {
+            if (variants.size === "lg") {
+              setVariants({ color: "red" });
+            }
+            if (variants.color === "red") {
+              setVariants({ size: "sm" });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants({ size: "lg" });
+      expect(variants).toEqual({ size: "sm", color: "red" });
+    });
+
+    test("getVariants re-runs when setDefaultVariants changes variants", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          computed: ({ variants, setDefaultVariants }) => {
+            setDefaultVariants({ color: "red" });
+            if (variants.color === "red") {
+              setDefaultVariants({ size: "lg" });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toEqual({ size: "lg", color: "red" });
+    });
+
     test("getVariants returns variants set by computed setDefaultVariants", () => {
       const component = getModeComponent(
         mode,
@@ -168,6 +210,222 @@ for (const config of Object.values(CONFIGS)) {
       );
       const variants = component.getVariants();
       expect(variants).toEqual({ size: "lg", color: "red" });
+    });
+
+    test("getVariants re-runs when base component computed changes variants", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" }, active: "" },
+        defaultVariants: { size: "sm" },
+        computed: ({ variants, setVariants }) => {
+          if (variants.active) {
+            setVariants({ size: "lg" });
+          }
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" } },
+          computed: ({ variants, setVariants }) => {
+            if (variants.size === "lg") {
+              setVariants({ color: "red" });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants({ active: true });
+      expect(variants).toEqual({ size: "lg", active: true, color: "red" });
+    });
+
+    test("getVariants preserves base setDefaultVariants after its own setVariants re-run", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          active: "",
+          mode: { on: "on" },
+        },
+        defaultVariants: { size: "sm" },
+        computed: ({ variants, setVariants, setDefaultVariants }) => {
+          if (variants.active) {
+            setVariants({ mode: "on" });
+          }
+          if (variants.mode === "on") {
+            setDefaultVariants({ size: "lg" });
+          }
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [base] }));
+      const variants = component.getVariants({ active: true });
+      expect(variants).toEqual({ size: "lg", active: true, mode: "on" });
+    });
+
+    test("getVariants setVariants uses the latest pending value", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ setVariants }) => {
+            setVariants({ size: "lg" });
+            setVariants({ size: "sm" });
+          },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toEqual({ size: "sm" });
+    });
+
+    test("getVariants child setVariants keeps overriding base setDefaultVariants across re-runs", () => {
+      const base = cv({
+        variants: { color: { red: "red", blue: "blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "blue" });
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          computed: ({ variants, setVariants }) => {
+            if (variants.size === "sm") {
+              setVariants({ color: "red" });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toEqual({ color: "red", size: "sm" });
+    });
+
+    test("getVariants setVariants sticks across re-runs", () => {
+      const base = cv({
+        variants: { color: { red: "red", blue: "blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "blue" });
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "red", blue: "blue" }, done: "" },
+          computed: ({ variants, setVariants }) => {
+            if (!variants.done) {
+              setVariants({ color: "red", done: true });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toEqual({ color: "red", done: true });
+    });
+
+    test("getVariants base setDefaultVariants can override child static defaults after a re-run", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          active: "",
+          mode: { on: "on" },
+        },
+        computed: ({ variants, setVariants, setDefaultVariants }) => {
+          if (variants.active) {
+            setVariants({ mode: "on" });
+          }
+          if (variants.mode === "on") {
+            setDefaultVariants({ size: "lg" });
+          }
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [base], defaultVariants: { size: "sm" } }),
+      );
+      const variants = component.getVariants({ active: true });
+      expect(variants).toEqual({ size: "lg", active: true, mode: "on" });
+    });
+
+    test("getVariants setVariants from earlier extends overrides setDefaultVariants from later extends", () => {
+      const first = cv({
+        variants: { color: { red: "first-red", blue: "first-blue" } },
+        computed: ({ setVariants }) => {
+          setVariants({ color: "red" });
+        },
+      });
+      const second = cv({
+        variants: { color: { red: "second-red", blue: "second-blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "blue" });
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [first, second] }));
+      const variants = component.getVariants();
+      expect(variants).toEqual({ color: "red" });
+    });
+
+    test("getVariants setDefaultVariants from later extends overrides setDefaultVariants from earlier extends", () => {
+      const first = cv({
+        variants: { color: { red: "first-red", blue: "first-blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "red" });
+        },
+      });
+      const second = cv({
+        variants: { color: { red: "second-red", blue: "second-blue" } },
+        computed: ({ setDefaultVariants }) => {
+          setDefaultVariants({ color: "blue" });
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [first, second] }));
+      const variants = component.getVariants();
+      expect(variants).toEqual({ color: "blue" });
+    });
+
+    test("getVariants setDefaultVariants does not override stable setVariants on later passes", () => {
+      const base = cv({
+        variants: { color: { red: "base-red", blue: "base-blue" } },
+        computed: ({ setVariants }) => {
+          setVariants({ color: "red" });
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { color: { red: "child-red", blue: "child-blue" } },
+          computed: ({ variants, setDefaultVariants }) => {
+            if (variants.color === "red") {
+              setDefaultVariants({ color: "blue" });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toEqual({ color: "red" });
+    });
+
+    test("getVariants setDefaultVariants does not override setVariants from a previous pass", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            color: { red: "red", blue: "blue" },
+            done: "",
+          },
+          computed: ({ variants, setVariants, setDefaultVariants }) => {
+            if (!variants.done) {
+              setVariants({ color: "red", done: true });
+            }
+            if (variants.done) {
+              setDefaultVariants({ color: "blue" });
+            }
+          },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toEqual({ color: "red", done: true });
     });
 
     test("variantKeys property", () => {

@@ -355,6 +355,8 @@ const toolbarButton = cv({
 
 `setVariants()` overrides explicit props. `setDefaultVariants()` overrides static `defaultVariants` and inherited defaults, but it does not override a prop the user explicitly passed unless that prop value is `undefined`. `addClass()` and `addStyle()` append output without changing resolved variant values. `getVariants()` includes values changed by `setVariants()` and `setDefaultVariants()`.
 
+When a computed callback changes variants, Clava re-runs the computed chain so later reads see the latest values. Re-runs are capped at 50 iterations, after which Clava stops and logs a warning in development.
+
 ## Splitting Props
 
 Use `splitProps()` to separate variant/style props from DOM or framework props without manually maintaining prop-name lists.
