@@ -1,5 +1,29 @@
 # clava
 
+## 0.3.0
+
+### Removed `keys`
+
+**BREAKING** if you're reading `keys` from [`cv`](https://clava.style/docs/reference/cv) components.
+
+Use `propKeys` instead. `propKeys` is now the only API for style props plus variant props and has accurate HTML and HTML object types for libraries such as Solid's `splitProps`.
+
+Before:
+
+```ts
+button.keys;
+```
+
+After:
+
+```ts
+button.propKeys;
+```
+
+### Re-run `cv` computed callbacks when they change variants
+
+This makes later reads in the same component chain, including [`getVariants()`](https://clava.style/docs/reference/getVariants) and extended components, use the latest values. Re-runs are capped at 50 iterations, after which Clava stops and logs a development warning.
+
 ## 0.2.4
 
 - Fixed [`cv`](https://clava.style/docs/reference/cv) variant props inferred from array class values to use boolean shorthand props.
