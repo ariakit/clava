@@ -272,7 +272,7 @@ export interface StyleClassValue {
   class?: ClassValue;
 }
 
-export interface ComputedContext<V> {
+export interface RefineContext<V> {
   variants: VariantValues<V>;
   setVariants: (variants: VariantValues<V>) => void;
   setDefaultVariants: (variants: VariantValues<V>) => void;
@@ -280,7 +280,7 @@ export interface ComputedContext<V> {
   addStyle: (style: StyleValue) => void;
 }
 
-export type Computed<V> = (context: ComputedContext<V>) => VariantValue;
+export type Refine<V> = (context: RefineContext<V>) => VariantValue;
 
 export type ComputedVariant = (value: any) => VariantValue;
 export type ComputedVariants = Record<string, ComputedVariant>;

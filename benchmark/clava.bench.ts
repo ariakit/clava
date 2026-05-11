@@ -111,7 +111,7 @@ const toolbarButton = cv({
   defaultVariants: {
     active: false,
   },
-  computed: ({ variants, addClass, addStyle, setDefaultVariants }) => {
+  refine: ({ variants, addClass, addStyle, setDefaultVariants }) => {
     if (variants.active) {
       addClass("toolbar-button-pressed");
       addStyle({ transform: "translateY(1px)" });

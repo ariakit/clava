@@ -18,7 +18,7 @@ import type { Variant, VariantProps } from "clava";
 - [Variants](#variants)
 - [Extending Components](#extending-components)
 - [Computed Variants](#computed-variants)
-- [Computed Logic](#computed-logic)
+- [Refine](#refine)
 - [Splitting Props](#splitting-props)
 - [React](#react)
 - [Solid](#solid)
@@ -152,7 +152,7 @@ const card = cv({
 });
 ```
 
-Variant and computed style results must use an explicit `{ style }` wrapper. A raw object like `{ backgroundColor: "red" }` is not a style result by itself.
+Style results from `variants`, `computedVariants`, and `refine` must use an explicit `{ style }` wrapper. A raw object like `{ backgroundColor: "red" }` is not a style result by itself.
 
 ```ts
 const chip = cv({
@@ -314,9 +314,9 @@ grid({ columns: 3, color: null });
 
 Computed variants can return any class value, `{ class, style }`, a default Clava component result, `null`, or `undefined`. A `computedVariants` entry with the same key as an extended variant replaces that inherited variant's prop type and output.
 
-## Computed Logic
+## Refine
 
-Use `computed` for compound conditions, dependent defaults, and final class/style adjustments. It receives the resolved variant values for the component and can return class/style output.
+Use `refine` for compound conditions, dependent defaults, and final class/style adjustments. It receives the resolved variant values for the component and can return class/style output.
 
 ```ts
 const toolbarButton = cv({
@@ -328,7 +328,7 @@ const toolbarButton = cv({
     },
     loading: "toolbar-button-loading",
   },
-  computed: ({
+  refine: ({
     variants,
     setVariants,
     setDefaultVariants,
@@ -355,7 +355,7 @@ const toolbarButton = cv({
 
 `setVariants()` overrides explicit props. `setDefaultVariants()` overrides static `defaultVariants` and inherited defaults, but it does not override a prop the user explicitly passed unless that prop value is `undefined`. `addClass()` and `addStyle()` append output without changing resolved variant values. `getVariants()` includes values changed by `setVariants()` and `setDefaultVariants()`.
 
-When a computed callback changes variants, Clava re-runs the computed chain so later reads see the latest values. Re-runs are capped at 50 iterations, after which Clava stops and logs a warning in development.
+When a `refine` callback changes variants, Clava re-runs the refine chain so later reads see the latest values. Re-runs are capped at 50 iterations, after which Clava stops and logs a warning in development.
 
 ## Splitting Props
 
@@ -525,7 +525,7 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 
 ## API Summary
 
-`cv(config?)` creates a typed Clava component. Supported config keys are `extend`, `class`, `style`, `variants`, `computedVariants`, `defaultVariants`, and `computed`.
+`cv(config?)` creates a typed Clava component. Supported config keys are `extend`, `class`, `style`, `variants`, `computedVariants`, `defaultVariants`, and `refine`.
 
 `component(props?)` returns `{ class, style }` with normalized camelCase style keys.
 
@@ -539,7 +539,7 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 
 `component.style(props?)` returns only the resolved style value for that component mode.
 
-`component.getVariants(props?)` returns resolved variant values after static defaults, inherited defaults, and computed variant updates.
+`component.getVariants(props?)` returns resolved variant values after static defaults, inherited defaults, and `refine` updates.
 
 `component.propKeys` lists style props plus variant props for that component mode.
 

@@ -5,7 +5,6 @@ import type {
   ClassValue,
   ComponentProps,
   ComponentResult,
-  Computed,
   ComputedVariants,
   ExtendableVariants,
   HTMLObjProps,
@@ -13,6 +12,7 @@ import type {
   JSXProps,
   MergeVariants,
   ModalComponent,
+  Refine,
   SplitPropsFunction,
   StyleClassProps,
   StyleClassValue,
@@ -42,23 +42,23 @@ type ComputeFn = (
   skipValues: Record<string, Set<string>> | null,
   classesOut: ClsxClassValue[],
   styleOut: StyleValue,
-  runState?: ComputedRunState,
+  runState?: RefineRunState,
   protectedVariants?: Record<string, unknown> | null,
   pendingProtectedVariants?: Record<string, unknown> | null,
   protectedVariantKeys?: Set<string> | null,
 ) => Record<string, unknown>;
 
-type ResolveComputedFn = (
+type ResolveRefineFn = (
   resolved: Record<string, unknown>,
   userVariantProps: Record<string, unknown>,
   filterOwnVariants?: boolean,
-  runState?: ComputedRunState,
+  runState?: RefineRunState,
   protectedVariants?: Record<string, unknown> | null,
   pendingProtectedVariants?: Record<string, unknown> | null,
   protectedVariantKeys?: Set<string> | null,
 ) => Record<string, unknown>;
 
-interface ComputedRunState {
+interface RefineRunState {
   remaining: number;
   warned: boolean;
 }
@@ -67,8 +67,8 @@ interface ComputedRunState {
 interface ComponentMeta {
   baseClass: string;
   staticDefaults: Record<string, unknown>;
-  // Returns variants set via setDefaultVariants in the computed function chain.
-  // null when this component has no resolveDefaults work to do (no `computed`
+  // Returns variants set via setDefaultVariants in the refine function chain.
+  // null when this component has no resolveDefaults work to do (no `refine`
   // and no extends with work).
   resolveDefaults:
     | ((
@@ -79,7 +79,7 @@ interface ComponentMeta {
   // Returns variant classes + style for this component, used by extending
   // components. Top-level rendering also routes through this.
   compute: ComputeFn;
-  resolveComputed: ResolveComputedFn | null;
+  resolveRefine: ResolveRefineFn | null;
   // Reference identity is used to detect mixed-factory `extend`. When a
   // component is extended by a parent from a different `create()` call, the
   // parent applies this transform to the extend's contribution before joining,
@@ -94,7 +94,7 @@ const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
   unknown
 >;
 
-const MAX_COMPUTED_RUNS = 50;
+const MAX_REFINE_RUNS = 50;
 
 function areVariantsEqual(
   a: Record<string, unknown>,
@@ -111,14 +111,14 @@ function areVariantsEqual(
   return true;
 }
 
-function warnComputedLimit(runState: ComputedRunState): void {
+function warnRefineLimit(runState: RefineRunState): void {
   if (runState.warned) return;
   runState.warned = true;
   if (process.env.NODE_ENV !== "production") {
     console.warn(
-      "Clava: Maximum computed update iterations exceeded. This can happen " +
-        "when a computed callback calls setVariants or setDefaultVariants, " +
-        "but one of the variants changes on every run.",
+      "Clava: Maximum refine iterations exceeded. This can happen when a " +
+        "refine callback calls setVariants or setDefaultVariants, but one " +
+        "of the variants changes on every run.",
     );
   }
 }
@@ -211,7 +211,7 @@ export interface CVConfig<
   variants?: ExtendableVariants<V, E>;
   computedVariants?: CV;
   defaultVariants?: VariantValues<MergeVariants<V, CV, E>>;
-  computed?: Computed<MergeVariants<V, CV, E>>;
+  refine?: Refine<MergeVariants<V, CV, E>>;
 }
 
 interface CreateParams {
@@ -590,7 +590,7 @@ export function create({
     const hasExtend = !!extend && extend.length > 0;
     const variants = config.variants;
     const computedVariantsCfg = config.computedVariants;
-    const computed = config.computed;
+    const refine = config.refine;
     const baseStyle = config.style;
     const hasBaseStyle = !!baseStyle;
 
@@ -702,18 +702,18 @@ export function create({
     }
     const extCount = extMetas.length;
 
-    // Filter to only extends with computed work in their chain. `resolveDefaults`
-    // and `resolveComputed` are populated from the same transitive condition,
+    // Filter to only extends with refine work in their chain. `resolveDefaults`
+    // and `resolveRefine` are populated from the same transitive condition,
     // so one bucket is enough for both resolver paths.
-    const extMetasWithComputed: ComponentMeta[] = [];
+    const extMetasWithRefine: ComponentMeta[] = [];
     for (let i = 0; i < extCount; i++) {
       const meta = extMetas[i];
       if (meta.resolveDefaults) {
-        extMetasWithComputed.push(meta);
+        extMetasWithRefine.push(meta);
       }
     }
-    const extMetasWithComputedCount = extMetasWithComputed.length;
-    const shouldCollectChangedVariants = extMetasWithComputedCount > 0;
+    const extMetasWithRefineCount = extMetasWithRefine.length;
+    const shouldCollectChangedVariants = extMetasWithRefineCount > 0;
 
     // Pre-compute static skip key/value sets to pass to extends. These never
     // change across calls — when caller passes no skip sets, we reuse the same
@@ -760,12 +760,12 @@ export function create({
 
     // Pre-create resolveDefaults function — used by parents during their
     // `resolveVariantsHot`. Returns the variants set via setDefaultVariants in
-    // the computed function chain.
+    // the refine function chain.
     //
-    // When this component has no `computed` and no `extend` with work, the
+    // When this component has no `refine` and no `extend` with work, the
     // function is null — callers can skip iterating it entirely.
     const resolveDefaultsFn: ComponentMeta["resolveDefaults"] =
-      computed || extMetasWithComputedCount > 0
+      refine || extMetasWithRefineCount > 0
         ? (
             childDefaults: Record<string, unknown>,
             userProps: Record<string, unknown> = EMPTY_DEFAULTS,
@@ -787,21 +787,21 @@ export function create({
               resolvedVariants[key] = v;
             }
 
-            const computedDefaults: Record<string, unknown> = {};
+            const refineDefaults: Record<string, unknown> = {};
 
-            for (let i = 0; i < extMetasWithComputedCount; i++) {
-              const extDefaults = extMetasWithComputed[i].resolveDefaults!(
+            for (let i = 0; i < extMetasWithRefineCount; i++) {
+              const extDefaults = extMetasWithRefine[i].resolveDefaults!(
                 childDefaults,
                 userProps,
               );
               for (const k in extDefaults) {
                 if (!Object.hasOwn(extDefaults, k)) continue;
-                computedDefaults[k] = extDefaults[k];
+                refineDefaults[k] = extDefaults[k];
               }
             }
 
-            if (computed) {
-              // Filter to own variant keys so `computed.ctx.variants` matches
+            if (refine) {
+              // Filter to own variant keys so `ctx.variants` matches
               // `VariantValues<V>` when this component is used as an extend by
               // a parent that adds extra variant keys (those keys would
               // otherwise leak through `userProps`).
@@ -812,7 +812,7 @@ export function create({
                   ownVariants[k] = resolvedVariants[k];
                 }
               }
-              computed({
+              refine({
                 variants: ownVariants as VariantValues<Record<string, unknown>>,
                 setVariants: noop,
                 setDefaultVariants: (newDefaults) => {
@@ -822,7 +822,7 @@ export function create({
                     if (userProps[key] !== undefined) continue;
                     if (isVariantDisabled(config, key)) continue;
                     if (isVariantValueDisabled(config, key, value)) continue;
-                    computedDefaults[key] = value;
+                    refineDefaults[key] = value;
                   }
                 },
                 addClass: noop,
@@ -830,12 +830,12 @@ export function create({
               });
             }
 
-            return computedDefaults;
+            return refineDefaults;
           }
         : null;
 
     // Hot path: resolve variants by merging static defaults + extends'
-    // computed defaults + user-provided props.
+    // refine defaults + user-provided props.
     function resolveVariantsHot(
       propsVariants: Record<string, unknown>,
     ): Record<string, unknown> {
@@ -843,14 +843,14 @@ export function create({
       const defaults: Record<string, unknown> = {};
       Object.assign(defaults, staticDefaults);
 
-      // Apply computed defaults from extended components (only those that have
+      // Apply refine defaults from extended components (only those that have
       // actual work to do).
-      for (let i = 0; i < extMetasWithComputedCount; i++) {
-        const meta = extMetasWithComputed[i];
-        const extComputed = meta.resolveDefaults!(defaults, propsVariants);
-        for (const k in extComputed) {
-          if (!Object.hasOwn(extComputed, k)) continue;
-          defaults[k] = extComputed[k];
+      for (let i = 0; i < extMetasWithRefineCount; i++) {
+        const meta = extMetasWithRefine[i];
+        const extDefaults = meta.resolveDefaults!(defaults, propsVariants);
+        for (const k in extDefaults) {
+          if (!Object.hasOwn(extDefaults, k)) continue;
+          defaults[k] = extDefaults[k];
         }
       }
 
@@ -872,7 +872,7 @@ export function create({
       return result;
     }
 
-    const runComputedContext = (
+    const runRefineContext = (
       resolved: Record<string, unknown>,
       userVariantProps: Record<string, unknown>,
       filterOwnVariants: boolean,
@@ -891,12 +891,12 @@ export function create({
       let cStyle: StyleValue | null = null;
       let changedVariants: Record<string, unknown> | null = null;
 
-      if (computed) {
+      if (refine) {
         let ownVariants = resolved;
         if (filterOwnVariants) {
           // When this component is being extended, `resolved` is the parent's
           // workingResolved (a superset of our variant keys). Filter to our own
-          // keys for `ctx.variants` so the user's `computed` callback sees the
+          // keys for `ctx.variants` so the user's `refine` callback sees the
           // shape declared by `VariantValues<V>` and not foreign parent keys.
           const filteredVariants: Record<string, unknown> = {};
           for (let i = 0; i < variantKeysLength; i++) {
@@ -905,9 +905,9 @@ export function create({
           }
           ownVariants = filteredVariants;
         }
-        // Lazy-init updatedVariants — many computeds only inspect `variants`
-        // or call setDefaultVariants for keys the user already set, so the
-        // copy is unnecessary in the common case.
+        // Lazy-init updatedVariants — many refine callbacks only inspect
+        // `variants` or call setDefaultVariants for keys the user already set,
+        // so the copy is unnecessary in the common case.
         let updatedVariants: Record<string, unknown> | null = null;
         const localCClasses: ClassValue[] | null = collectOutput ? [] : null;
         let localCStyle: StyleValue | null = null;
@@ -1003,7 +1003,7 @@ export function create({
             Object.assign(localCStyle, newStyle);
           },
         };
-        const result = computed(ctx);
+        const result = refine(ctx);
         if (collectOutput && result != null) {
           const r = extractClassAndStylePrebuilt(result);
           if (r.class != null) localCClasses?.push(r.class);
@@ -1052,14 +1052,14 @@ export function create({
       pendingProtectedVariants,
       protectedVariantKeys,
     ) => {
-      // Run `computed` (if any). May modify resolved variants and emit classes
+      // Run `refine` (if any). May modify resolved variants and emit classes
       // and styles.
       let workingResolved = resolved;
       let cClasses: ClassValue[] | null = null;
       let cStyle: StyleValue | null = null;
       let changedVariants: Record<string, unknown> | null = null;
-      if (computed) {
-        const computedResult = runComputedContext(
+      if (refine) {
+        const refineResult = runRefineContext(
           resolved,
           userVariantProps,
           true,
@@ -1068,20 +1068,20 @@ export function create({
           pendingProtectedVariants,
           protectedVariantKeys,
         );
-        workingResolved = computedResult.workingResolved;
-        cClasses = computedResult.classes;
-        cStyle = computedResult.style;
-        changedVariants = computedResult.changedVariants;
+        workingResolved = refineResult.workingResolved;
+        cClasses = refineResult.classes;
+        cStyle = refineResult.style;
+        changedVariants = refineResult.changedVariants;
       }
 
       // Run extends' contributions first (their full classes + styles) so our
       // own base style and variants apply on top, matching the original
       // ext1 → ext2 → … → current ordering.
       //
-      // Pass explicit user values plus computed changes as the extends'
-      // `userVariantProps`. This lets more-specific computed decisions stick
+      // Pass explicit user values plus refine changes as the extends'
+      // `userVariantProps`. This lets more-specific refine decisions stick
       // across re-runs while inherited static defaults can still be refined by
-      // the extended component's own computed chain.
+      // the extended component's own refine chain.
       if (hasExtend) {
         // Build skip sets to pass to extends. Reuse precomputed values when no
         // caller-provided sets need merging.
@@ -1118,7 +1118,7 @@ export function create({
         }
 
         const extUserVariantProps =
-          extMetasWithComputedCount > 0
+          extMetasWithRefineCount > 0
             ? getExtUserVariantProps(
                 userVariantProps,
                 protectedVariants ?? null,
@@ -1165,9 +1165,9 @@ export function create({
               protectedVariantKeys,
             );
           }
-          // Only sync protected variants when a child computed resolver can
+          // Only sync protected variants when a child refine resolver can
           // observe them. Otherwise extUserVariantProps may alias caller props.
-          if (protectedVariants && extMetasWithComputedCount > 0) {
+          if (protectedVariants && extMetasWithRefineCount > 0) {
             Object.assign(extUserVariantProps, protectedVariants);
           }
         }
@@ -1239,7 +1239,7 @@ export function create({
         if (r.style) Object.assign(styleOut, r.style);
       }
 
-      // Apply `computed` results — must come after own variants/computedVariants.
+      // Apply `refine` results — must come after own variants/computedVariants.
       if (cClasses) {
         for (let i = 0; i < cClasses.length; i++) {
           classesOut.push(cClasses[i] as ClsxClassValue);
@@ -1251,7 +1251,7 @@ export function create({
     };
 
     const compute: ComputeFn =
-      !computed && extMetasWithComputedCount === 0
+      !refine && extMetasWithRefineCount === 0
         ? (
             resolved,
             userVariantProps,
@@ -1289,7 +1289,7 @@ export function create({
             pendingProtectedVariants,
             protectedVariantKeys,
           ) => {
-            runState ??= { remaining: MAX_COMPUTED_RUNS, warned: false };
+            runState ??= { remaining: MAX_REFINE_RUNS, warned: false };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
@@ -1359,7 +1359,7 @@ export function create({
               if (useDirectOutput && runState.remaining === 0) {
                 // Keep the direct output from the last allowed run. Rolling
                 // back here would drop it before the fallback copy below.
-                warnComputedLimit(runState);
+                warnRefineLimit(runState);
                 return nextResolved;
               }
 
@@ -1379,7 +1379,7 @@ export function create({
               isFirstRun = false;
             }
 
-            warnComputedLimit(runState);
+            warnRefineLimit(runState);
 
             for (let i = 0; i < lastClasses.length; i++) {
               classesOut.push(lastClasses[i]);
@@ -1388,7 +1388,7 @@ export function create({
             return workingResolved;
           };
 
-    const resolveComputedOnce: ResolveComputedFn = (
+    const resolveRefineOnce: ResolveRefineFn = (
       resolved,
       userVariantProps,
       filterOwnVariants = true,
@@ -1399,8 +1399,8 @@ export function create({
     ) => {
       let workingResolved = resolved;
       let changedVariants: Record<string, unknown> | null = null;
-      if (computed) {
-        const computedResult = runComputedContext(
+      if (refine) {
+        const refineResult = runRefineContext(
           resolved,
           userVariantProps,
           filterOwnVariants,
@@ -1409,21 +1409,21 @@ export function create({
           pendingProtectedVariants,
           protectedVariantKeys,
         );
-        workingResolved = computedResult.workingResolved;
-        changedVariants = computedResult.changedVariants;
+        workingResolved = refineResult.workingResolved;
+        changedVariants = refineResult.changedVariants;
       }
 
-      if (extMetasWithComputedCount > 0) {
+      if (extMetasWithRefineCount > 0) {
         const extUserVariantProps = getExtUserVariantProps(
           userVariantProps,
           protectedVariants ?? null,
           changedVariants,
         );
-        for (let i = 0; i < extMetasWithComputedCount; i++) {
-          const meta = extMetasWithComputed[i];
-          const resolveComputed = meta.resolveComputed;
-          if (!resolveComputed) continue;
-          workingResolved = resolveComputed(
+        for (let i = 0; i < extMetasWithRefineCount; i++) {
+          const meta = extMetasWithRefine[i];
+          const resolveRefine = meta.resolveRefine;
+          if (!resolveRefine) continue;
+          workingResolved = resolveRefine(
             workingResolved,
             extUserVariantProps,
             true,
@@ -1441,8 +1441,8 @@ export function create({
       return workingResolved;
     };
 
-    const resolveComputed: ResolveComputedFn | null =
-      computed || extMetasWithComputedCount > 0
+    const resolveRefine: ResolveRefineFn | null =
+      refine || extMetasWithRefineCount > 0
         ? (
             resolved,
             userVariantProps,
@@ -1452,7 +1452,7 @@ export function create({
             pendingProtectedVariants,
             protectedVariantKeys,
           ) => {
-            runState ??= { remaining: MAX_COMPUTED_RUNS, warned: false };
+            runState ??= { remaining: MAX_REFINE_RUNS, warned: false };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
@@ -1461,7 +1461,7 @@ export function create({
             while (runState.remaining > 0) {
               runState.remaining -= 1;
               const nextPendingProtectedVariants: Record<string, unknown> = {};
-              const nextResolved = resolveComputedOnce(
+              const nextResolved = resolveRefineOnce(
                 workingResolved,
                 userVariantProps,
                 filterOwnVariants,
@@ -1499,7 +1499,7 @@ export function create({
             }
 
             if (reachedLimit) {
-              warnComputedLimit(runState);
+              warnRefineLimit(runState);
             }
 
             return workingResolved;
@@ -1521,7 +1521,7 @@ export function create({
       Object.assign(resolved, staticDefaults);
 
       let userVariantProps: Record<string, unknown>;
-      if (extMetasWithComputedCount > 0) {
+      if (extMetasWithRefineCount > 0) {
         // Some extends need a resolveDefaults pass. They expect a variant-only
         // object as `userProps`, so we extract one.
         const variantProps: Record<string, unknown> = {};
@@ -1531,12 +1531,12 @@ export function create({
             variantProps[key] = propsRecord[key];
           }
         }
-        for (let i = 0; i < extMetasWithComputedCount; i++) {
-          const meta = extMetasWithComputed[i];
-          const extComputed = meta.resolveDefaults!(resolved, variantProps);
-          for (const k in extComputed) {
-            if (!Object.hasOwn(extComputed, k)) continue;
-            resolved[k] = extComputed[k];
+        for (let i = 0; i < extMetasWithRefineCount; i++) {
+          const meta = extMetasWithRefine[i];
+          const extDefaults = meta.resolveDefaults!(resolved, variantProps);
+          for (const k in extDefaults) {
+            if (!Object.hasOwn(extDefaults, k)) continue;
+            resolved[k] = extDefaults[k];
           }
         }
         for (const k in variantProps) {
@@ -1610,12 +1610,8 @@ export function create({
     const getVariants = (variants?: VariantValues<MergedVariants>) => {
       const variantProps = variants ?? EMPTY_DEFAULTS;
       let resolvedVariants = resolveVariantsHot(variantProps);
-      if (resolveComputed) {
-        resolvedVariants = resolveComputed(
-          resolvedVariants,
-          variantProps,
-          false,
-        );
+      if (resolveRefine) {
+        resolvedVariants = resolveRefine(resolvedVariants, variantProps, false);
       }
       return resolvedVariants as VariantValues<MergedVariants>;
     };
@@ -1642,7 +1638,7 @@ export function create({
       staticDefaults,
       resolveDefaults: resolveDefaultsFn,
       compute,
-      resolveComputed,
+      resolveRefine,
       transformClass,
     };
 

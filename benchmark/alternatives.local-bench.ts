@@ -163,7 +163,7 @@ const clavaInteraction = cv({
   class: interactionBase,
   variants: interactionVariants,
   defaultVariants: interactionDefaultVariants,
-  computed: ({ variants, addClass }) => {
+  refine: ({ variants, addClass }) => {
     if (variants.disabled) {
       addClass("hover:bg-current hover:text-current");
     }
@@ -181,7 +181,7 @@ const clavaProduct = cv({
   class: productBase,
   variants: productVariants,
   defaultVariants: productDefaultVariants,
-  computed: ({ variants, addClass }) => {
+  refine: ({ variants, addClass }) => {
     if (variants.size === "lg" && variants.emphasis === "high") {
       addClass("tracking-wide");
     }
