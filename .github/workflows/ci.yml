@@ -127,35 +127,18 @@ jobs:
         run: |
           mkdir -p .perf-results
 
-          run_vitest_bench() {
-            local output="$1"
-            local config_args=()
-
-            if node -e 'process.exit(require("./package.json").scripts.bench ? 0 : 1)'; then
-              pnpm bench \
-                --outputJson "$output" \
-                --passWithNoTests
-              return
-            fi
-
-            if [ -f vitest.bench.config.ts ]; then
-              config_args=(--config vitest.bench.config.ts)
-            fi
-            pnpm exec vitest bench \
-              "${config_args[@]}" \
-              --outputJson "$output" \
-              --passWithNoTests
-          }
-
           run_perf_round() {
             local i="$1"
 
             echo "::group::Round $i - baseline"
-            (cd "$BASELINE_DIR" && \
-              run_vitest_bench "$GITHUB_WORKSPACE/.perf-results/baseline-$i.json")
+            (cd "$BASELINE_DIR" && pnpm bench \
+              --outputJson "$GITHUB_WORKSPACE/.perf-results/baseline-$i.json" \
+              --passWithNoTests)
             echo "::endgroup::"
             echo "::group::Round $i - current"
-            run_vitest_bench ".perf-results/current-$i.json"
+            pnpm bench \
+              --outputJson ".perf-results/current-$i.json" \
+              --passWithNoTests
             echo "::endgroup::"
           }
 
