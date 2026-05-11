@@ -16,7 +16,7 @@ import { rspack } from "@rspack/core";
 import { build as esbuild } from "esbuild";
 import { rolldown } from "rolldown";
 import { build as viteBuild } from "vite";
-import { afterAll, beforeAll, expect, test } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import webpack from "webpack";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,6 +32,7 @@ async function createFixture() {
   const clavaDir = join(nodeModulesDir, "clava");
   await mkdir(clavaDir, { recursive: true });
   await cp(join(root, "dist"), join(clavaDir, "dist"), { recursive: true });
+  await cp(join(root, "src"), join(clavaDir, "src"), { recursive: true });
   const clsxDir = await realpath(join(root, "node_modules/clsx"));
   await cp(clsxDir, join(nodeModulesDir, "clsx"), { recursive: true });
   await writeFile(
@@ -93,8 +94,7 @@ async function bundleWithEsbuild() {
 }
 
 async function bundleWithVite() {
-  const previousNodeEnv = process.env.NODE_ENV;
-  process.env.NODE_ENV = "production";
+  vi.stubEnv("NODE_ENV", "production");
   try {
     const result = await viteBuild({
       root: dirname(getFixtureEntry()),
@@ -118,11 +118,7 @@ async function bundleWithVite() {
       .map((output) => (output.type === "chunk" ? output.code : ""))
       .join("\n");
   } finally {
-    if (previousNodeEnv == null) {
-      delete process.env.NODE_ENV;
-    } else {
-      process.env.NODE_ENV = previousNodeEnv;
-    }
+    vi.unstubAllEnvs();
   }
 }
 
@@ -196,6 +192,21 @@ async function bundleWithRspack() {
   return readFile(join(outputDir, "bundle.js"), "utf8");
 }
 
+async function resolveWarningModule(conditions: string[] = []) {
+  const { stdout } = await exec(
+    "node",
+    [
+      ...conditions.map((condition) => `--conditions=${condition}`),
+      "--input-type=module",
+      "-e",
+      "console.log(await import.meta.resolve('#clava/warn'))",
+    ],
+    { cwd: root },
+  );
+
+  return fileURLToPath(stdout.trim());
+}
+
 beforeAll(async () => {
   await exec("pnpm", ["--dir", root, "build"]);
   const fixture = await createFixture();
@@ -221,19 +232,28 @@ test("build emits conditional warning modules for consumers", async () => {
   expect(warnNoopCode).not.toContain(warningText);
 });
 
-test("source condition resolves development warning module", async () => {
-  const { stdout } = await exec(
-    "node",
-    [
-      "--conditions=source",
-      "--input-type=module",
-      "-e",
-      "console.log(await import.meta.resolve('#clava/warn'))",
-    ],
-    { cwd: root },
+test("source condition resolves source warning module", async () => {
+  await expect(resolveWarningModule(["source"])).resolves.toBe(
+    join(root, "src/warn.ts"),
   );
+});
 
-  expect(fileURLToPath(stdout.trim())).toBe(join(root, "src/warn.ts"));
+test("production condition resolves noop warning module", async () => {
+  await expect(resolveWarningModule(["production"])).resolves.toBe(
+    join(root, "dist/warn.noop.js"),
+  );
+});
+
+test("development condition resolves warning module", async () => {
+  await expect(resolveWarningModule(["development"])).resolves.toBe(
+    join(root, "dist/warn.js"),
+  );
+});
+
+test("default condition resolves noop warning module", async () => {
+  await expect(resolveWarningModule()).resolves.toBe(
+    join(root, "dist/warn.noop.js"),
+  );
 });
 
 const bundlers: [string, () => Promise<string>][] = [
