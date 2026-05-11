@@ -750,8 +750,7 @@ for (const config of Object.values(CONFIGS)) {
 
     test("computed warning is omitted in production", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const nodeEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = "production";
+      vi.stubEnv("NODE_ENV", "production");
       const component = getModeComponent(
         mode,
         cv({
@@ -767,7 +766,7 @@ for (const config of Object.values(CONFIGS)) {
         component();
         expect(warn).not.toHaveBeenCalled();
       } finally {
-        process.env.NODE_ENV = nodeEnv;
+        vi.unstubAllEnvs();
         warn.mockRestore();
       }
     });
