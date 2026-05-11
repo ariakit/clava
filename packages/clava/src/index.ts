@@ -294,13 +294,13 @@ function collectDisabledVariantValues(
 }
 
 interface NormalizedSource {
-  keys: string[];
+  propKeys: string[];
   variantKeys: string[];
   isComponent: boolean;
 }
 
 const EMPTY_SOURCE: NormalizedSource = {
-  keys: [],
+  propKeys: [],
   variantKeys: [],
   isComponent: false,
 };
@@ -308,7 +308,7 @@ const EMPTY_SOURCE: NormalizedSource = {
 function normalizeKeySource(source: unknown): NormalizedSource {
   if (Array.isArray(source)) {
     return {
-      keys: source as string[],
+      propKeys: source as string[],
       variantKeys: source as string[],
       isComponent: false,
     };
@@ -318,16 +318,16 @@ function normalizeKeySource(source: unknown): NormalizedSource {
   if (typeof source !== "object" && typeof source !== "function") {
     return EMPTY_SOURCE;
   }
-  if (!("keys" in source)) return EMPTY_SOURCE;
+  if (!("propKeys" in source)) return EMPTY_SOURCE;
   if (!("variantKeys" in source)) return EMPTY_SOURCE;
 
   // Component-provided arrays are immutable metadata — reference directly.
   const typed = source as {
-    keys: string[];
+    propKeys: string[];
     variantKeys: string[];
   };
   return {
-    keys: typed.keys,
+    propKeys: typed.propKeys,
     variantKeys: typed.variantKeys,
     isComponent: true,
   };
@@ -368,7 +368,9 @@ function splitPropsImpl(
     const sourceResult: Record<string, unknown> = {};
 
     const effectiveKeys =
-      source.isComponent && stylingClaimed ? source.variantKeys : source.keys;
+      source.isComponent && stylingClaimed
+        ? source.variantKeys
+        : source.propKeys;
 
     const effectiveKeysLength = effectiveKeys.length;
     for (let i = 0; i < effectiveKeysLength; i++) {
@@ -422,7 +424,7 @@ export const splitProps: SplitPropsFunction = ((
 ) => {
   const normalizedSource1 = normalizeKeySource(source1);
   return splitPropsImpl(
-    normalizedSource1.keys,
+    normalizedSource1.propKeys,
     normalizedSource1.isComponent,
     props,
     sources,
@@ -1255,15 +1257,14 @@ export function create({
       T extends ModalComponent<MergedVariants, R>,
     >(
       c: T,
-      keys: string[],
+      propKeys: string[],
       style: T["style"],
     ): T => {
       c.class = classFn;
       c.style = style;
       c.getVariants = getVariants;
-      c.keys = keys;
       c.variantKeys = variantKeys;
-      c.propKeys = keys;
+      c.propKeys = propKeys;
       setComponentMeta(c, meta);
       return c;
     };

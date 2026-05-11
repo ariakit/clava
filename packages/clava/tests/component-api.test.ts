@@ -170,19 +170,6 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
-    test("keys returns props keys", () => {
-      const component = getModeComponent(
-        mode,
-        cv({ variants: { size: { sm: "sm" }, color: { red: "red" } } }),
-      );
-      expectTypeOf(component.keys).toExtend<
-        ("class" | "className" | "style" | "size" | "color")[]
-      >();
-      expect(component.keys).toEqual(
-        getExpectedPropsKeys(config, "size", "color"),
-      );
-    });
-
     test("variantKeys property", () => {
       const component = getModeComponent(
         mode,
@@ -216,6 +203,30 @@ for (const config of Object.values(CONFIGS)) {
     });
   });
 }
+
+test("propKeys are mode-specific", () => {
+  const component = cvBase({
+    variants: { size: { sm: "sm", md: "md" } },
+  });
+
+  expectTypeOf(component.propKeys).toEqualTypeOf<
+    ("class" | "className" | "style" | "size")[]
+  >();
+  expectTypeOf(component.jsx.propKeys).toEqualTypeOf<
+    ("className" | "style" | "size")[]
+  >();
+  expectTypeOf(component.html.propKeys).toEqualTypeOf<
+    ("class" | "style" | "size")[]
+  >();
+  expectTypeOf(component.htmlObj.propKeys).toEqualTypeOf<
+    ("class" | "style" | "size")[]
+  >();
+
+  expect(component.propKeys).toEqual(["class", "className", "style", "size"]);
+  expect(component.jsx.propKeys).toEqual(["className", "style", "size"]);
+  expect(component.html.propKeys).toEqual(["class", "style", "size"]);
+  expect(component.htmlObj.propKeys).toEqual(["class", "style", "size"]);
+});
 
 describe("Variant utility type", () => {
   test("matches variant keys from another component", () => {

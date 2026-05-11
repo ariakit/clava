@@ -70,10 +70,14 @@ export type ComponentProps<V = {}> = VariantValues<V> & NullableComponentResult;
 
 export type GetVariants<V> = (variants?: VariantValues<V>) => VariantValues<V>;
 
+type ComponentPropKey<R extends ComponentResult> =
+  | keyof R
+  | (R extends StyleClassProps ? "className" : never);
+
 // Key source types - what can be passed as additional parameters to splitProps
 export type KeySourceArray = readonly string[];
 export type KeySourceComponent = {
-  keys: readonly (string | number | symbol)[];
+  propKeys: readonly (string | number | symbol)[];
   variantKeys: readonly (string | number | symbol)[];
   getVariants: () => Record<string, unknown>;
 };
@@ -85,7 +89,7 @@ type IsComponent<S> = S extends { getVariants: () => unknown } ? true : false;
 // Extract keys from a source (includes class/style for components)
 type SourceKeys<S> = S extends readonly (infer K)[]
   ? K
-  : S extends { keys: readonly (infer K)[] }
+  : S extends { propKeys: readonly (infer K)[] }
     ? K
     : never;
 
@@ -169,9 +173,8 @@ export interface ModalComponent<V, R extends ComponentResult> {
   class: (props?: ComponentProps<V>) => string;
   style: (props?: ComponentProps<V>) => R["style"];
   getVariants: GetVariants<V>;
-  keys: (keyof V | keyof NullableComponentResult)[];
   variantKeys: (keyof V)[];
-  propKeys: (keyof V | keyof NullableComponentResult)[];
+  propKeys: (keyof V | ComponentPropKey<R>)[];
 }
 
 export interface CVComponent<
