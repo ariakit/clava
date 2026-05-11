@@ -859,44 +859,44 @@ export function create({
       return result;
     }
 
-    // Core compute path. Called both for top-level rendering (via
-    // `computeResult`) and recursively when this component is used as an
-    // `extend` target by another component. Pushes variant classes (excluding
-    // base class) into `classesOut` and merges styles into `styleOut`.
-    const computeOnce: ComputeFn = (
-      resolved,
-      userVariantProps,
-      skipKeys,
-      skipValues,
-      classesOut,
-      styleOut,
-      runState,
-      protectedVariants,
-      pendingProtectedVariants,
-      protectedVariantKeys,
-    ) => {
-      // Run `computed` (if any). May modify resolved variants and emit classes
-      // and styles.
+    const runComputedContext = (
+      resolved: Record<string, unknown>,
+      userVariantProps: Record<string, unknown>,
+      filterOwnVariants: boolean,
+      collectOutput: boolean,
+      protectedVariants: Record<string, unknown> | null | undefined,
+      pendingProtectedVariants: Record<string, unknown> | null | undefined,
+      protectedVariantKeys: Set<string> | null | undefined,
+    ): {
+      workingResolved: Record<string, unknown>;
+      changedVariants: Record<string, unknown> | null;
+      classes: ClassValue[] | null;
+      style: StyleValue | null;
+    } => {
       let workingResolved = resolved;
       let cClasses: ClassValue[] | null = null;
       let cStyle: StyleValue | null = null;
       let changedVariants: Record<string, unknown> | null = null;
 
       if (computed) {
-        // When this component is being extended, `resolved` is the parent's
-        // workingResolved (a superset of our variant keys). Filter to our own
-        // keys for `ctx.variants` so the user's `computed` callback sees the
-        // shape declared by `VariantValues<V>` and not foreign parent keys.
-        const ownVariants: Record<string, unknown> = {};
-        for (let i = 0; i < variantKeysLength; i++) {
-          const k = variantKeys[i];
-          if (Object.hasOwn(resolved, k)) ownVariants[k] = resolved[k];
+        let ownVariants = resolved;
+        if (filterOwnVariants) {
+          // When this component is being extended, `resolved` is the parent's
+          // workingResolved (a superset of our variant keys). Filter to our own
+          // keys for `ctx.variants` so the user's `computed` callback sees the
+          // shape declared by `VariantValues<V>` and not foreign parent keys.
+          const filteredVariants: Record<string, unknown> = {};
+          for (let i = 0; i < variantKeysLength; i++) {
+            const k = variantKeys[i];
+            if (Object.hasOwn(resolved, k)) filteredVariants[k] = resolved[k];
+          }
+          ownVariants = filteredVariants;
         }
         // Lazy-init updatedVariants — many computeds only inspect `variants`
         // or call setDefaultVariants for keys the user already set, so the
         // copy is unnecessary in the common case.
         let updatedVariants: Record<string, unknown> | null = null;
-        const localCClasses: ClassValue[] = [];
+        const localCClasses: ClassValue[] | null = collectOutput ? [] : null;
         let localCStyle: StyleValue | null = null;
         const ensureUpdated = (): Record<string, unknown> => {
           if (updatedVariants) return updatedVariants;
@@ -980,17 +980,18 @@ export function create({
             }
           },
           addClass: (className: ClassValue) => {
-            localCClasses.push(className);
+            localCClasses?.push(className);
           },
           addStyle: (newStyle: StyleValue) => {
+            if (!collectOutput) return;
             if (!localCStyle) localCStyle = {};
             Object.assign(localCStyle, newStyle);
           },
         };
         const result = computed(ctx);
-        if (result != null) {
+        if (collectOutput && result != null) {
           const r = extractClassAndStylePrebuilt(result);
-          if (r.class != null) localCClasses.push(r.class);
+          if (r.class != null) localCClasses?.push(r.class);
           if (r.style) {
             if (!localCStyle) localCStyle = {};
             Object.assign(localCStyle, r.style);
@@ -1011,6 +1012,46 @@ export function create({
           workingResolved = nextResolved;
         }
       }
+
+      return {
+        workingResolved,
+        changedVariants,
+        classes: cClasses,
+        style: cStyle,
+      };
+    };
+
+    // Core compute path. Called both for top-level rendering (via
+    // `computeResult`) and recursively when this component is used as an
+    // `extend` target by another component. Pushes variant classes (excluding
+    // base class) into `classesOut` and merges styles into `styleOut`.
+    const computeOnce: ComputeFn = (
+      resolved,
+      userVariantProps,
+      skipKeys,
+      skipValues,
+      classesOut,
+      styleOut,
+      runState,
+      protectedVariants,
+      pendingProtectedVariants,
+      protectedVariantKeys,
+    ) => {
+      // Run `computed` (if any). May modify resolved variants and emit classes
+      // and styles.
+      const computedResult = runComputedContext(
+        resolved,
+        userVariantProps,
+        true,
+        true,
+        protectedVariants,
+        pendingProtectedVariants,
+        protectedVariantKeys,
+      );
+      let workingResolved = computedResult.workingResolved;
+      const cClasses = computedResult.classes;
+      const cStyle = computedResult.style;
+      const changedVariants = computedResult.changedVariants;
 
       // Build skip sets to pass to extends. Reuse precomputed values when no
       // caller-provided sets need merging.
@@ -1286,120 +1327,17 @@ export function create({
       pendingProtectedVariants,
       protectedVariantKeys,
     ) => {
-      let workingResolved = resolved;
-      let changedVariants: Record<string, unknown> | null = null;
-
-      if (computed) {
-        let ownVariants = resolved;
-        if (filterOwnVariants) {
-          const filteredVariants: Record<string, unknown> = {};
-          for (let i = 0; i < variantKeysLength; i++) {
-            const k = variantKeys[i];
-            if (Object.hasOwn(resolved, k)) filteredVariants[k] = resolved[k];
-          }
-          ownVariants = filteredVariants;
-        }
-
-        let updatedVariants: Record<string, unknown> | null = null;
-        const ensureUpdated = (): Record<string, unknown> => {
-          if (updatedVariants) return updatedVariants;
-          const u: Record<string, unknown> = {};
-          Object.assign(u, ownVariants);
-          updatedVariants = u;
-          return u;
-        };
-        const setChangedVariant = (
-          key: string,
-          value: unknown,
-          protect = false,
-        ) => {
-          if (!changedVariants) changedVariants = {};
-          changedVariants[key] = value;
-          if (protect && protectedVariants) {
-            protectedVariants[key] = value;
-            protectedVariantKeys?.add(key);
-          }
-        };
-        const getCurrentVariantValue = (key: string) => {
-          return updatedVariants ? updatedVariants[key] : ownVariants[key];
-        };
-        const ctx = {
-          variants: ownVariants as VariantValues<Record<string, unknown>>,
-          setVariants: (
-            newVariants: VariantValues<Record<string, unknown>>,
-          ) => {
-            if (!hasAnyDisabled) {
-              for (const key in newVariants) {
-                if (!Object.hasOwn(newVariants, key)) continue;
-                const value = (newVariants as Record<string, unknown>)[key];
-                setChangedVariant(key, value, true);
-                if (getCurrentVariantValue(key) === value) continue;
-                ensureUpdated()[key] = value;
-              }
-              return;
-            }
-            for (const key in newVariants) {
-              if (!Object.hasOwn(newVariants, key)) continue;
-              if (disabledVariantKeys.has(key)) continue;
-              const value = (newVariants as Record<string, unknown>)[key];
-              if (hasDisabledVariantValues) {
-                const valueKey = getVariantValueKey(value);
-                if (
-                  valueKey != null &&
-                  disabledVariantValues[key]?.has(valueKey)
-                ) {
-                  continue;
-                }
-              }
-              setChangedVariant(key, value, true);
-              if (getCurrentVariantValue(key) === value) continue;
-              ensureUpdated()[key] = value;
-            }
-          },
-          setDefaultVariants: (
-            newDefaults: VariantValues<Record<string, unknown>>,
-          ) => {
-            for (const key in newDefaults) {
-              if (!Object.hasOwn(newDefaults, key)) continue;
-              if (userVariantProps[key] !== undefined) continue;
-              if (protectedVariantKeys?.has(key)) continue;
-              const value = (newDefaults as Record<string, unknown>)[key];
-              if (hasAnyDisabled) {
-                if (disabledVariantKeys.has(key)) continue;
-                const valueKey = getVariantValueKey(value);
-                if (
-                  valueKey != null &&
-                  disabledVariantValues[key]?.has(valueKey)
-                ) {
-                  continue;
-                }
-              }
-              setChangedVariant(key, value);
-              if (pendingProtectedVariants) {
-                pendingProtectedVariants[key] = value;
-              }
-              if (getCurrentVariantValue(key) === value) continue;
-              ensureUpdated()[key] = value;
-            }
-          },
-          addClass: noop,
-          addStyle: noop,
-        };
-        computed(ctx);
-
-        if (updatedVariants) {
-          const nextResolved: Record<string, unknown> = {};
-          Object.assign(nextResolved, workingResolved);
-          if (hasAnyDisabled) {
-            const filteredUpdated: Record<string, unknown> = {};
-            filterDisabledInto(updatedVariants, filteredUpdated);
-            Object.assign(nextResolved, filteredUpdated);
-          } else {
-            Object.assign(nextResolved, updatedVariants);
-          }
-          workingResolved = nextResolved;
-        }
-      }
+      const computedResult = runComputedContext(
+        resolved,
+        userVariantProps,
+        filterOwnVariants,
+        false,
+        protectedVariants,
+        pendingProtectedVariants,
+        protectedVariantKeys,
+      );
+      let workingResolved = computedResult.workingResolved;
+      const changedVariants = computedResult.changedVariants;
 
       if (hasExtend) {
         const extUserVariantProps = getExtUserVariantProps(
