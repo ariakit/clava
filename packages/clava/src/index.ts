@@ -89,10 +89,6 @@ interface ComponentMeta {
 
 const META_KEY = "__meta";
 
-const EMPTY_COMPONENT_METAS: ComponentMeta[] = [];
-const EMPTY_BOOLEANS: boolean[] = [];
-const EMPTY_STRINGS: string[] = [];
-
 const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
   string,
   unknown
@@ -682,59 +678,43 @@ export function create({
     // class string — otherwise our outer `transformClass(clsx(allClasses))`
     // would be the only transform that runs, and the extend's factory would
     // be silently bypassed for any base coming from `extend: [otherFactoryCv]`.
-    let extMetas = EMPTY_COMPONENT_METAS;
-    let extBaseClassesArr = EMPTY_STRINGS;
-    let extIsolated = EMPTY_BOOLEANS;
+    const extMetas: ComponentMeta[] = [];
+    const extBaseClassesArr: string[] = [];
+    const extIsolated: boolean[] = [];
     let hasIsolatedExt = false;
     if (hasExtend) {
-      const extMetasMutable: ComponentMeta[] = [];
-      const extBaseClassesMutable: string[] = [];
-      const extIsolatedMutable: boolean[] = [];
       for (const ext of extend) {
         const meta = getComponentMeta(ext);
         if (!meta) continue;
-        extMetasMutable.push(meta);
+        extMetas.push(meta);
         const isolated = meta.transformClass !== transformClass;
-        extIsolatedMutable.push(isolated);
+        extIsolated.push(isolated);
         if (isolated) {
           hasIsolatedExt = true;
           // Apply the extend's own transformClass to its base class so it
           // survives our outer transform (which still applies on top, matching
           // the original public-component round-trip behavior).
-          extBaseClassesMutable.push(meta.transformClass(meta.baseClass));
+          extBaseClassesArr.push(meta.transformClass(meta.baseClass));
         } else {
-          extBaseClassesMutable.push(meta.baseClass);
+          extBaseClassesArr.push(meta.baseClass);
         }
       }
-      extMetas = extMetasMutable;
-      extBaseClassesArr = extBaseClassesMutable;
-      extIsolated = extIsolatedMutable;
     }
     const extCount = extMetas.length;
 
     // Filter to only extends whose `resolveDefaults` actually does work
     // (config.computed exists, transitively). Iterating these in
     // `resolveVariantsHot` skips empty work.
-    let extMetasWithResolveDefaults = EMPTY_COMPONENT_METAS;
-    let extMetasWithResolveComputed = EMPTY_COMPONENT_METAS;
-    let extMetasWithResolveDefaultsMutable: ComponentMeta[] | null = null;
-    let extMetasWithResolveComputedMutable: ComponentMeta[] | null = null;
+    const extMetasWithResolveDefaults: ComponentMeta[] = [];
+    const extMetasWithResolveComputed: ComponentMeta[] = [];
     for (let i = 0; i < extCount; i++) {
       const meta = extMetas[i];
       if (meta.resolveDefaults) {
-        extMetasWithResolveDefaultsMutable ??= [];
-        extMetasWithResolveDefaultsMutable.push(meta);
+        extMetasWithResolveDefaults.push(meta);
       }
       if (meta.resolveComputed) {
-        extMetasWithResolveComputedMutable ??= [];
-        extMetasWithResolveComputedMutable.push(meta);
+        extMetasWithResolveComputed.push(meta);
       }
-    }
-    if (extMetasWithResolveDefaultsMutable) {
-      extMetasWithResolveDefaults = extMetasWithResolveDefaultsMutable;
-    }
-    if (extMetasWithResolveComputedMutable) {
-      extMetasWithResolveComputed = extMetasWithResolveComputedMutable;
     }
     const extMetasWithResolveDefaultsCount = extMetasWithResolveDefaults.length;
     const extMetasWithResolveComputedCount = extMetasWithResolveComputed.length;
