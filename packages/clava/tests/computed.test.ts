@@ -490,6 +490,32 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
+    test("computed setVariants does not mutate props with plain extends", () => {
+      const base = cv({
+        variants: { color: { red: "red", blue: "blue" } },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { active: "" },
+          computed: ({ variants, setVariants }) => {
+            if (variants.active) {
+              setVariants({ color: "red" });
+            }
+          },
+        }),
+      );
+      const mutableProps = { active: true };
+      component(mutableProps);
+      expect(mutableProps).toEqual({ active: true });
+
+      const frozenProps = Object.freeze({ active: true });
+      const getProps = () => component(frozenProps);
+      expect(getProps).not.toThrow();
+      expect(getStyleClass(getProps())).toEqual({ class: cls("red") });
+    });
+
     test("child setVariants keeps overriding base setDefaultVariants across re-runs", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },

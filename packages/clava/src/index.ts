@@ -89,6 +89,10 @@ interface ComponentMeta {
 
 const META_KEY = "__meta";
 
+const EMPTY_COMPONENT_METAS: ComponentMeta[] = [];
+const EMPTY_BOOLEANS: boolean[] = [];
+const EMPTY_STRINGS: string[] = [];
+
 const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
   string,
   unknown
@@ -145,9 +149,18 @@ function mergeVariants(
   skipKeys?: Set<string> | null,
 ): boolean {
   let changed = false;
+  if (!skipKeys || skipKeys.size === 0) {
+    for (const key in source) {
+      if (!Object.hasOwn(source, key)) continue;
+      const value = source[key];
+      if (!Object.is(target[key], value)) changed = true;
+      target[key] = value;
+    }
+    return changed;
+  }
   for (const key in source) {
     if (!Object.hasOwn(source, key)) continue;
-    if (skipKeys?.has(key)) continue;
+    if (skipKeys.has(key)) continue;
     const value = source[key];
     if (!Object.is(target[key], value)) changed = true;
     target[key] = value;
@@ -669,40 +682,63 @@ export function create({
     // class string — otherwise our outer `transformClass(clsx(allClasses))`
     // would be the only transform that runs, and the extend's factory would
     // be silently bypassed for any base coming from `extend: [otherFactoryCv]`.
-    const extMetas: ComponentMeta[] = [];
-    const extBaseClassesArr: string[] = [];
-    const extIsolated: boolean[] = [];
+    let extMetas = EMPTY_COMPONENT_METAS;
+    let extBaseClassesArr = EMPTY_STRINGS;
+    let extIsolated = EMPTY_BOOLEANS;
     let hasIsolatedExt = false;
-    if (extend) {
+    if (hasExtend) {
+      const extMetasMutable: ComponentMeta[] = [];
+      const extBaseClassesMutable: string[] = [];
+      const extIsolatedMutable: boolean[] = [];
       for (const ext of extend) {
         const meta = getComponentMeta(ext);
         if (!meta) continue;
-        extMetas.push(meta);
+        extMetasMutable.push(meta);
         const isolated = meta.transformClass !== transformClass;
-        extIsolated.push(isolated);
+        extIsolatedMutable.push(isolated);
         if (isolated) {
           hasIsolatedExt = true;
           // Apply the extend's own transformClass to its base class so it
           // survives our outer transform (which still applies on top, matching
           // the original public-component round-trip behavior).
-          extBaseClassesArr.push(meta.transformClass(meta.baseClass));
+          extBaseClassesMutable.push(meta.transformClass(meta.baseClass));
         } else {
-          extBaseClassesArr.push(meta.baseClass);
+          extBaseClassesMutable.push(meta.baseClass);
         }
       }
+      extMetas = extMetasMutable;
+      extBaseClassesArr = extBaseClassesMutable;
+      extIsolated = extIsolatedMutable;
     }
     const extCount = extMetas.length;
 
     // Filter to only extends whose `resolveDefaults` actually does work
     // (config.computed exists, transitively). Iterating these in
     // `resolveVariantsHot` skips empty work.
-    const extMetasWithResolveDefaults: ComponentMeta[] = [];
+    let extMetasWithResolveDefaults = EMPTY_COMPONENT_METAS;
+    let extMetasWithResolveComputed = EMPTY_COMPONENT_METAS;
+    let extMetasWithResolveDefaultsMutable: ComponentMeta[] | null = null;
+    let extMetasWithResolveComputedMutable: ComponentMeta[] | null = null;
     for (let i = 0; i < extCount; i++) {
-      if (extMetas[i].resolveDefaults) {
-        extMetasWithResolveDefaults.push(extMetas[i]);
+      const meta = extMetas[i];
+      if (meta.resolveDefaults) {
+        extMetasWithResolveDefaultsMutable ??= [];
+        extMetasWithResolveDefaultsMutable.push(meta);
+      }
+      if (meta.resolveComputed) {
+        extMetasWithResolveComputedMutable ??= [];
+        extMetasWithResolveComputedMutable.push(meta);
       }
     }
+    if (extMetasWithResolveDefaultsMutable) {
+      extMetasWithResolveDefaults = extMetasWithResolveDefaultsMutable;
+    }
+    if (extMetasWithResolveComputedMutable) {
+      extMetasWithResolveComputed = extMetasWithResolveComputedMutable;
+    }
     const extMetasWithResolveDefaultsCount = extMetasWithResolveDefaults.length;
+    const extMetasWithResolveComputedCount = extMetasWithResolveComputed.length;
+    const shouldCollectChangedVariants = extMetasWithResolveComputedCount > 0;
 
     // Pre-compute static skip key/value sets to pass to extends. These never
     // change across calls — when caller passes no skip sets, we reuse the same
@@ -910,8 +946,10 @@ export function create({
           value: unknown,
           protect = false,
         ) => {
-          if (!changedVariants) changedVariants = {};
-          changedVariants[key] = value;
+          if (shouldCollectChangedVariants) {
+            if (!changedVariants) changedVariants = {};
+            changedVariants[key] = value;
+          }
           if (protect && protectedVariants) {
             protectedVariants[key] = value;
             protectedVariantKeys?.add(key);
@@ -1039,52 +1077,24 @@ export function create({
     ) => {
       // Run `computed` (if any). May modify resolved variants and emit classes
       // and styles.
-      const computedResult = runComputedContext(
-        resolved,
-        userVariantProps,
-        true,
-        true,
-        protectedVariants,
-        pendingProtectedVariants,
-        protectedVariantKeys,
-      );
-      let workingResolved = computedResult.workingResolved;
-      const cClasses = computedResult.classes;
-      const cStyle = computedResult.style;
-      const changedVariants = computedResult.changedVariants;
-
-      // Build skip sets to pass to extends. Reuse precomputed values when no
-      // caller-provided sets need merging.
-      let extSkipKeys: Set<string> | null;
-      if (skipKeys === null) {
-        extSkipKeys = staticExtSkipKeys;
-      } else if (staticExtSkipKeys === null) {
-        extSkipKeys = skipKeys;
-      } else {
-        extSkipKeys = new Set(skipKeys);
-        for (const k of staticExtSkipKeys) extSkipKeys.add(k);
-      }
-
-      let extSkipVals: Record<string, Set<string>> | null;
-      if (skipValues === null) {
-        extSkipVals = staticExtSkipValues;
-      } else if (staticExtSkipValues === null) {
-        extSkipVals = skipValues;
-      } else {
-        extSkipVals = {};
-        for (const k in skipValues) {
-          extSkipVals[k] = skipValues[k];
-        }
-        for (const k in staticExtSkipValues) {
-          const existing = extSkipVals[k];
-          if (existing) {
-            const merged = new Set<string>(existing);
-            for (const v of staticExtSkipValues[k]) merged.add(v);
-            extSkipVals[k] = merged;
-          } else {
-            extSkipVals[k] = staticExtSkipValues[k];
-          }
-        }
+      let workingResolved = resolved;
+      let cClasses: ClassValue[] | null = null;
+      let cStyle: StyleValue | null = null;
+      let changedVariants: Record<string, unknown> | null = null;
+      if (computed) {
+        const computedResult = runComputedContext(
+          resolved,
+          userVariantProps,
+          true,
+          true,
+          protectedVariants,
+          pendingProtectedVariants,
+          protectedVariantKeys,
+        );
+        workingResolved = computedResult.workingResolved;
+        cClasses = computedResult.classes;
+        cStyle = computedResult.style;
+        changedVariants = computedResult.changedVariants;
       }
 
       // Run extends' contributions first (their full classes + styles) so our
@@ -1096,11 +1106,48 @@ export function create({
       // across re-runs while inherited static defaults can still be refined by
       // the extended component's own computed chain.
       if (hasExtend) {
-        const extUserVariantProps = getExtUserVariantProps(
-          userVariantProps,
-          protectedVariants ?? null,
-          changedVariants,
-        );
+        // Build skip sets to pass to extends. Reuse precomputed values when no
+        // caller-provided sets need merging.
+        let extSkipKeys: Set<string> | null;
+        if (skipKeys === null) {
+          extSkipKeys = staticExtSkipKeys;
+        } else if (staticExtSkipKeys === null) {
+          extSkipKeys = skipKeys;
+        } else {
+          extSkipKeys = new Set(skipKeys);
+          for (const k of staticExtSkipKeys) extSkipKeys.add(k);
+        }
+
+        let extSkipVals: Record<string, Set<string>> | null;
+        if (skipValues === null) {
+          extSkipVals = staticExtSkipValues;
+        } else if (staticExtSkipValues === null) {
+          extSkipVals = skipValues;
+        } else {
+          extSkipVals = {};
+          for (const k in skipValues) {
+            extSkipVals[k] = skipValues[k];
+          }
+          for (const k in staticExtSkipValues) {
+            const existing = extSkipVals[k];
+            if (existing) {
+              const merged = new Set<string>(existing);
+              for (const v of staticExtSkipValues[k]) merged.add(v);
+              extSkipVals[k] = merged;
+            } else {
+              extSkipVals[k] = staticExtSkipValues[k];
+            }
+          }
+        }
+
+        const extUserVariantProps =
+          extMetasWithResolveComputedCount > 0
+            ? getExtUserVariantProps(
+                userVariantProps,
+                protectedVariants ?? null,
+                changedVariants,
+              )
+            : userVariantProps;
         for (let i = 0; i < extCount; i++) {
           if (hasIsolatedExt && extIsolated[i]) {
             // Isolated extend (different factory): gather its variant classes
@@ -1141,7 +1188,9 @@ export function create({
               protectedVariantKeys,
             );
           }
-          if (protectedVariants) {
+          // Only sync protected variants when a child computed resolver can
+          // observe them. Otherwise extUserVariantProps may alias caller props.
+          if (protectedVariants && extMetasWithResolveComputedCount > 0) {
             Object.assign(extUserVariantProps, protectedVariants);
           }
         }
@@ -1224,99 +1273,143 @@ export function create({
       return workingResolved;
     };
 
-    const compute: ComputeFn = (
-      resolved,
-      userVariantProps,
-      skipKeys,
-      skipValues,
-      classesOut,
-      styleOut,
-      runState,
-      protectedVariants,
-      pendingProtectedVariants,
-      protectedVariantKeys,
-    ) => {
-      if (!computed && extMetasWithResolveDefaultsCount === 0) {
-        return computeOnce(
-          resolved,
-          userVariantProps,
-          skipKeys,
-          skipValues,
-          classesOut,
-          styleOut,
-          runState,
-          protectedVariants,
-          pendingProtectedVariants,
-          protectedVariantKeys,
-        );
-      }
-
-      runState ??= { remaining: MAX_COMPUTED_RUNS, warned: false };
-      protectedVariants ??= {};
-      protectedVariantKeys ??= new Set<string>();
-      let workingResolved = resolved;
-      let lastClasses: ClsxClassValue[] = [];
-      let lastStyle: StyleValue = {};
-      let reachedLimit = true;
-
-      while (runState.remaining > 0) {
-        runState.remaining -= 1;
-        const nextPendingProtectedVariants: Record<string, unknown> = {};
-        const nextClasses: ClsxClassValue[] = [];
-        const nextStyle: StyleValue = {};
-        const nextResolved = computeOnce(
-          workingResolved,
-          userVariantProps,
-          skipKeys,
-          skipValues,
-          nextClasses,
-          nextStyle,
-          runState,
-          protectedVariants,
-          nextPendingProtectedVariants,
-          protectedVariantKeys,
-        );
-
-        lastClasses = nextClasses;
-        lastStyle = nextStyle;
-        let protectedChanged: boolean;
-        if (pendingProtectedVariants) {
-          protectedChanged = mergeVariants(
-            pendingProtectedVariants,
-            nextPendingProtectedVariants,
-            protectedVariantKeys,
-          );
-        } else {
-          protectedChanged = mergeVariants(
+    const compute: ComputeFn =
+      !computed && extMetasWithResolveDefaultsCount === 0
+        ? (
+            resolved,
+            userVariantProps,
+            skipKeys,
+            skipValues,
+            classesOut,
+            styleOut,
+            runState,
             protectedVariants,
-            nextPendingProtectedVariants,
+            pendingProtectedVariants,
             protectedVariantKeys,
-          );
-        }
+          ) => {
+            return computeOnce(
+              resolved,
+              userVariantProps,
+              skipKeys,
+              skipValues,
+              classesOut,
+              styleOut,
+              runState,
+              protectedVariants,
+              pendingProtectedVariants,
+              protectedVariantKeys,
+            );
+          }
+        : (
+            resolved,
+            userVariantProps,
+            skipKeys,
+            skipValues,
+            classesOut,
+            styleOut,
+            runState,
+            protectedVariants,
+            pendingProtectedVariants,
+            protectedVariantKeys,
+          ) => {
+            runState ??= { remaining: MAX_COMPUTED_RUNS, warned: false };
+            protectedVariants ??= {};
+            protectedVariantKeys ??= new Set<string>();
+            let workingResolved = resolved;
+            let lastClasses: ClsxClassValue[] = [];
+            let lastStyle: StyleValue = {};
+            let isFirstRun = true;
 
-        if (
-          !protectedChanged &&
-          (nextResolved === workingResolved ||
-            areVariantsEqual(workingResolved, nextResolved))
-        ) {
-          workingResolved = nextResolved;
-          reachedLimit = false;
-          break;
-        }
+            while (runState.remaining > 0) {
+              runState.remaining -= 1;
+              let useDirectOutput = isFirstRun;
+              if (useDirectOutput) {
+                for (const key in styleOut) {
+                  if (Object.hasOwn(styleOut, key)) {
+                    useDirectOutput = false;
+                    break;
+                  }
+                }
+              }
+              const classCount = classesOut.length;
+              const nextPendingProtectedVariants: Record<string, unknown> = {};
+              const nextClasses: ClsxClassValue[] = useDirectOutput
+                ? classesOut
+                : [];
+              const nextStyle: StyleValue = useDirectOutput ? styleOut : {};
+              const nextResolved = computeOnce(
+                workingResolved,
+                userVariantProps,
+                skipKeys,
+                skipValues,
+                nextClasses,
+                nextStyle,
+                runState,
+                protectedVariants,
+                nextPendingProtectedVariants,
+                protectedVariantKeys,
+              );
 
-        workingResolved = nextResolved;
-      }
+              let protectedChanged: boolean;
+              if (pendingProtectedVariants) {
+                protectedChanged = mergeVariants(
+                  pendingProtectedVariants,
+                  nextPendingProtectedVariants,
+                  protectedVariantKeys,
+                );
+              } else {
+                protectedChanged = mergeVariants(
+                  protectedVariants,
+                  nextPendingProtectedVariants,
+                  protectedVariantKeys,
+                );
+              }
 
-      if (reachedLimit) {
-        warnComputedLimit(runState);
-      }
+              if (
+                !protectedChanged &&
+                (nextResolved === workingResolved ||
+                  areVariantsEqual(workingResolved, nextResolved))
+              ) {
+                if (!useDirectOutput) {
+                  for (let i = 0; i < nextClasses.length; i++) {
+                    classesOut.push(nextClasses[i]);
+                  }
+                  Object.assign(styleOut, nextStyle);
+                }
+                return nextResolved;
+              }
 
-      for (let i = 0; i < lastClasses.length; i++) {
-        classesOut.push(lastClasses[i]);
-      }
-      Object.assign(styleOut, lastStyle);
-      return workingResolved;
-    };
+              if (useDirectOutput && runState.remaining === 0) {
+                // Keep the direct output from the last allowed run. Rolling
+                // back here would drop it before the fallback copy below.
+                warnComputedLimit(runState);
+                return nextResolved;
+              }
+
+              if (useDirectOutput) {
+                classesOut.length = classCount;
+                for (const key in styleOut) {
+                  if (Object.hasOwn(styleOut, key)) {
+                    Reflect.deleteProperty(styleOut, key);
+                  }
+                }
+              } else {
+                lastClasses = nextClasses;
+                lastStyle = nextStyle;
+              }
+
+              workingResolved = nextResolved;
+              isFirstRun = false;
+            }
+
+            warnComputedLimit(runState);
+
+            for (let i = 0; i < lastClasses.length; i++) {
+              classesOut.push(lastClasses[i]);
+            }
+            Object.assign(styleOut, lastStyle);
+            return workingResolved;
+          };
 
     const resolveComputedOnce: ResolveComputedFn = (
       resolved,
@@ -1327,26 +1420,31 @@ export function create({
       pendingProtectedVariants,
       protectedVariantKeys,
     ) => {
-      const computedResult = runComputedContext(
-        resolved,
-        userVariantProps,
-        filterOwnVariants,
-        false,
-        protectedVariants,
-        pendingProtectedVariants,
-        protectedVariantKeys,
-      );
-      let workingResolved = computedResult.workingResolved;
-      const changedVariants = computedResult.changedVariants;
+      let workingResolved = resolved;
+      let changedVariants: Record<string, unknown> | null = null;
+      if (computed) {
+        const computedResult = runComputedContext(
+          resolved,
+          userVariantProps,
+          filterOwnVariants,
+          false,
+          protectedVariants,
+          pendingProtectedVariants,
+          protectedVariantKeys,
+        );
+        workingResolved = computedResult.workingResolved;
+        changedVariants = computedResult.changedVariants;
+      }
 
-      if (hasExtend) {
+      if (extMetasWithResolveComputedCount > 0) {
         const extUserVariantProps = getExtUserVariantProps(
           userVariantProps,
           protectedVariants ?? null,
           changedVariants,
         );
-        for (let i = 0; i < extCount; i++) {
-          const resolveComputed = extMetas[i].resolveComputed;
+        for (let i = 0; i < extMetasWithResolveComputedCount; i++) {
+          const meta = extMetasWithResolveComputed[i];
+          const resolveComputed = meta.resolveComputed;
           if (!resolveComputed) continue;
           workingResolved = resolveComputed(
             workingResolved,
@@ -1367,7 +1465,7 @@ export function create({
     };
 
     const resolveComputed: ResolveComputedFn | null =
-      computed || extMetasWithResolveDefaultsCount > 0
+      computed || extMetasWithResolveComputedCount > 0
         ? (
             resolved,
             userVariantProps,
@@ -1551,10 +1649,12 @@ export function create({
     // `transformClass(clsx(allClasses))` at render time, so applying it here
     // would compound (double for own-render, triple+ for extend chains) and
     // misbehave for non-idempotent transforms.
-    const computedBaseClass = clsx(
-      ...(extBaseClassesArr as ClsxClassValue[]),
-      config.class as ClsxClassValue,
-    );
+    const computedBaseClass = hasExtend
+      ? clsx(
+          ...(extBaseClassesArr as ClsxClassValue[]),
+          config.class as ClsxClassValue,
+        )
+      : clsx(config.class as ClsxClassValue);
 
     // Shared closures across the default and modal components.
     const classFn = (props: ComponentProps<MergedVariants> = {}) => {
