@@ -645,3 +645,18 @@ test("splitProps ignores sources with malformed variantKeys", () => {
   ) as unknown[];
   expect(result).toEqual([{ size: "lg" }, {}, { id: "test", color: "red" }]);
 });
+
+test("splitProps type rejects non-string component source keys", () => {
+  const props = { size: "lg" };
+  const symbolKey = Symbol("size");
+
+  const [sourceProps, otherProps] = splitProps(props, {
+    getVariants: () => ({}),
+    // @ts-expect-error component source keys must be strings
+    propKeys: [symbolKey],
+    // @ts-expect-error component source keys must be strings
+    variantKeys: [1],
+  });
+  expect(sourceProps).toEqual({});
+  expect(otherProps).toEqual(props);
+});

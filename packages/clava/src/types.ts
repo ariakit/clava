@@ -77,8 +77,8 @@ type ComponentPropKey<R extends ComponentResult> =
 // Key source types - what can be passed as additional parameters to splitProps
 export type KeySourceArray = readonly string[];
 export type KeySourceComponent = {
-  propKeys: readonly (string | number | symbol)[];
-  variantKeys: readonly (string | number | symbol)[];
+  propKeys: readonly string[];
+  variantKeys: readonly string[];
   getVariants: () => Record<string, unknown>;
 };
 export type KeySource = KeySourceArray | KeySourceComponent;
