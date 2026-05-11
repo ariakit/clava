@@ -59,7 +59,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "sm" });
     });
 
-    test("getVariants returns variants set by computed setVariants", () => {
+    test("getVariants returns variants set by refine setVariants", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -67,7 +67,7 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          computed: ({ variants, setVariants }) => {
+          refine: ({ variants, setVariants }) => {
             if (variants.size === "lg") {
               setVariants({ color: "red" });
             }
@@ -78,7 +78,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
-    test("getVariants re-runs when computed changes variants", () => {
+    test("getVariants re-runs when refine changes variants", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -86,7 +86,7 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          computed: ({ variants, setVariants }) => {
+          refine: ({ variants, setVariants }) => {
             if (variants.size === "lg") {
               setVariants({ color: "red" });
             }
@@ -108,7 +108,7 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          computed: ({ variants, setDefaultVariants }) => {
+          refine: ({ variants, setDefaultVariants }) => {
             setDefaultVariants({ color: "red" });
             if (variants.color === "red") {
               setDefaultVariants({ size: "lg" });
@@ -120,7 +120,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
-    test("getVariants returns variants set by computed setDefaultVariants", () => {
+    test("getVariants returns variants set by refine setDefaultVariants", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -128,7 +128,7 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          computed: ({ variants, setDefaultVariants }) => {
+          refine: ({ variants, setDefaultVariants }) => {
             if (variants.size === "lg") {
               setDefaultVariants({ color: "blue" });
             }
@@ -147,7 +147,7 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          computed: ({ setDefaultVariants }) => {
+          refine: ({ setDefaultVariants }) => {
             setDefaultVariants({ color: "blue" });
           },
         }),
@@ -164,7 +164,7 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          computed: ({ setVariants }) => {
+          refine: ({ setVariants }) => {
             setVariants({ color: "blue" });
           },
         }),
@@ -176,7 +176,7 @@ for (const config of Object.values(CONFIGS)) {
     test("getVariants picks up setDefaultVariants from extended component", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
-        computed: ({ setDefaultVariants }) => {
+        refine: ({ setDefaultVariants }) => {
           setDefaultVariants({ size: "lg" });
         },
       });
@@ -195,7 +195,7 @@ for (const config of Object.values(CONFIGS)) {
     test("getVariants picks up setDefaultVariants from grandparent component", () => {
       const grandparent = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
-        computed: ({ setDefaultVariants }) => {
+        refine: ({ setDefaultVariants }) => {
           setDefaultVariants({ size: "lg" });
         },
       });
@@ -212,11 +212,11 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
-    test("getVariants re-runs when base component computed changes variants", () => {
+    test("getVariants re-runs when base component refine changes variants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" }, active: "" },
         defaultVariants: { size: "sm" },
-        computed: ({ variants, setVariants }) => {
+        refine: ({ variants, setVariants }) => {
           if (variants.active) {
             setVariants({ size: "lg" });
           }
@@ -227,7 +227,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { color: { red: "red", blue: "blue" } },
-          computed: ({ variants, setVariants }) => {
+          refine: ({ variants, setVariants }) => {
             if (variants.size === "lg") {
               setVariants({ color: "red" });
             }
@@ -246,7 +246,7 @@ for (const config of Object.values(CONFIGS)) {
           mode: { on: "on" },
         },
         defaultVariants: { size: "sm" },
-        computed: ({ variants, setVariants, setDefaultVariants }) => {
+        refine: ({ variants, setVariants, setDefaultVariants }) => {
           if (variants.active) {
             setVariants({ mode: "on" });
           }
@@ -266,7 +266,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
-          computed: ({ setVariants }) => {
+          refine: ({ setVariants }) => {
             setVariants({ size: "lg" });
             setVariants({ size: "sm" });
           },
@@ -279,7 +279,7 @@ for (const config of Object.values(CONFIGS)) {
     test("getVariants child setVariants keeps overriding base setDefaultVariants across re-runs", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
-        computed: ({ setDefaultVariants }) => {
+        refine: ({ setDefaultVariants }) => {
           setDefaultVariants({ color: "blue" });
         },
       });
@@ -289,7 +289,7 @@ for (const config of Object.values(CONFIGS)) {
           extend: [base],
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
-          computed: ({ variants, setVariants }) => {
+          refine: ({ variants, setVariants }) => {
             if (variants.size === "sm") {
               setVariants({ color: "red" });
             }
@@ -303,7 +303,7 @@ for (const config of Object.values(CONFIGS)) {
     test("getVariants setVariants sticks across re-runs", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
-        computed: ({ setDefaultVariants }) => {
+        refine: ({ setDefaultVariants }) => {
           setDefaultVariants({ color: "blue" });
         },
       });
@@ -312,7 +312,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { color: { red: "red", blue: "blue" }, done: "" },
-          computed: ({ variants, setVariants }) => {
+          refine: ({ variants, setVariants }) => {
             if (!variants.done) {
               setVariants({ color: "red", done: true });
             }
@@ -330,7 +330,7 @@ for (const config of Object.values(CONFIGS)) {
           active: "",
           mode: { on: "on" },
         },
-        computed: ({ variants, setVariants, setDefaultVariants }) => {
+        refine: ({ variants, setVariants, setDefaultVariants }) => {
           if (variants.active) {
             setVariants({ mode: "on" });
           }
@@ -350,13 +350,13 @@ for (const config of Object.values(CONFIGS)) {
     test("getVariants setVariants from earlier extends overrides setDefaultVariants from later extends", () => {
       const first = cv({
         variants: { color: { red: "first-red", blue: "first-blue" } },
-        computed: ({ setVariants }) => {
+        refine: ({ setVariants }) => {
           setVariants({ color: "red" });
         },
       });
       const second = cv({
         variants: { color: { red: "second-red", blue: "second-blue" } },
-        computed: ({ setDefaultVariants }) => {
+        refine: ({ setDefaultVariants }) => {
           setDefaultVariants({ color: "blue" });
         },
       });
@@ -368,13 +368,13 @@ for (const config of Object.values(CONFIGS)) {
     test("getVariants setDefaultVariants from later extends overrides setDefaultVariants from earlier extends", () => {
       const first = cv({
         variants: { color: { red: "first-red", blue: "first-blue" } },
-        computed: ({ setDefaultVariants }) => {
+        refine: ({ setDefaultVariants }) => {
           setDefaultVariants({ color: "red" });
         },
       });
       const second = cv({
         variants: { color: { red: "second-red", blue: "second-blue" } },
-        computed: ({ setDefaultVariants }) => {
+        refine: ({ setDefaultVariants }) => {
           setDefaultVariants({ color: "blue" });
         },
       });
@@ -386,7 +386,7 @@ for (const config of Object.values(CONFIGS)) {
     test("getVariants setDefaultVariants does not override stable setVariants on later passes", () => {
       const base = cv({
         variants: { color: { red: "base-red", blue: "base-blue" } },
-        computed: ({ setVariants }) => {
+        refine: ({ setVariants }) => {
           setVariants({ color: "red" });
         },
       });
@@ -395,7 +395,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { color: { red: "child-red", blue: "child-blue" } },
-          computed: ({ variants, setDefaultVariants }) => {
+          refine: ({ variants, setDefaultVariants }) => {
             if (variants.color === "red") {
               setDefaultVariants({ color: "blue" });
             }
@@ -414,7 +414,7 @@ for (const config of Object.values(CONFIGS)) {
             color: { red: "red", blue: "blue" },
             done: "",
           },
-          computed: ({ variants, setVariants, setDefaultVariants }) => {
+          refine: ({ variants, setVariants, setDefaultVariants }) => {
             if (!variants.done) {
               setVariants({ color: "red", done: true });
             }

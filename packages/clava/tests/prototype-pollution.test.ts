@@ -27,16 +27,16 @@ test("render ignores keys inherited from Object.prototype", () => {
   expect(component({}).class).toBe("sm");
 });
 
-test("extend's resolveDefaults ignores polluted prototype on parent's computed", () => {
-  // Base's computed branches on its own variants.size — if the polluted
-  // "size" key leaks into resolveDefaultsFn's resolvedVariants, the computed
-  // callback would see size = "lg" instead of the staticDefault "sm" and
-  // emit the lg-specific class.
+test("extend's resolveDefaults ignores polluted prototype on parent's refine", () => {
+  // Base's refine branches on its own variants.size — if the polluted "size"
+  // key leaks into resolveDefaultsFn's resolvedVariants, the refine callback
+  // would see size = "lg" instead of the staticDefault "sm" and emit the
+  // lg-specific class.
   proto.size = "lg";
   const base = cv({
     variants: { size: { sm: "sm", lg: "lg" } },
     defaultVariants: { size: "sm" },
-    computed: ({ variants, addClass }) => {
+    refine: ({ variants, addClass }) => {
       if (variants.size === "lg") {
         addClass("base-lg-detected");
       }

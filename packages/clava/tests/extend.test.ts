@@ -144,7 +144,7 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("extend disabled variant value with computed setDefaultVariants", () => {
+    test("extend disabled variant value with refine setDefaultVariants", () => {
       const base = cv({
         variants: {
           size: {
@@ -158,7 +158,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { size: { sm: null } },
-          computed: ({ setDefaultVariants }) => {
+          refine: ({ setDefaultVariants }) => {
             setDefaultVariants({ size: "lg" });
           },
         }),
@@ -173,7 +173,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { size: { sm: null } },
-          computed: ({ setDefaultVariants }) => {
+          refine: ({ setDefaultVariants }) => {
             setDefaultVariants({
               // @ts-expect-error disabled variant value cannot be set
               size:
@@ -186,7 +186,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(invalidComponent())).toEqual({ class: "" });
     });
 
-    test("extend disabled variant value with computed setVariants", () => {
+    test("extend disabled variant value with refine setVariants", () => {
       const base = cv({
         variants: {
           size: {
@@ -200,7 +200,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { size: { sm: null } },
-          computed: ({ setVariants }) => {
+          refine: ({ setVariants }) => {
             setVariants({ size: "lg" });
           },
         }),
@@ -215,7 +215,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { size: { sm: null } },
-          computed: ({ setVariants }) => {
+          refine: ({ setVariants }) => {
             setVariants({
               // @ts-expect-error disabled variant value cannot be set
               size:
