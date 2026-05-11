@@ -318,17 +318,14 @@ function normalizeKeySource(source: unknown): NormalizedSource {
   if (typeof source !== "object" && typeof source !== "function") {
     return EMPTY_SOURCE;
   }
-  if (!("propKeys" in source)) return EMPTY_SOURCE;
-  if (!("variantKeys" in source)) return EMPTY_SOURCE;
+  const typed = source as Record<string, unknown>;
+  if (typeof typed.getVariants !== "function") return EMPTY_SOURCE;
+  if (!Array.isArray(typed.propKeys)) return EMPTY_SOURCE;
+  if (!Array.isArray(typed.variantKeys)) return EMPTY_SOURCE;
 
-  // Component-provided arrays are immutable metadata — reference directly.
-  const typed = source as {
-    propKeys: string[];
-    variantKeys: string[];
-  };
   return {
-    propKeys: typed.propKeys,
-    variantKeys: typed.variantKeys,
+    propKeys: typed.propKeys as string[],
+    variantKeys: typed.variantKeys as string[],
     isComponent: true,
   };
 }
