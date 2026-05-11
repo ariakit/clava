@@ -689,6 +689,8 @@ for (const config of Object.values(CONFIGS)) {
 
       try {
         component();
+        component();
+        expect(warn).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining(
             "Maximum computed update iterations exceeded",
@@ -744,29 +746,6 @@ for (const config of Object.values(CONFIGS)) {
           ),
         );
       } finally {
-        warn.mockRestore();
-      }
-    });
-
-    test("computed warning is omitted in production", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      vi.stubEnv("NODE_ENV", "production");
-      const component = getModeComponent(
-        mode,
-        cv({
-          variants: { size: { sm: "sm", lg: "lg" } },
-          defaultVariants: { size: "sm" },
-          computed: ({ variants, setVariants }) => {
-            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
-          },
-        }),
-      );
-
-      try {
-        component();
-        expect(warn).not.toHaveBeenCalled();
-      } finally {
-        vi.unstubAllEnvs();
         warn.mockRestore();
       }
     });

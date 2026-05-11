@@ -1,4 +1,5 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
+import { warn } from "#clava/warn";
 import type {
   AnyComponent,
   CVComponent,
@@ -60,7 +61,6 @@ type ResolveComputedFn = (
 
 interface ComputedRunState {
   remaining: number;
-  warned: boolean;
 }
 
 // Internal metadata stored on components but hidden from public types.
@@ -111,16 +111,12 @@ function areVariantsEqual(
   return true;
 }
 
-function warnComputedLimit(runState: ComputedRunState): void {
-  if (runState.warned) return;
-  runState.warned = true;
-  if (process.env.NODE_ENV !== "production") {
-    console.warn(
-      "Clava: Maximum computed update iterations exceeded. This can happen " +
-        "when a computed callback calls setVariants or setDefaultVariants, " +
-        "but one of the variants changes on every run.",
-    );
-  }
+function warnComputedLimit(): void {
+  warn(
+    "Clava: Maximum computed update iterations exceeded. This can happen " +
+      "when a computed callback calls setVariants or setDefaultVariants, " +
+      "but one of the variants changes on every run.",
+  );
 }
 
 function getExtUserVariantProps(
@@ -1289,7 +1285,7 @@ export function create({
             pendingProtectedVariants,
             protectedVariantKeys,
           ) => {
-            runState ??= { remaining: MAX_COMPUTED_RUNS, warned: false };
+            runState ??= { remaining: MAX_COMPUTED_RUNS };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
@@ -1359,7 +1355,7 @@ export function create({
               if (useDirectOutput && runState.remaining === 0) {
                 // Keep the direct output from the last allowed run. Rolling
                 // back here would drop it before the fallback copy below.
-                warnComputedLimit(runState);
+                warnComputedLimit();
                 return nextResolved;
               }
 
@@ -1379,7 +1375,7 @@ export function create({
               isFirstRun = false;
             }
 
-            warnComputedLimit(runState);
+            warnComputedLimit();
 
             for (let i = 0; i < lastClasses.length; i++) {
               classesOut.push(lastClasses[i]);
@@ -1452,7 +1448,7 @@ export function create({
             pendingProtectedVariants,
             protectedVariantKeys,
           ) => {
-            runState ??= { remaining: MAX_COMPUTED_RUNS, warned: false };
+            runState ??= { remaining: MAX_COMPUTED_RUNS };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
@@ -1499,7 +1495,7 @@ export function create({
             }
 
             if (reachedLimit) {
-              warnComputedLimit(runState);
+              warnComputedLimit();
             }
 
             return workingResolved;

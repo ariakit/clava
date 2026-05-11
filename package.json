@@ -11,7 +11,7 @@
   "scripts": {
     "build": "pnpm -r --filter './packages/**' build",
     "test": "vitest",
-    "perf": "pnpm build && vitest bench",
+    "perf": "pnpm build && vitest bench --config vitest.bench.config.ts",
     "perf-compare": "node scripts/perf-compare.ts",
     "perf-alternatives": "pnpm build && vitest bench --config vitest.alternatives.config.ts",
     "tsc": "tsc -b",
@@ -29,8 +29,10 @@
     "@changesets/cli": "2.31.0",
     "@changesets/config": "3.1.4",
     "@changesets/types": "6.1.0",
+    "@rspack/core": "2.0.2",
     "@types/node": "25.6.2",
     "@types/react": "19.2.14",
+    "esbuild": "0.28.0",
     "husky": "9.1.7",
     "lint-staged": "17.0.4",
     "oxfmt": "0.48.0",
@@ -41,7 +43,8 @@
     "solid-js": "1.9.12",
     "typescript": "6.0.3",
     "vite": "8.0.12",
-    "vitest": "4.1.6"
+    "vitest": "4.1.6",
+    "webpack": "5.106.2"
   },
   "lint-staged": {
     "*": [

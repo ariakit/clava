@@ -14,11 +14,15 @@
     {
       "matchPackageNames": [
         "pnpm",
+        "@rspack/core",
+        "esbuild",
+        "webpack",
         "/^@types//",
         "/^oxlint/",
         "/^oxfmt/",
         "/^rolldown/",
         "/^vite/",
+        "vitest",
         "/^typescript/"
       ],
       "automerge": true,
