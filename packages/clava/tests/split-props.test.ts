@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
-import { splitProps } from "../src/index.ts";
+import { cv, splitProps } from "../src/index.ts";
 import {
   CONFIGS,
   type HTMLProperties,
@@ -588,3 +588,75 @@ for (const config of Object.values(CONFIGS)) {
     });
   });
 }
+
+test.each([
+  [
+    "missing getVariants",
+    {
+      propKeys: ["size"],
+      variantKeys: ["size"],
+    },
+  ],
+  [
+    "non-callable getVariants",
+    {
+      getVariants: true,
+      propKeys: ["size"],
+      variantKeys: ["size"],
+    },
+  ],
+  [
+    "non-array propKeys",
+    {
+      getVariants: () => ({}),
+      propKeys: null,
+      variantKeys: ["size"],
+    },
+  ],
+] as const)(
+  "splitProps ignores malformed component-like sources: %s",
+  (_, malformedSource) => {
+    const props = { id: "test", size: "lg" };
+
+    const [sourceProps, otherProps] = splitProps(
+      props,
+      // @ts-expect-error malformed source
+      malformedSource,
+    );
+    expect(sourceProps).toEqual({});
+    expect(otherProps).toEqual(props);
+  },
+);
+
+test("splitProps ignores sources with malformed variantKeys", () => {
+  const component = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
+  const props = { id: "test", size: "lg", color: "red" };
+  const malformedSource = {
+    getVariants: () => ({}),
+    propKeys: ["color"],
+    variantKeys: null,
+  };
+
+  const result = splitProps(
+    props,
+    component,
+    // @ts-expect-error malformed source
+    malformedSource,
+  ) as unknown[];
+  expect(result).toEqual([{ size: "lg" }, {}, { id: "test", color: "red" }]);
+});
+
+test("splitProps type rejects non-string component source keys", () => {
+  const props = { size: "lg" };
+  const symbolKey = Symbol("size");
+
+  const [sourceProps, otherProps] = splitProps(props, {
+    getVariants: () => ({}),
+    // @ts-expect-error component source keys must be strings
+    propKeys: [symbolKey],
+    // @ts-expect-error component source keys must be strings
+    variantKeys: [1],
+  });
+  expect(sourceProps).toEqual({});
+  expect(otherProps).toEqual(props);
+});

@@ -119,9 +119,6 @@ button.style({ size: "lg" });
 button.getVariants({ size: "lg" });
 // { disabled: false, size: "lg", intent: "primary" }
 
-button.keys;
-// ["class", "className", "style", "size", "intent", "disabled", "fluid"]
-
 button.propKeys;
 // ["class", "className", "style", "size", "intent", "disabled", "fluid"]
 
@@ -129,7 +126,7 @@ button.variantKeys;
 // ["size", "intent", "disabled", "fluid"]
 ```
 
-`keys` and `propKeys` include style props plus variant props for that mode. `variantKeys` includes only variant props.
+`propKeys` includes style props plus variant props for that mode. `variantKeys` includes only variant props.
 
 ## Classes And Styles
 
@@ -542,7 +539,7 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 
 `component.getVariants(props?)` returns resolved variant values after static defaults, inherited defaults, and computed variant updates.
 
-`component.keys` and `component.propKeys` list style props plus variant props for that component mode.
+`component.propKeys` lists style props plus variant props for that component mode.
 
 `component.variantKeys` lists only variant prop keys.
 
