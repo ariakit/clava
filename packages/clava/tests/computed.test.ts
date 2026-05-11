@@ -96,6 +96,35 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
+    test("computed converges with NaN setDefaultVariants", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const component = getModeComponent(
+        mode,
+        cv({
+          computedVariants: {
+            value: (value: number) => (Number.isNaN(value) ? "nan" : null),
+          },
+          computed: ({ variants, setDefaultVariants, addClass }) => {
+            setDefaultVariants({ value: Number.NaN });
+            if (Number.isNaN(variants.value)) {
+              addClass("computed-nan");
+            }
+          },
+        }),
+      );
+
+      try {
+        const props = component();
+        expect(getStyleClass(props)).toEqual({
+          class: cls("nan computed-nan"),
+        });
+        expect(component.getVariants()).toEqual({ value: Number.NaN });
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     test("computed with setDefaultVariants", () => {
       const component = getModeComponent(
         mode,
@@ -713,54 +742,6 @@ for (const config of Object.values(CONFIGS)) {
         expect(warn).not.toHaveBeenCalled();
       } finally {
         process.env.NODE_ENV = nodeEnv;
-        warn.mockRestore();
-      }
-    });
-
-    test("computed warning is omitted without process", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const originalProcess = globalThis.process;
-      const component = getModeComponent(
-        mode,
-        cv({
-          variants: { size: { sm: "sm", lg: "lg" } },
-          defaultVariants: { size: "sm" },
-          computed: ({ variants, setVariants }) => {
-            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
-          },
-        }),
-      );
-
-      try {
-        vi.stubGlobal("process", undefined);
-        component();
-        expect(warn).not.toHaveBeenCalled();
-      } finally {
-        vi.stubGlobal("process", originalProcess);
-        warn.mockRestore();
-      }
-    });
-
-    test("computed warning is omitted without process.env", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const originalProcess = globalThis.process;
-      const component = getModeComponent(
-        mode,
-        cv({
-          variants: { size: { sm: "sm", lg: "lg" } },
-          defaultVariants: { size: "sm" },
-          computed: ({ variants, setVariants }) => {
-            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
-          },
-        }),
-      );
-
-      try {
-        vi.stubGlobal("process", {});
-        component();
-        expect(warn).not.toHaveBeenCalled();
-      } finally {
-        vi.stubGlobal("process", originalProcess);
         warn.mockRestore();
       }
     });
