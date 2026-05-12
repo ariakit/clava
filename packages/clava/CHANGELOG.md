@@ -1,5 +1,71 @@
 # clava
 
+## 0.4.0
+
+### Removed `computedVariants` in favor of function values in `variants`
+
+**BREAKING** if you're using the `computedVariants` config option.
+
+Define a function directly inside [`variants`](https://clava.style/docs/reference/cv#variants) — it now acts as a function variant. The function's parameter type defines the prop type and replaces any inherited variant for the same key.
+
+Before:
+
+```ts
+const grid = cv({
+  variants: {
+    color: { red: "text-red", blue: "text-blue" },
+  },
+  computedVariants: {
+    columns: (value: number) => `grid-cols-${value}`,
+  },
+});
+```
+
+After:
+
+```ts
+const grid = cv({
+  variants: {
+    color: { red: "text-red", blue: "text-blue" },
+    columns: (value: number) => `grid-cols-${value}`,
+  },
+});
+```
+
+### Renamed `computed` to `refine`
+
+**BREAKING** if you use the `computed` config field on [`cv`](https://clava.style/docs/reference/cv).
+
+The `computed` field previously collided with `computedVariants`, even though the two have very different semantics: `computedVariants` is a map of pure per-variant transformer functions, while `computed` is a single imperative callback that can mutate variants, set defaults, and emit class/style output across re-runs until variants stabilize. The new name `refine` describes that iterative refinement and removes the collision.
+
+Rename the `computed` field to `refine`. The callback signature and context (`variants`, `setVariants`, `setDefaultVariants`, `addClass`, `addStyle`) are unchanged.
+
+Before:
+
+```ts
+const button = cv({
+  variants: { size: { sm: "sm", lg: "lg" } },
+  computed: ({ variants, addClass }) => {
+    if (variants.size === "lg") {
+      addClass("is-large");
+    }
+  },
+});
+```
+
+After:
+
+```ts
+const button = cv({
+  variants: { size: { sm: "sm", lg: "lg" } },
+  refine: ({ variants, addClass }) => {
+    if (variants.size === "lg") {
+      addClass("is-large");
+    }
+  },
+});
+```
+
 ## 0.3.0
 
 ### Removed `keys`
