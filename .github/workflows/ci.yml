@@ -77,7 +77,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
     env:
       # Clean runs stop after two paired rounds. Significant deltas get one
       # extra confirmation round, which makes the final comparison require
@@ -92,6 +91,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
 
@@ -189,11 +189,25 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
+      - name: Create GitHub App token
+        id: app-token
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.ARIAKIT_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ARIAKIT_CI_APP_PRIVATE_KEY }}
+          permission-issues: write
+          permission-pull-requests: write
+
       - name: Post or update PR comment
-        if: always()
+        if: >
+          always() &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          steps.app-token.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@v9
         with:
+          github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const fs = require("fs");
             const marker = "<!-- perf-results -->";
@@ -213,9 +227,12 @@ jobs:
                 issue_number: context.issue.number,
               },
             );
-            const existing = comments.find((comment) =>
-              comment.body?.includes(marker),
+            const matches = comments.filter(
+              (comment) =>
+                comment.body?.includes(marker) &&
+                comment.user?.login === "ariakito[bot]",
             );
+            const existing = matches.at(-1);
 
             if (existing) {
               await github.rest.issues.updateComment({
