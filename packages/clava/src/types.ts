@@ -179,46 +179,46 @@ export interface ModalComponent<V, R extends ComponentResult> {
 
 export interface CVComponent<
   V extends Variants = {},
-  CV extends ComputedVariants = {},
   E extends AnyComponent[] = [],
   R extends ComponentResult = StyleClassProps,
-> extends ModalComponent<MergeVariants<V, CV, E>, R> {
-  jsx: ModalComponent<MergeVariants<V, CV, E>, JSXProps>;
-  html: ModalComponent<MergeVariants<V, CV, E>, HTMLProps>;
-  htmlObj: ModalComponent<MergeVariants<V, CV, E>, HTMLObjProps>;
+> extends ModalComponent<MergeVariants<V, E>, R> {
+  jsx: ModalComponent<MergeVariants<V, E>, JSXProps>;
+  html: ModalComponent<MergeVariants<V, E>, HTMLProps>;
+  htmlObj: ModalComponent<MergeVariants<V, E>, HTMLObjProps>;
 }
 
 export type AnyComponent =
-  | CVComponent<any, any, any, any>
+  | CVComponent<any, any, any>
   | ModalComponent<any, any>;
 
 type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
   ? ExtractVariants<First> & MergeExtendedVariants<Rest>
   : {};
 
-type MergeExtendedComputedVariants<T> = T extends readonly [
-  infer First,
-  ...infer Rest,
-]
-  ? ExtractComputedVariants<First> & MergeExtendedComputedVariants<Rest>
-  : {};
-
+// Returns a component's effective variants — merged with its own extends —
+// so that a later intermediate component's static variant correctly hides a
+// grandparent's function variant from further descendants. Using a raw
+// intersection here would re-expose the grandparent function through the
+// type chain even after the middle layer replaced it.
 type ExtractVariants<T> =
-  T extends CVComponent<infer V, any, infer E, any>
-    ? V & MergeExtendedVariants<E>
+  T extends CVComponent<infer V, infer E, any>
+    ? MergeVariantMaps<V, MergeExtendedVariants<E>>
     : {};
 
-type ExtractComputedVariants<T> =
-  T extends CVComponent<any, infer CV, infer E, any>
-    ? CV & Omit<MergeExtendedComputedVariants<E>, keyof CV>
-    : {};
-
-type MergeVariantDefinition<Child, Parent> =
-  Child extends Record<string, any>
-    ? Parent extends Record<string, any>
-      ? Omit<Parent, keyof Child> & Child
-      : Child
-    : Child;
+// A function value in `variants` (a function variant) replaces any inherited
+// variant for the same key. An object value merges value-by-value with an
+// inherited object, but replaces an inherited function.
+type MergeVariantDefinition<Child, Parent> = Child extends (
+  ...args: any[]
+) => any
+  ? Child
+  : Parent extends (...args: any[]) => any
+    ? Child
+    : Child extends Record<string, any>
+      ? Parent extends Record<string, any>
+        ? Omit<Parent, keyof Child> & Child
+        : Child
+      : Child;
 
 type MergeVariantMaps<Child, Parent> = Omit<Parent, keyof Child> &
   Child & {
@@ -228,16 +228,10 @@ type MergeVariantMaps<Child, Parent> = Omit<Parent, keyof Child> &
     >;
   };
 
-type MergeExtendedAllVariants<E extends AnyComponent[]> =
-  MergeExtendedVariants<E> & MergeExtendedComputedVariants<E>;
-
-type MergeBaseVariants<V, E extends AnyComponent[]> = MergeVariantMaps<
+export type MergeVariants<V, E extends AnyComponent[]> = MergeVariantMaps<
   NoInfer<V>,
-  MergeExtendedAllVariants<E>
+  MergeExtendedVariants<E>
 >;
-
-export type MergeVariants<V, CV, E extends AnyComponent[]> = NoInfer<CV> &
-  Omit<MergeBaseVariants<V, E>, keyof CV>;
 
 type StringToBoolean<T> = T extends "true" | "false" ? boolean : T;
 
@@ -282,13 +276,11 @@ export interface RefineContext<V> {
 
 export type Refine<V> = (context: RefineContext<V>) => VariantValue;
 
-export type ComputedVariant = (value: any) => VariantValue;
-export type ComputedVariants = Record<string, ComputedVariant>;
-export type Variant = ClassValue | Record<string, VariantValue>;
+export type Variant =
+  | ClassValue
+  | Record<string, VariantValue>
+  | ((value: any) => VariantValue);
 export type Variants = Record<string, Variant>;
-
-type ExtendedVariants<E extends AnyComponent[]> = MergeExtendedVariants<E> &
-  MergeExtendedComputedVariants<E>;
 
 type NullablePartial<T> =
   T extends Record<string, any> ? { [K in keyof T]?: T[K] | null } : T | null;
@@ -297,7 +289,7 @@ export type ExtendableVariants<
   V extends Variants,
   E extends AnyComponent[],
 > = V & {
-  [K in keyof ExtendedVariants<E>]?:
-    | NullablePartial<ExtendedVariants<E>[K]>
+  [K in keyof MergeExtendedVariants<E>]?:
+    | NullablePartial<MergeExtendedVariants<E>[K]>
     | Variant;
 };

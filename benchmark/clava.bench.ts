@@ -96,8 +96,6 @@ const toolbarButton = cv({
       true: "toolbar-button-active",
       false: "toolbar-button-idle",
     },
-  },
-  computedVariants: {
     intent: (value: unknown) => {
       if (value === "danger") {
         return {
@@ -176,7 +174,7 @@ describe("cv", () => {
   );
 
   bench(
-    "resolve extended computed props",
+    "resolve extended function variant props",
     () => {
       consume(
         toolbarButton({

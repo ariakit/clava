@@ -16,8 +16,8 @@ import type { Variant, VariantProps } from "clava";
 - [Output Modes](#output-modes)
 - [Classes And Styles](#classes-and-styles)
 - [Variants](#variants)
+- [Function Variants](#function-variants)
 - [Extending Components](#extending-components)
-- [Computed Variants](#computed-variants)
 - [Refine](#refine)
 - [Splitting Props](#splitting-props)
 - [React](#react)
@@ -78,7 +78,7 @@ button({ size: "lg", disabled: true, fluid: true, className: "mt-2" });
 // }
 ```
 
-Variant prop types are inferred from the `variants`, `computedVariants`, `defaultVariants`, and `extend` configuration. Invalid variant keys and values are TypeScript errors and are ignored at runtime.
+Variant prop types are inferred from the `variants`, `defaultVariants`, and `extend` configuration. Invalid variant keys and values are TypeScript errors and are ignored at runtime.
 
 Input props may use `class` or `className` in any output mode. Both are appended to the generated class string.
 
@@ -152,7 +152,7 @@ const card = cv({
 });
 ```
 
-Style results from `variants`, `computedVariants`, and `refine` must use an explicit `{ style }` wrapper. A raw object like `{ backgroundColor: "red" }` is not a style result by itself.
+Style results from `variants` and `refine` must use an explicit `{ style }` wrapper. A raw object like `{ backgroundColor: "red" }` is not a style result by itself.
 
 ```ts
 const chip = cv({
@@ -226,7 +226,34 @@ item({ active: true, interactive: true }).class;
 // "item-active item-interactive focus-visible:ring"
 ```
 
-Variant values can be class values, arrays, or `{ class, style }` objects. Use `null` in an extending component to disable inherited variants or inherited variant values.
+Variant values can be class values, arrays, `{ class, style }` objects, or [functions](#function-variants). Use `null` in an extending component to disable inherited variants or inherited variant values.
+
+## Function Variants
+
+Add a function as a variant value when the prop should generate class/style output dynamically. The function's parameter type defines the prop type.
+
+```ts
+const grid = cv({
+  class: "grid",
+  variants: {
+    columns: (value: number) => ({
+      class: `grid-cols-${value}`,
+      style: { "--grid-columns": `${value}` },
+    }),
+    color: (value: string | null) => {
+      return value ? `text-${value}` : "text-current";
+    },
+  },
+});
+
+grid({ columns: 3, color: null });
+// {
+//   class: "grid grid-cols-3 text-current",
+//   style: { "--grid-columns": "3" },
+// }
+```
+
+Function variants can return any class value, `{ class, style }`, a default Clava component result, `null`, or `undefined`. A function variant with the same key as an extended variant replaces that inherited variant's prop type and output.
 
 ## Extending Components
 
@@ -286,33 +313,6 @@ const plainButton = cv({
 ```
 
 You can extend any component mode, including `baseButton.jsx`, `baseButton.html`, and `baseButton.htmlObj`.
-
-## Computed Variants
-
-Use `computedVariants` when a prop value should generate class/style output dynamically. The function parameter defines the prop type.
-
-```ts
-const grid = cv({
-  class: "grid",
-  computedVariants: {
-    columns: (value: number) => ({
-      class: `grid-cols-${value}`,
-      style: { "--grid-columns": `${value}` },
-    }),
-    color: (value: string | null) => {
-      return value ? `text-${value}` : "text-current";
-    },
-  },
-});
-
-grid({ columns: 3, color: null });
-// {
-//   class: "grid grid-cols-3 text-current",
-//   style: { "--grid-columns": "3" },
-// }
-```
-
-Computed variants can return any class value, `{ class, style }`, a default Clava component result, `null`, or `undefined`. A `computedVariants` entry with the same key as an extended variant replaces that inherited variant's prop type and output.
 
 ## Refine
 
@@ -525,7 +525,7 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 
 ## API Summary
 
-`cv(config?)` creates a typed Clava component. Supported config keys are `extend`, `class`, `style`, `variants`, `computedVariants`, `defaultVariants`, and `refine`.
+`cv(config?)` creates a typed Clava component. Supported config keys are `extend`, `class`, `style`, `variants`, `defaultVariants`, and `refine`.
 
 `component(props?)` returns `{ class, style }` with normalized camelCase style keys.
 
