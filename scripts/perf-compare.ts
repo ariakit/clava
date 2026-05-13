@@ -482,14 +482,17 @@ function formatPercent(value: number) {
   return `${sign}${value.toFixed(0)}%`;
 }
 
-function formatBytes(value: number) {
-  return `${Math.round(value).toLocaleString("en-US")} B`;
+function formatKilobytes(value: number) {
+  return `${(value / 1000).toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })} kB`;
 }
 
 function formatBundleSizeChange(row: BundleSizeRow) {
   const sign = row.delta > 0 ? "+" : "";
   const percentSign = row.percent > 0 ? "+" : "";
-  let change = `${sign}${formatBytes(row.delta)} (${percentSign}${row.percent.toFixed(1)}%)`;
+  let change = `${sign}${formatKilobytes(row.delta)} (${percentSign}${row.percent.toFixed(1)}%)`;
   if (row.delta > 0) {
     change += " :warning:";
   } else if (row.delta < 0) {
@@ -537,8 +540,8 @@ function formatBundleSizeRows(comparison: BundleSizeComparison) {
   for (const row of comparison.rows) {
     const cells = [
       escapeTableCell(row.label),
-      formatBytes(row.baseline),
-      formatBytes(row.current),
+      formatKilobytes(row.baseline),
+      formatKilobytes(row.current),
       formatBundleSizeChange(row),
     ];
     lines.push(`| ${cells.join(" | ")} |`);

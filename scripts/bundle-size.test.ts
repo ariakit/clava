@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -46,6 +46,44 @@ test("measures production bundle size", async () => {
     expect(report.minifiedBytes).toBeGreaterThan(0);
     expect(report.gzipBytes).toBeGreaterThan(0);
     expect(report.gzipBytes).toBeLessThanOrEqual(report.minifiedBytes);
+  } finally {
+    await rm(tempDir, { force: true, recursive: true });
+  }
+}, 60_000);
+
+test("does not include source paths in measured size", async () => {
+  try {
+    await access(path.join(root, "packages/clava/dist/index.js"));
+  } catch {
+    await buildPackage();
+  }
+
+  const tempDir = await mkdtemp(path.join(tmpdir(), "clava-bundle-size-test-"));
+  try {
+    const linkedRoot = path.join(tempDir, "clava-link");
+    const realOutput = path.join(tempDir, "real.json");
+    const linkOutput = path.join(tempDir, "link.json");
+
+    await symlink(root, linkedRoot);
+
+    await exec(process.execPath, [
+      scriptPath,
+      "--source-root",
+      root,
+      "--output",
+      realOutput,
+    ]);
+    await exec(process.execPath, [
+      scriptPath,
+      "--source-root",
+      linkedRoot,
+      "--output",
+      linkOutput,
+    ]);
+
+    expect(JSON.parse(await readFile(linkOutput, "utf-8"))).toEqual(
+      JSON.parse(await readFile(realOutput, "utf-8")),
+    );
   } finally {
     await rm(tempDir, { force: true, recursive: true });
   }

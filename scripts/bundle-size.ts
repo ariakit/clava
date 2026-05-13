@@ -71,16 +71,21 @@ async function measureBundleSize({ sourceRoot, output }: Options) {
       },
     });
 
-    const code = await readFile(bundle);
+    // Rolldown's region comments include resolved module paths, which would
+    // make identical bundles measure differently across worktree directories.
+    const code = (await readFile(bundle, "utf-8")).replace(
+      /^\/\/#(?:end)?region.*\r?\n/gm,
+      "",
+    );
     const result = {
-      minifiedBytes: code.byteLength,
+      minifiedBytes: Buffer.byteLength(code),
       gzipBytes: gzipSync(code).byteLength,
     };
 
     await mkdir(path.dirname(output), { recursive: true });
     await writeFile(output, `${JSON.stringify(result, null, 2)}\n`);
     console.log(
-      `Bundle size: ${result.minifiedBytes} B minified, ${result.gzipBytes} B gzip`,
+      `Bundle size: ${(result.minifiedBytes / 1000).toFixed(2)} kB minified, ${(result.gzipBytes / 1000).toFixed(2)} kB gzip`,
     );
   } finally {
     await rm(tempDir, { force: true, recursive: true });

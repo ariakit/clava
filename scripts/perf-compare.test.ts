@@ -158,10 +158,10 @@ describe("perf compare", () => {
     expect(markdown).toContain("## Bundle Size");
     expect(markdown).toContain("| Metric | Baseline | Current | Change |");
     expect(markdown).toContain(
-      "| Minified | 1,000 B | 1,100 B | +100 B (+10.0%) :warning: |",
+      "| Minified | 1.00 kB | 1.10 kB | +0.10 kB (+10.0%) :warning: |",
     );
     expect(markdown).toContain(
-      "| Minified + gzip | 500 B | 450 B | -50 B (-10.0%) :rocket: |",
+      "| Minified + gzip | 0.50 kB | 0.45 kB | -0.05 kB (-10.0%) :rocket: |",
     );
   });
 
