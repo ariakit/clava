@@ -59,7 +59,7 @@ type ResolveRefineFn = (
 
 interface RefineRunState {
   remaining: number;
-  warned: boolean;
+  warned?: boolean;
 }
 
 // Internal metadata stored on components but hidden from public types.
@@ -190,24 +190,25 @@ function warnRefineLimit(
   creationFrame: CreationFrame | undefined,
   unstableKeys: Set<string> | null,
 ): void {
+  // Bundlers are expected to replace this branch with a production literal,
+  // allowing warning-only code below to be removed from consumer bundles.
+  if (process.env.NODE_ENV === "production") return;
   if (runState.warned) return;
   runState.warned = true;
-  if (process.env.NODE_ENV !== "production") {
-    let message =
-      "Clava: Maximum refine iterations exceeded. This can happen when a " +
-      "refine callback calls setVariants or setDefaultVariants, but one " +
-      "of the variants changes on every run.";
-    if (unstableKeys && unstableKeys.size > 0) {
-      message += `\nVariant(s) that did not stabilize: ${Array.from(unstableKeys).join(", ")}.`;
-    }
-    if (creationFrame) {
-      const creationStack = formatCreationStack(creationFrame);
-      if (creationStack) {
-        message += `\nComponent created at:\n${creationStack}`;
-      }
-    }
-    console.warn(message);
+  let message =
+    "Clava: Maximum refine iterations exceeded. This can happen when a " +
+    "refine callback calls setVariants or setDefaultVariants, but one " +
+    "of the variants changes on every run.";
+  if (unstableKeys && unstableKeys.size > 0) {
+    message += `\nVariant(s) that did not stabilize: ${Array.from(unstableKeys).join(", ")}.`;
   }
+  if (creationFrame) {
+    const creationStack = formatCreationStack(creationFrame);
+    if (creationStack) {
+      message += `\nComponent created at:\n${creationStack}`;
+    }
+  }
+  console.warn(message);
 }
 
 function getExtUserVariantProps(
@@ -1424,7 +1425,7 @@ export function create({
             pendingProtectedVariants,
             protectedVariantKeys,
           ) => {
-            runState ??= { remaining: MAX_REFINE_RUNS, warned: false };
+            runState ??= { remaining: MAX_REFINE_RUNS };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
@@ -1604,7 +1605,7 @@ export function create({
             pendingProtectedVariants,
             protectedVariantKeys,
           ) => {
-            runState ??= { remaining: MAX_REFINE_RUNS, warned: false };
+            runState ??= { remaining: MAX_REFINE_RUNS };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
