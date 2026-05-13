@@ -4,7 +4,6 @@ import {
   type RefineRunState,
   type VariantChange,
   accumulateUnstableVariantChanges,
-  accumulateUnstableVariantKeys,
   captureCreationFrame,
   warnRefineLimit,
 } from "./refine-warning.ts";
@@ -1381,11 +1380,8 @@ export function create({
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
-            // Union of variant keys that differed on non-converging iterations
-            // inside the tracking window, so the refine-limit warning can name
-            // every variant that contributed to the late-stage oscillation.
-            // Lazy-init keeps convergent loops allocation-free.
-            let unstableKeys: Set<string> | null = null;
+            // Latest variant changes from non-converging iterations inside the
+            // tracking window. Lazy-init keeps convergent loops allocation-free.
             let unstableChanges: Map<string, VariantChange> | null = null;
             let lastClasses: ClsxClassValue[] = [];
             let lastStyle: StyleValue = {};
@@ -1454,17 +1450,9 @@ export function create({
                 process.env.NODE_ENV !== "production" &&
                 runState.remaining < REFINE_UNSTABLE_TRACKING_WINDOW
               ) {
-                if (!unstableKeys) {
-                  unstableKeys = new Set<string>();
-                }
                 if (!unstableChanges) {
                   unstableChanges = new Map<string, VariantChange>();
                 }
-                accumulateUnstableVariantKeys(
-                  unstableKeys,
-                  workingResolved,
-                  nextResolved,
-                );
                 accumulateUnstableVariantChanges(
                   unstableChanges,
                   workingResolved,
@@ -1478,7 +1466,6 @@ export function create({
                 warnRefineLimit({
                   runState,
                   creationFrame,
-                  unstableKeys,
                   unstableChanges,
                 });
                 return nextResolved;
@@ -1503,7 +1490,6 @@ export function create({
             warnRefineLimit({
               runState,
               creationFrame,
-              unstableKeys,
               unstableChanges,
             });
 
@@ -1582,11 +1568,9 @@ export function create({
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
-            // Union of variant keys that differed on non-converging iterations
-            // inside the tracking window — see the compute loop above for the
-            // shared rationale. Lazy-init keeps convergent loops
-            // allocation-free.
-            let unstableKeys: Set<string> | null = null;
+            // Latest variant changes from non-converging iterations inside the
+            // tracking window. See the compute loop above for the shared
+            // rationale.
             let unstableChanges: Map<string, VariantChange> | null = null;
             let reachedLimit = true;
 
@@ -1631,17 +1615,9 @@ export function create({
                 process.env.NODE_ENV !== "production" &&
                 runState.remaining < REFINE_UNSTABLE_TRACKING_WINDOW
               ) {
-                if (!unstableKeys) {
-                  unstableKeys = new Set<string>();
-                }
                 if (!unstableChanges) {
                   unstableChanges = new Map<string, VariantChange>();
                 }
-                accumulateUnstableVariantKeys(
-                  unstableKeys,
-                  workingResolved,
-                  nextResolved,
-                );
                 accumulateUnstableVariantChanges(
                   unstableChanges,
                   workingResolved,
@@ -1655,7 +1631,6 @@ export function create({
               warnRefineLimit({
                 runState,
                 creationFrame,
-                unstableKeys,
                 unstableChanges,
               });
             }

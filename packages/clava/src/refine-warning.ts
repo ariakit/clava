@@ -13,7 +13,7 @@ export interface VariantChange {
 }
 
 // Once a refine loop is within this many iterations of the cap, start tracking
-// every variant key and latest value transition that changes between
+// the latest value transition for every variant key that changes between
 // iterations so the warning can report every key that contributed to the
 // oscillation, not just the keys that happened to flip on the final step.
 // Convergent loops (the common case) exit well before this threshold and pay no
@@ -77,29 +77,6 @@ function isInternalCreationFrame(line: string): boolean {
   return false;
 }
 
-// Accumulates the union of variant keys that differ between `prev` and `next`
-// into `into`. Called on every non-converging iteration of the refine loop so
-// the refine-limit warning can report any key that ever changed across runs,
-// not just the keys that changed on the final iteration (two keys flipping at
-// different cadences could otherwise hide each other on the last step).
-export function accumulateUnstableVariantKeys(
-  into: Set<string>,
-  prev: Record<string, unknown>,
-  next: Record<string, unknown>,
-): void {
-  for (const key in next) {
-    if (!Object.hasOwn(next, key)) continue;
-    if (!Object.is(prev[key], next[key])) {
-      into.add(key);
-    }
-  }
-  for (const key in prev) {
-    if (!Object.hasOwn(prev, key)) continue;
-    if (Object.hasOwn(next, key)) continue;
-    into.add(key);
-  }
-}
-
 function formatVariantValue(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
   if (typeof value === "number") {
@@ -153,14 +130,12 @@ function formatVariantChanges(changes: Map<string, VariantChange>): string {
 interface WarnRefineLimitParams {
   runState: RefineRunState;
   creationFrame: CreationFrame | undefined;
-  unstableKeys: Set<string> | null;
   unstableChanges: Map<string, VariantChange> | null;
 }
 
 export function warnRefineLimit({
   runState,
   creationFrame,
-  unstableKeys,
   unstableChanges,
 }: WarnRefineLimitParams): void {
   // Bundlers are expected to replace this branch with a production literal,
@@ -172,10 +147,8 @@ export function warnRefineLimit({
     "Clava: Maximum refine iterations exceeded. This can happen when a " +
     "refine callback calls setVariants or setDefaultVariants, but one " +
     "of the variants changes on every run.";
-  if (unstableKeys && unstableKeys.size > 0) {
-    message += `\nVariant(s) that did not stabilize: ${Array.from(unstableKeys).join(", ")}.`;
-  }
   if (unstableChanges && unstableChanges.size > 0) {
+    message += `\nVariant(s) that did not stabilize: ${Array.from(unstableChanges.keys()).join(", ")}.`;
     message += `\nLatest variant changes before warning: ${formatVariantChanges(unstableChanges)}.`;
   }
   if (creationFrame) {
