@@ -94,6 +94,10 @@ interface ComponentMeta {
 
 const META_KEY = "__meta";
 
+interface ComponentWithMeta {
+  [META_KEY]?: ComponentMeta;
+}
+
 const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
   string,
   unknown
@@ -176,7 +180,9 @@ function accumulateUnstableVariantKeys(
 ): void {
   for (const key in next) {
     if (!Object.hasOwn(next, key)) continue;
-    if (!Object.is(prev[key], next[key])) into.add(key);
+    if (!Object.is(prev[key], next[key])) {
+      into.add(key);
+    }
   }
   for (const key in prev) {
     if (!Object.hasOwn(prev, key)) continue;
@@ -237,7 +243,9 @@ function mergeVariants(
     for (const key in source) {
       if (!Object.hasOwn(source, key)) continue;
       const value = source[key];
-      if (!Object.is(target[key], value)) changed = true;
+      if (!Object.is(target[key], value)) {
+        changed = true;
+      }
       target[key] = value;
     }
     return changed;
@@ -246,21 +254,22 @@ function mergeVariants(
     if (!Object.hasOwn(source, key)) continue;
     if (skipKeys.has(key)) continue;
     const value = source[key];
-    if (!Object.is(target[key], value)) changed = true;
+    if (!Object.is(target[key], value)) {
+      changed = true;
+    }
     target[key] = value;
   }
   return changed;
 }
 
-// Dynamic property access on function requires cast through unknown.
+// Components carry internal metadata on a non-public property so user-facing
+// component types stay clean.
 function getComponentMeta(component: AnyComponent): ComponentMeta | undefined {
-  return (component as unknown as Record<string, unknown>)[META_KEY] as
-    | ComponentMeta
-    | undefined;
+  return (component as AnyComponent & ComponentWithMeta)[META_KEY];
 }
 
 function setComponentMeta(component: AnyComponent, meta: ComponentMeta): void {
-  (component as unknown as Record<string, unknown>)[META_KEY] = meta;
+  (component as AnyComponent & ComponentWithMeta)[META_KEY] = meta;
 }
 
 export type {
@@ -404,9 +413,15 @@ function isVariantDisabled(
 }
 
 function getVariantValueKey(value: unknown): string | undefined {
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  if (typeof value === "boolean") return String(value);
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return String(value);
+  }
   return undefined;
 }
 
@@ -426,7 +441,9 @@ function collectDisabledVariantKeys(
   config: CVConfig<Variants, AnyComponent[]>,
 ): Set<string> {
   const keys = new Set<string>();
-  if (!config.variants) return keys;
+  if (!config.variants) {
+    return keys;
+  }
   for (const key in config.variants) {
     if (!Object.hasOwn(config.variants, key)) continue;
     if ((config.variants as Record<string, unknown>)[key] === null) {
@@ -440,7 +457,9 @@ function collectDisabledVariantValues(
   config: CVConfig<Variants, AnyComponent[]>,
 ): Record<string, Set<string>> {
   const values: Record<string, Set<string>> = {};
-  if (!config.variants) return values;
+  if (!config.variants) {
+    return values;
+  }
   for (const key in config.variants) {
     if (!Object.hasOwn(config.variants, key)) continue;
     const variant = (config.variants as Record<string, unknown>)[key];
@@ -480,14 +499,22 @@ function normalizeKeySource(source: unknown): NormalizedSource {
     };
   }
 
-  if (!source) return EMPTY_SOURCE;
+  if (!source) {
+    return EMPTY_SOURCE;
+  }
   if (typeof source !== "object" && typeof source !== "function") {
     return EMPTY_SOURCE;
   }
   const typed = source as Record<string, unknown>;
-  if (typeof typed.getVariants !== "function") return EMPTY_SOURCE;
-  if (!Array.isArray(typed.propKeys)) return EMPTY_SOURCE;
-  if (!Array.isArray(typed.variantKeys)) return EMPTY_SOURCE;
+  if (typeof typed.getVariants !== "function") {
+    return EMPTY_SOURCE;
+  }
+  if (!Array.isArray(typed.propKeys)) {
+    return EMPTY_SOURCE;
+  }
+  if (!Array.isArray(typed.variantKeys)) {
+    return EMPTY_SOURCE;
+  }
 
   return {
     propKeys: typed.propKeys as string[],
@@ -623,7 +650,9 @@ function buildPrebuiltVariant(variantDef: unknown): PrebuiltVariant {
     if (!Object.hasOwn(variantDef, key)) continue;
     const value = variantDef[key];
     if (value === null) {
-      if (!disabledValues) disabledValues = new Set<string>();
+      if (!disabledValues) {
+        disabledValues = new Set<string>();
+      }
       disabledValues.add(key);
       continue;
     }
@@ -702,7 +731,9 @@ export function create({
     if (extend) {
       for (const ext of extend) {
         const meta = getComponentMeta(ext);
-        if (meta) Object.assign(staticDefaults, meta.staticDefaults);
+        if (meta) {
+          Object.assign(staticDefaults, meta.staticDefaults);
+        }
       }
     }
     if (variants) {
@@ -848,7 +879,9 @@ export function create({
       staticVariantsOverridingExtFn !== null
     ) {
       staticExtSkipKeys = new Set<string>();
-      for (const k of disabledVariantKeys) staticExtSkipKeys.add(k);
+      for (const k of disabledVariantKeys) {
+        staticExtSkipKeys.add(k);
+      }
       for (let i = 0; i < functionVariantCount; i++) {
         staticExtSkipKeys.add(functionVariantNames[i]);
       }
@@ -872,7 +905,9 @@ export function create({
     ): void {
       if (!hasAnyDisabled) {
         for (const key in input) {
-          if (Object.hasOwn(input, key)) out[key] = input[key];
+          if (Object.hasOwn(input, key)) {
+            out[key] = input[key];
+          }
         }
         return;
       }
@@ -996,7 +1031,9 @@ export function create({
         defaults[k] = v;
       }
 
-      if (!hasAnyDisabled) return defaults;
+      if (!hasAnyDisabled) {
+        return defaults;
+      }
 
       // Filter disabled
       const result: Record<string, unknown> = {};
@@ -1033,7 +1070,9 @@ export function create({
           const filteredVariants: Record<string, unknown> = {};
           for (let i = 0; i < variantKeysLength; i++) {
             const k = variantKeys[i];
-            if (Object.hasOwn(resolved, k)) filteredVariants[k] = resolved[k];
+            if (Object.hasOwn(resolved, k)) {
+              filteredVariants[k] = resolved[k];
+            }
           }
           ownVariants = filteredVariants;
         }
@@ -1044,7 +1083,9 @@ export function create({
         const localCClasses: ClassValue[] | null = collectOutput ? [] : null;
         let localCStyle: StyleValue | null = null;
         const ensureUpdated = (): Record<string, unknown> => {
-          if (updatedVariants) return updatedVariants;
+          if (updatedVariants) {
+            return updatedVariants;
+          }
           const u: Record<string, unknown> = {};
           Object.assign(u, ownVariants);
           updatedVariants = u;
@@ -1056,7 +1097,9 @@ export function create({
           protect = false,
         ) => {
           if (shouldCollectChangedVariants) {
-            if (!changedVariants) changedVariants = {};
+            if (!changedVariants) {
+              changedVariants = {};
+            }
             changedVariants[key] = value;
           }
           if (protect && protectedVariants) {
@@ -1131,16 +1174,22 @@ export function create({
           },
           addStyle: (newStyle: StyleValue) => {
             if (!collectOutput) return;
-            if (!localCStyle) localCStyle = {};
+            if (!localCStyle) {
+              localCStyle = {};
+            }
             Object.assign(localCStyle, newStyle);
           },
         };
         const result = refine(ctx);
         if (collectOutput && result != null) {
           const r = extractClassAndStylePrebuilt(result);
-          if (r.class != null) localCClasses?.push(r.class);
+          if (r.class != null) {
+            localCClasses?.push(r.class);
+          }
           if (r.style) {
-            if (!localCStyle) localCStyle = {};
+            if (!localCStyle) {
+              localCStyle = {};
+            }
             Object.assign(localCStyle, r.style);
           }
         }
@@ -1224,7 +1273,9 @@ export function create({
           extSkipKeys = skipKeys;
         } else {
           extSkipKeys = new Set(skipKeys);
-          for (const k of staticExtSkipKeys) extSkipKeys.add(k);
+          for (const k of staticExtSkipKeys) {
+            extSkipKeys.add(k);
+          }
         }
 
         let extSkipVals: Record<string, Set<string>> | null;
@@ -1241,7 +1292,9 @@ export function create({
             const existing = extSkipVals[k];
             if (existing) {
               const merged = new Set<string>(existing);
-              for (const v of staticExtSkipValues[k]) merged.add(v);
+              for (const v of staticExtSkipValues[k]) {
+                merged.add(v);
+              }
               extSkipVals[k] = merged;
             } else {
               extSkipVals[k] = staticExtSkipValues[k];
@@ -1306,7 +1359,9 @@ export function create({
       }
 
       // Apply own base style (after extends' styles, matching original order).
-      if (hasBaseStyle) Object.assign(styleOut, baseStyle);
+      if (hasBaseStyle) {
+        Object.assign(styleOut, baseStyle);
+      }
 
       // Apply own variants. Skip keys/values come from caller (e.g., parent
       // wants its own function variant to override this variant).
@@ -1341,12 +1396,20 @@ export function create({
           if (selectedKey == null) continue;
           const v = variant.values[selectedKey];
           if (!v) continue;
-          if (v.class != null) classesOut.push(v.class as ClsxClassValue);
-          if (v.style) Object.assign(styleOut, v.style);
+          if (v.class != null) {
+            classesOut.push(v.class as ClsxClassValue);
+          }
+          if (v.style) {
+            Object.assign(styleOut, v.style);
+          }
         } else if (variant.shorthand && selectedValue === true) {
           const v = variant.shorthand;
-          if (v.class != null) classesOut.push(v.class as ClsxClassValue);
-          if (v.style) Object.assign(styleOut, v.style);
+          if (v.class != null) {
+            classesOut.push(v.class as ClsxClassValue);
+          }
+          if (v.style) {
+            Object.assign(styleOut, v.style);
+          }
         }
       }
 
@@ -1370,8 +1433,12 @@ export function create({
         const computedResult = fn(selectedValue);
         if (computedResult == null) continue;
         const r = extractClassAndStylePrebuilt(computedResult);
-        if (r.class != null) classesOut.push(r.class as ClsxClassValue);
-        if (r.style) Object.assign(styleOut, r.style);
+        if (r.class != null) {
+          classesOut.push(r.class as ClsxClassValue);
+        }
+        if (r.style) {
+          Object.assign(styleOut, r.style);
+        }
       }
 
       // Apply `refine` results — must come after own variants (static and
@@ -1381,7 +1448,9 @@ export function create({
           classesOut.push(cClasses[i] as ClsxClassValue);
         }
       }
-      if (cStyle) Object.assign(styleOut, cStyle);
+      if (cStyle) {
+        Object.assign(styleOut, cStyle);
+      }
 
       return workingResolved;
     };
@@ -1501,7 +1570,9 @@ export function create({
                 process.env.NODE_ENV !== "production" &&
                 runState.remaining < REFINE_UNSTABLE_TRACKING_WINDOW
               ) {
-                if (!unstableKeys) unstableKeys = new Set<string>();
+                if (!unstableKeys) {
+                  unstableKeys = new Set<string>();
+                }
                 accumulateUnstableVariantKeys(
                   unstableKeys,
                   workingResolved,
@@ -1657,7 +1728,9 @@ export function create({
                 process.env.NODE_ENV !== "production" &&
                 runState.remaining < REFINE_UNSTABLE_TRACKING_WINDOW
               ) {
-                if (!unstableKeys) unstableKeys = new Set<string>();
+                if (!unstableKeys) {
+                  unstableKeys = new Set<string>();
+                }
                 accumulateUnstableVariantKeys(
                   unstableKeys,
                   workingResolved,

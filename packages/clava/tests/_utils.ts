@@ -87,12 +87,16 @@ export function getModeComponent<
   V extends Variants = {},
   const E extends AnyComponent[] = [],
 >(mode: M, component: CVComponent<V, E>) {
-  if (!mode) return component;
+  if (!mode) {
+    return component;
+  }
   return component[mode];
 }
 
 function getClass(props: ComponentResult) {
-  if ("class" in props) return props.class;
+  if ("class" in props) {
+    return props.class;
+  }
   return props.className;
 }
 

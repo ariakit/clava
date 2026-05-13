@@ -204,7 +204,9 @@ function normalizeFilePath(filePath: string) {
   const rooted = filePath.match(
     /(?:^|[\\/])((?:packages|app|benchmark)[\\/].+)$/,
   );
-  if (rooted?.[1]) return rooted[1];
+  if (rooted?.[1]) {
+    return rooted[1];
+  }
   return path.relative(process.cwd(), filePath);
 }
 
@@ -214,7 +216,9 @@ function normalizeBenchmarkName(name: string) {
 
 function getPackageName(filePath: string) {
   const [workspace, packageName] = filePath.split(/[\\/]/);
-  if (workspace === "packages" && packageName) return packageName;
+  if (workspace === "packages" && packageName) {
+    return packageName;
+  }
   return workspace ?? "";
 }
 
@@ -275,7 +279,9 @@ function discoverRoundFiles(prefix: string): DiscoveredRoundFile[] {
   }
 
   const fallback = path.join(RESULTS_DIR, `${prefix}.json`);
-  if (existsSync(fallback)) return [{ filePath: fallback, roundIndex: 1 }];
+  if (existsSync(fallback)) {
+    return [{ filePath: fallback, roundIndex: 1 }];
+  }
   return [];
 }
 
@@ -295,7 +301,9 @@ function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].toSorted((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[middle] ?? 0;
+  if (sorted.length % 2 === 1) {
+    return sorted[middle] ?? 0;
+  }
   const left = sorted[middle - 1] ?? 0;
   const right = sorted[middle] ?? 0;
   return (left + right) / 2;
@@ -341,7 +349,9 @@ function aggregateByKey(
 // run so a one-off CI hiccup cannot block an alert.
 function requiredAgreement(roundsCount: number) {
   if (roundsCount <= 1) return 1;
-  if (roundsCount <= 4) return roundsCount;
+  if (roundsCount <= 4) {
+    return roundsCount;
+  }
   return roundsCount - 1;
 }
 
@@ -405,7 +415,9 @@ function compare(): ComparisonSummary {
 
     const sharedRounds: number[] = [];
     for (const roundIndex of currentEntry.byRound.keys()) {
-      if (baselineEntry.byRound.has(roundIndex)) sharedRounds.push(roundIndex);
+      if (baselineEntry.byRound.has(roundIndex)) {
+        sharedRounds.push(roundIndex);
+      }
     }
     sharedRounds.sort((a, b) => a - b);
 

@@ -39,7 +39,9 @@ export function hyphenToCamel(str: string) {
   }
   // Fast path: no hyphen -> return as-is
   let hyphenIndex = str.indexOf("-");
-  if (hyphenIndex === -1) return str;
+  if (hyphenIndex === -1) {
+    return str;
+  }
 
   let result = "";
   let lastIndex = 0;
@@ -91,7 +93,9 @@ export function camelToHyphen(str: string) {
     lastIndex = i + 1;
   }
 
-  if (lastIndex === 0) return str;
+  if (lastIndex === 0) {
+    return str;
+  }
   return result + str.slice(lastIndex);
 }
 
@@ -102,7 +106,9 @@ export function camelToHyphen(str: string) {
  * parseLengthValue("2em"); // "2em"
  */
 export function parseLengthValue(value: string | number) {
-  if (typeof value === "string") return value;
+  if (typeof value === "string") {
+    return value;
+  }
   return `${value}px`;
 }
 
@@ -135,7 +141,10 @@ export function htmlStyleToStyleValue(styleString: string) {
     }
     if (i >= len || styleString.charCodeAt(i) === 59) {
       // No colon found - skip this declaration
-      if (i < len) i++; // skip ';'
+      if (i < len) {
+        // Skip ';'.
+        i++;
+      }
       continue;
     }
     let propEnd = i;
@@ -147,12 +156,17 @@ export function htmlStyleToStyleValue(styleString: string) {
     }
     if (propEnd === propStart) {
       // Empty property - skip
-      while (i < len && styleString.charCodeAt(i) !== 59) i++;
-      if (i < len) i++;
+      while (i < len && styleString.charCodeAt(i) !== 59) {
+        i++;
+      }
+      if (i < len) {
+        i++;
+      }
       continue;
     }
     const property = styleString.slice(propStart, propEnd);
-    i++; // skip ':'
+    // Skip ':'.
+    i++;
     // Skip whitespace before value
     while (i < len) {
       const c = styleString.charCodeAt(i);
@@ -160,14 +174,19 @@ export function htmlStyleToStyleValue(styleString: string) {
       i++;
     }
     const valStart = i;
-    while (i < len && styleString.charCodeAt(i) !== 59) i++;
+    while (i < len && styleString.charCodeAt(i) !== 59) {
+      i++;
+    }
     let valEnd = i;
     while (valEnd > valStart) {
       const c = styleString.charCodeAt(valEnd - 1);
       if (c !== 32 && c !== 9 && c !== 10 && c !== 13) break;
       valEnd--;
     }
-    if (i < len) i++; // skip ';'
+    if (i < len) {
+      // Skip ';'.
+      i++;
+    }
     if (valEnd === valStart) continue;
     const value = styleString.slice(valStart, valEnd);
     // CSS property names and values are dynamic - cast required for index access
@@ -229,7 +248,9 @@ export function styleValueToHTMLStyle(style: StyleValue): string {
     if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
-    if (result) result += "; ";
+    if (result) {
+      result += "; ";
+    }
     result += camelToHyphen(key);
     result += ": ";
     result += value as string | number;

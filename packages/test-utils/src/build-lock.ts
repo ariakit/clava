@@ -14,12 +14,18 @@ export async function withPackageBuildLock<T>(callback: () => Promise<T>) {
       await mkdir(lockDir);
       break;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw error;
+      }
       const { mtimeMs } = await stat(heartbeatFile).catch(
         (statError: NodeJS.ErrnoException) => {
-          if (statError.code !== "ENOENT") throw statError;
+          if (statError.code !== "ENOENT") {
+            throw statError;
+          }
           return stat(lockDir).catch((lockError: NodeJS.ErrnoException) => {
-            if (lockError.code !== "ENOENT") throw lockError;
+            if (lockError.code !== "ENOENT") {
+              throw lockError;
+            }
             return { mtimeMs: Date.now() };
           });
         },
@@ -42,7 +48,9 @@ export async function withPackageBuildLock<T>(callback: () => Promise<T>) {
     }, 1000);
     return await callback();
   } finally {
-    if (heartbeat) clearInterval(heartbeat);
+    if (heartbeat) {
+      clearInterval(heartbeat);
+    }
     await rm(lockDir, { force: true, recursive: true });
   }
 }

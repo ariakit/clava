@@ -34,7 +34,9 @@ async function getReleaseLine(changeset: NewChangesetWithCommit) {
     .split("\n")
     .map((line) => line.trimEnd());
 
-  if (!nextLines.length) return `- ${firstLine}`;
+  if (!nextLines.length) {
+    return `- ${firstLine}`;
+  }
 
   return `### ${firstLine}\n${nextLines.join("\n")}`;
 }
@@ -55,10 +57,14 @@ async function getChangelogText(changelogLines: Array<Promise<string>>) {
   if (!headingLines.length && !otherLines.length) return "";
 
   const other = otherLines.join("\n");
-  if (!headingLines.length) return other;
+  if (!headingLines.length) {
+    return other;
+  }
 
   const heading = headingLines.join("\n\n");
-  if (!other.trim()) return heading;
+  if (!other.trim()) {
+    return heading;
+  }
 
   return `${heading}\n\n### Other updates\n\n${other}`;
 }
