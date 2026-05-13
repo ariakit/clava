@@ -125,6 +125,125 @@ for (const config of Object.values(CONFIGS)) {
       }
     });
 
+    test("refine converges with undefined setDefaultVariants", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          invert: { true: "invert" },
+          offset: (value: boolean | undefined) =>
+            value ? "offset" : undefined,
+          push: (value: number | undefined) =>
+            value === undefined ? undefined : `push-${value}`,
+        },
+        refine: ({ variants, setDefaultVariants }) => {
+          setDefaultVariants({
+            offset: !variants.invert,
+            push: variants.invert ? 20 : undefined,
+          });
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [base] }));
+
+      try {
+        const props = component();
+        expect(getStyleClass(props)).toEqual({
+          class: cls("offset"),
+        });
+        expect(component.getVariants()).toEqual({
+          offset: true,
+          push: undefined,
+        });
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("refine converges with undefined setDefaultVariants in nested extends", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const calls = {
+        layer: 0,
+        frame: 0,
+        control: 0,
+      };
+      const layer = cv({
+        variants: {
+          layer: { true: "layer" },
+          invert: { true: "invert" },
+          offset: (value: boolean | undefined) =>
+            value ? "offset" : undefined,
+          push: (value: number | undefined) =>
+            value === undefined ? undefined : `push-${value}`,
+        },
+        defaultVariants: {
+          layer: true,
+        },
+        refine: ({ variants, setDefaultVariants }) => {
+          calls.layer += 1;
+          setDefaultVariants({
+            offset: !variants.invert,
+            push: variants.invert ? 20 : undefined,
+          });
+        },
+      });
+      const frame = cv({
+        extend: [layer],
+        variants: {
+          frame: { true: "frame" },
+        },
+        defaultVariants: {
+          frame: true,
+        },
+        refine: () => {
+          calls.frame += 1;
+        },
+      });
+      const control = cv({
+        extend: [frame],
+        variants: {
+          control: { true: "control" },
+        },
+        defaultVariants: {
+          control: true,
+          offset: true,
+        },
+        refine: () => {
+          calls.control += 1;
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [control] }));
+
+      try {
+        const props = component();
+        expect(getStyleClass(props)).toEqual({
+          class: cls("layer offset frame control"),
+        });
+        expect(calls).toEqual({
+          layer: 2,
+          frame: 2,
+          control: 2,
+        });
+        calls.layer = 0;
+        calls.frame = 0;
+        calls.control = 0;
+        expect(component.getVariants()).toEqual({
+          layer: true,
+          offset: true,
+          push: undefined,
+          frame: true,
+          control: true,
+        });
+        expect(calls).toEqual({
+          layer: 2,
+          frame: 2,
+          control: 2,
+        });
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     test("refine with setDefaultVariants", () => {
       const component = getModeComponent(
         mode,
@@ -720,6 +839,11 @@ for (const config of Object.values(CONFIGS)) {
           ),
         );
         expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /Latest variant changes before warning: [^\n]*\bsize: "(sm|lg)" -> "(sm|lg)"/,
+          ),
+        );
+        expect(warn).toHaveBeenCalledWith(
           expect.stringContaining("Component created at:"),
         );
       } finally {
@@ -748,6 +872,11 @@ for (const config of Object.values(CONFIGS)) {
         expect(warn).toHaveBeenCalledWith(
           expect.stringMatching(
             /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+          ),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /Latest variant changes before warning: [^\n]*\bsize: "(sm|lg)" -> "(sm|lg)"/,
           ),
         );
         expect(warn).toHaveBeenCalledWith(
@@ -853,6 +982,11 @@ for (const config of Object.values(CONFIGS)) {
             /Variant\(s\) that did not stabilize: [^\n]*\bcolor\b/,
           ),
         );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /Latest variant changes before warning: [^\n]*\bsize\b[^\n]*\bcolor\b/,
+          ),
+        );
       } finally {
         warn.mockRestore();
       }
@@ -879,7 +1013,50 @@ for (const config of Object.values(CONFIGS)) {
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining("refine.test.ts"),
         );
+        expect(warn).toHaveBeenCalledWith(
+          expect.not.stringContaining("node_modules"),
+        );
       } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("refine warning fallback stack skips internal creation frames", () => {
+      const ErrorWithCaptureStackTrace = Error as ErrorConstructor & {
+        captureStackTrace?: (
+          targetObject: object,
+          constructorOpt?: Function,
+        ) => void;
+      };
+      const captureStackTrace = ErrorWithCaptureStackTrace.captureStackTrace;
+      Reflect.deleteProperty(ErrorWithCaptureStackTrace, "captureStackTrace");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          refine: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        component();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("Component created at:"),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("refine.test.ts"),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.not.stringContaining("captureCreationFrame"),
+        );
+      } finally {
+        if (captureStackTrace) {
+          ErrorWithCaptureStackTrace.captureStackTrace = captureStackTrace;
+        }
         warn.mockRestore();
       }
     });

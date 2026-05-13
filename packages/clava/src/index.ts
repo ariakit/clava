@@ -1,4 +1,13 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
+import {
+  REFINE_UNSTABLE_TRACKING_WINDOW,
+  type RefineRunState,
+  type VariantChange,
+  accumulateUnstableVariantChanges,
+  accumulateUnstableVariantKeys,
+  captureCreationFrame,
+  warnRefineLimit,
+} from "./refine-warning.ts";
 import type {
   AnyComponent,
   CVComponent,
@@ -57,11 +66,6 @@ type ResolveRefineFn = (
   protectedVariantKeys?: Set<string> | null,
 ) => Record<string, unknown>;
 
-interface RefineRunState {
-  remaining: number;
-  warned?: boolean;
-}
-
 // Internal metadata stored on components but hidden from public types.
 interface ComponentMeta {
   baseClass: string;
@@ -105,13 +109,6 @@ const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
 
 const MAX_REFINE_RUNS = 50;
 
-// Once a refine loop is within this many iterations of the cap, start tracking
-// every variant key that changes between iterations so the warning can report
-// every key that contributed to the oscillation, not just the keys that
-// happened to flip on the final step. Convergent loops (the common case) exit
-// well before this threshold and pay no per-iteration tracking cost.
-const REFINE_UNSTABLE_TRACKING_WINDOW = 10;
-
 function areVariantsEqual(
   a: Record<string, unknown>,
   b: Record<string, unknown>,
@@ -125,96 +122,6 @@ function areVariantsEqual(
     if (!Object.hasOwn(a, key)) return false;
   }
   return true;
-}
-
-interface CreationFrame {
-  stack?: string;
-}
-
-// Captures the call site of the function passed in `skipFn` so refine-limit
-// warnings can point developers at the originating `cv()` call. Returns
-// `undefined` in production so bundlers that replace `process.env.NODE_ENV` at
-// build time can drop the entire warning machinery. The underlying `.stack`
-// string is formatted lazily on first access in every major engine (V8,
-// SpiderMonkey, JavaScriptCore), so holding the captured frame for the
-// lifetime of the component is cheap when no warning fires.
-function captureCreationFrame(skipFn: Function): CreationFrame | undefined {
-  if (process.env.NODE_ENV === "production") return undefined;
-  if (typeof Error.captureStackTrace === "function") {
-    const holder: CreationFrame = {};
-    Error.captureStackTrace(holder, skipFn);
-    return holder;
-  }
-  // Engines without `Error.captureStackTrace` (SpiderMonkey, JavaScriptCore)
-  // can't strip internal frames, but their `Error.stack` getter is still
-  // lazy, so returning the Error instance defers the format cost. The
-  // resulting trace includes 1–2 extra frames at the top from this helper and
-  // `cv` itself.
-  return new Error();
-}
-
-function formatCreationStack(frame: CreationFrame): string | undefined {
-  let stack = frame.stack;
-  if (!stack) return undefined;
-  // V8 prefixes the stack with a leading "Error" / "Error: message" line that
-  // isn't meaningful for a captured location — drop it.
-  const newlineIdx = stack.indexOf("\n");
-  if (newlineIdx > 0) {
-    const firstLine = stack.slice(0, newlineIdx);
-    if (firstLine === "Error" || firstLine.startsWith("Error:")) {
-      stack = stack.slice(newlineIdx + 1);
-    }
-  }
-  return stack;
-}
-
-// Accumulates the union of variant keys that differ between `prev` and `next`
-// into `into`. Called on every non-converging iteration of the refine loop so
-// the refine-limit warning can report any key that ever changed across runs,
-// not just the keys that changed on the final iteration (two keys flipping at
-// different cadences could otherwise hide each other on the last step).
-function accumulateUnstableVariantKeys(
-  into: Set<string>,
-  prev: Record<string, unknown>,
-  next: Record<string, unknown>,
-): void {
-  for (const key in next) {
-    if (!Object.hasOwn(next, key)) continue;
-    if (!Object.is(prev[key], next[key])) {
-      into.add(key);
-    }
-  }
-  for (const key in prev) {
-    if (!Object.hasOwn(prev, key)) continue;
-    if (Object.hasOwn(next, key)) continue;
-    into.add(key);
-  }
-}
-
-function warnRefineLimit(
-  runState: RefineRunState,
-  creationFrame: CreationFrame | undefined,
-  unstableKeys: Set<string> | null,
-): void {
-  // Bundlers are expected to replace this branch with a production literal,
-  // allowing warning-only code below to be removed from consumer bundles.
-  if (process.env.NODE_ENV === "production") return;
-  if (runState.warned) return;
-  runState.warned = true;
-  let message =
-    "Clava: Maximum refine iterations exceeded. This can happen when a " +
-    "refine callback calls setVariants or setDefaultVariants, but one " +
-    "of the variants changes on every run.";
-  if (unstableKeys && unstableKeys.size > 0) {
-    message += `\nVariant(s) that did not stabilize: ${Array.from(unstableKeys).join(", ")}.`;
-  }
-  if (creationFrame) {
-    const creationStack = formatCreationStack(creationFrame);
-    if (creationStack) {
-      message += `\nComponent created at:\n${creationStack}`;
-    }
-  }
-  console.warn(message);
 }
 
 function getExtUserVariantProps(
@@ -1120,7 +1027,7 @@ export function create({
                 if (!Object.hasOwn(newVariants, key)) continue;
                 const value = (newVariants as Record<string, unknown>)[key];
                 setChangedVariant(key, value, true);
-                if (getCurrentVariantValue(key) === value) continue;
+                if (Object.is(getCurrentVariantValue(key), value)) continue;
                 ensureUpdated()[key] = value;
               }
               return;
@@ -1139,7 +1046,7 @@ export function create({
                 }
               }
               setChangedVariant(key, value, true);
-              if (getCurrentVariantValue(key) === value) continue;
+              if (Object.is(getCurrentVariantValue(key), value)) continue;
               ensureUpdated()[key] = value;
             }
           },
@@ -1161,11 +1068,11 @@ export function create({
                   continue;
                 }
               }
+              if (Object.is(getCurrentVariantValue(key), value)) continue;
               setChangedVariant(key, value);
               if (pendingProtectedVariants) {
                 pendingProtectedVariants[key] = value;
               }
-              if (getCurrentVariantValue(key) === value) continue;
               ensureUpdated()[key] = value;
             }
           },
@@ -1479,6 +1386,7 @@ export function create({
             // every variant that contributed to the late-stage oscillation.
             // Lazy-init keeps convergent loops allocation-free.
             let unstableKeys: Set<string> | null = null;
+            let unstableChanges: Map<string, VariantChange> | null = null;
             let lastClasses: ClsxClassValue[] = [];
             let lastStyle: StyleValue = {};
             let isFirstRun = true;
@@ -1549,8 +1457,16 @@ export function create({
                 if (!unstableKeys) {
                   unstableKeys = new Set<string>();
                 }
+                if (!unstableChanges) {
+                  unstableChanges = new Map<string, VariantChange>();
+                }
                 accumulateUnstableVariantKeys(
                   unstableKeys,
+                  workingResolved,
+                  nextResolved,
+                );
+                accumulateUnstableVariantChanges(
+                  unstableChanges,
                   workingResolved,
                   nextResolved,
                 );
@@ -1559,7 +1475,12 @@ export function create({
               if (useDirectOutput && runState.remaining === 0) {
                 // Keep the direct output from the last allowed run. Rolling
                 // back here would drop it before the fallback copy below.
-                warnRefineLimit(runState, creationFrame, unstableKeys);
+                warnRefineLimit({
+                  runState,
+                  creationFrame,
+                  unstableKeys,
+                  unstableChanges,
+                });
                 return nextResolved;
               }
 
@@ -1579,7 +1500,12 @@ export function create({
               isFirstRun = false;
             }
 
-            warnRefineLimit(runState, creationFrame, unstableKeys);
+            warnRefineLimit({
+              runState,
+              creationFrame,
+              unstableKeys,
+              unstableChanges,
+            });
 
             for (let i = 0; i < lastClasses.length; i++) {
               classesOut.push(lastClasses[i]);
@@ -1661,6 +1587,7 @@ export function create({
             // shared rationale. Lazy-init keeps convergent loops
             // allocation-free.
             let unstableKeys: Set<string> | null = null;
+            let unstableChanges: Map<string, VariantChange> | null = null;
             let reachedLimit = true;
 
             while (runState.remaining > 0) {
@@ -1707,8 +1634,16 @@ export function create({
                 if (!unstableKeys) {
                   unstableKeys = new Set<string>();
                 }
+                if (!unstableChanges) {
+                  unstableChanges = new Map<string, VariantChange>();
+                }
                 accumulateUnstableVariantKeys(
                   unstableKeys,
+                  workingResolved,
+                  nextResolved,
+                );
+                accumulateUnstableVariantChanges(
+                  unstableChanges,
                   workingResolved,
                   nextResolved,
                 );
@@ -1717,7 +1652,12 @@ export function create({
             }
 
             if (reachedLimit) {
-              warnRefineLimit(runState, creationFrame, unstableKeys);
+              warnRefineLimit({
+                runState,
+                creationFrame,
+                unstableKeys,
+                unstableChanges,
+              });
             }
 
             return workingResolved;
