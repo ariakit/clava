@@ -25,6 +25,15 @@ interface ComparisonSummary {
   hasSignificantChanges: boolean;
   hasConfirmableChanges: boolean;
   pairedRoundsCount: number;
+  bundleSize?: {
+    rows: Array<{
+      label: string;
+      baseline: number;
+      current: number;
+      delta: number;
+      percent: number;
+    }>;
+  };
 }
 
 function createTempDir() {
@@ -57,9 +66,13 @@ function writeJson(dir: string, name: string, data: unknown) {
 function runCompare({
   baseline,
   current,
+  bundleSizeBaseline,
+  bundleSizeCurrent,
 }: {
   baseline?: unknown;
   current?: unknown;
+  bundleSizeBaseline?: unknown;
+  bundleSizeCurrent?: unknown;
 }) {
   const dir = createTempDir();
   const outputDir = path.join(dir, resultsDir);
@@ -69,6 +82,12 @@ function runCompare({
   }
   if (current) {
     writeJson(dir, "current.json", current);
+  }
+  if (bundleSizeBaseline) {
+    writeJson(dir, "bundle-size-baseline.json", bundleSizeBaseline);
+  }
+  if (bundleSizeCurrent) {
+    writeJson(dir, "bundle-size-current.json", bundleSizeCurrent);
   }
 
   execFileSync(process.execPath, [scriptPath], {
@@ -82,9 +101,13 @@ function runCompare({
 function runCompareRoundsResult({
   baseline,
   current,
+  bundleSizeBaseline,
+  bundleSizeCurrent,
 }: {
   baseline: unknown[];
   current: unknown[];
+  bundleSizeBaseline?: unknown;
+  bundleSizeCurrent?: unknown;
 }) {
   const dir = createTempDir();
   const outputDir = path.join(dir, resultsDir);
@@ -95,6 +118,12 @@ function runCompareRoundsResult({
   current.forEach((report, index) => {
     writeJson(dir, `current-${index + 1}.json`, report);
   });
+  if (bundleSizeBaseline) {
+    writeJson(dir, "bundle-size-baseline.json", bundleSizeBaseline);
+  }
+  if (bundleSizeCurrent) {
+    writeJson(dir, "bundle-size-current.json", bundleSizeCurrent);
+  }
 
   execFileSync(process.execPath, [scriptPath], {
     cwd: dir,
@@ -120,6 +149,91 @@ afterEach(() => {
 });
 
 describe("perf compare", () => {
+  test("renders bundle size comparison", () => {
+    const markdown = runCompare({
+      bundleSizeBaseline: { minifiedBytes: 1000, gzipBytes: 500 },
+      bundleSizeCurrent: { minifiedBytes: 1100, gzipBytes: 450 },
+    });
+
+    expect(markdown).toContain("## Bundle Size");
+    expect(markdown).toContain("| Metric | Baseline | Current | Change |");
+    expect(markdown).toContain(
+      "| Minified | 1.00 kB | 1.10 kB | +0.10 kB (+10.0%) :warning: |",
+    );
+    expect(markdown).toContain(
+      "| Minified + gzip | 0.50 kB | 0.45 kB | -0.05 kB (-10.0%) :rocket: |",
+    );
+  });
+
+  test("writes bundle size comparison to summary JSON", () => {
+    const { summary } = runCompareRoundsResult({
+      baseline: [],
+      current: [],
+      bundleSizeBaseline: { minifiedBytes: 1000, gzipBytes: 500 },
+      bundleSizeCurrent: { minifiedBytes: 1100, gzipBytes: 450 },
+    });
+
+    expect(summary.bundleSize?.rows).toEqual([
+      {
+        label: "Minified",
+        baseline: 1000,
+        current: 1100,
+        delta: 100,
+        percent: 10,
+      },
+      {
+        label: "Minified + gzip",
+        baseline: 500,
+        current: 450,
+        delta: -50,
+        percent: -10,
+      },
+    ]);
+  });
+
+  test("omits bundle size comparison when size results are absent", () => {
+    const dir = createTempDir();
+    const markdown = runCompare({
+      current: createReport(dir, [{ name: "current", hz: 100, mean: 0.01 }]),
+    });
+
+    expect(markdown).not.toContain("## Bundle Size");
+    expect(markdown).toContain("No baseline results available for comparison.");
+  });
+
+  test("omits bundle size comparison when size results are partial", () => {
+    const markdown = runCompare({
+      bundleSizeBaseline: { minifiedBytes: 1000, gzipBytes: 500 },
+      bundleSizeCurrent: { minifiedBytes: 1100 },
+    });
+
+    expect(markdown).not.toContain("## Bundle Size");
+    expect(markdown).toContain("No performance results found.");
+  });
+
+  test("omits bundle size comparison when size JSON is malformed", () => {
+    const dir = createTempDir();
+    const outputDir = path.join(dir, resultsDir);
+    mkdirSync(outputDir, { recursive: true });
+    writeJson(dir, "bundle-size-baseline.json", {
+      minifiedBytes: 1000,
+      gzipBytes: 500,
+    });
+    writeFileSync(path.join(outputDir, "bundle-size-current.json"), "{");
+
+    execFileSync(process.execPath, [scriptPath], {
+      cwd: dir,
+      stdio: "pipe",
+    });
+
+    const markdown = readFileSync(
+      path.join(outputDir, "comparison.md"),
+      "utf-8",
+    );
+    expect(markdown).not.toContain("## Bundle Size");
+    expect(markdown).toContain("No performance results found.");
+  });
+
   test("formats package benchmark labels", () => {
     const dir = createTempDir();
     const outputDir = path.join(dir, resultsDir);
