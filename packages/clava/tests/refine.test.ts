@@ -805,7 +805,53 @@ for (const config of Object.values(CONFIGS)) {
           ),
         );
         expect(warn).toHaveBeenCalledWith(
-          expect.not.stringContaining("did not stabilize: color"),
+          expect.not.stringMatching(
+            /Variant\(s\) that did not stabilize: [^\n]*\bcolor\b/,
+          ),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("refine warning reports keys that oscillate at different cadences", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      // `size` flips every iteration, `color` flips every other iteration, so
+      // the final pair may agree on one of them — the warning must still name
+      // both keys because each contributed to a transition.
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          defaultVariants: { size: "sm", color: "red" },
+          refine: ({ variants, setVariants }) => {
+            setVariants({
+              size: variants.size === "sm" ? "lg" : "sm",
+              color:
+                variants.size === "sm"
+                  ? variants.color === "red"
+                    ? "blue"
+                    : "red"
+                  : variants.color,
+            });
+          },
+        }),
+      );
+
+      try {
+        component();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+          ),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /Variant\(s\) that did not stabilize: [^\n]*\bcolor\b/,
+          ),
         );
       } finally {
         warn.mockRestore();

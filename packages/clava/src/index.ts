@@ -101,6 +101,13 @@ const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
 
 const MAX_REFINE_RUNS = 50;
 
+// Once a refine loop is within this many iterations of the cap, start tracking
+// every variant key that changes between iterations so the warning can report
+// every key that contributed to the oscillation, not just the keys that
+// happened to flip on the final step. Convergent loops (the common case) exit
+// well before this threshold and pay no per-iteration tracking cost.
+const REFINE_UNSTABLE_TRACKING_WINDOW = 10;
+
 function areVariantsEqual(
   a: Record<string, unknown>,
   b: Record<string, unknown>,
@@ -157,28 +164,31 @@ function formatCreationStack(frame: CreationFrame): string | undefined {
   return stack;
 }
 
-function collectUnstableVariantKeys(
+// Accumulates the union of variant keys that differ between `prev` and `next`
+// into `into`. Called on every non-converging iteration of the refine loop so
+// the refine-limit warning can report any key that ever changed across runs,
+// not just the keys that changed on the final iteration (two keys flipping at
+// different cadences could otherwise hide each other on the last step).
+function accumulateUnstableVariantKeys(
+  into: Set<string>,
   prev: Record<string, unknown>,
   next: Record<string, unknown>,
-): string[] {
-  const keys: string[] = [];
+): void {
   for (const key in next) {
     if (!Object.hasOwn(next, key)) continue;
-    if (!Object.is(prev[key], next[key])) keys.push(key);
+    if (!Object.is(prev[key], next[key])) into.add(key);
   }
   for (const key in prev) {
     if (!Object.hasOwn(prev, key)) continue;
     if (Object.hasOwn(next, key)) continue;
-    keys.push(key);
+    into.add(key);
   }
-  return keys;
 }
 
 function warnRefineLimit(
   runState: RefineRunState,
   creationFrame: CreationFrame | undefined,
-  priorResolved: Record<string, unknown>,
-  nextResolved: Record<string, unknown>,
+  unstableKeys: Set<string> | null,
 ): void {
   if (runState.warned) return;
   runState.warned = true;
@@ -187,12 +197,8 @@ function warnRefineLimit(
       "Clava: Maximum refine iterations exceeded. This can happen when a " +
       "refine callback calls setVariants or setDefaultVariants, but one " +
       "of the variants changes on every run.";
-    const unstableKeys = collectUnstableVariantKeys(
-      priorResolved,
-      nextResolved,
-    );
-    if (unstableKeys.length > 0) {
-      message += `\nVariant(s) that did not stabilize: ${unstableKeys.join(", ")}.`;
+    if (unstableKeys && unstableKeys.size > 0) {
+      message += `\nVariant(s) that did not stabilize: ${Array.from(unstableKeys).join(", ")}.`;
     }
     if (creationFrame) {
       const creationStack = formatCreationStack(creationFrame);
@@ -1422,10 +1428,11 @@ export function create({
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
-            // Snapshot of `workingResolved` before each non-converging iteration
-            // so the refine-limit warning can diff against the final value and
-            // report which variant keys are still changing.
-            let priorResolved: Record<string, unknown> = resolved;
+            // Union of variant keys that differed on non-converging iterations
+            // inside the tracking window, so the refine-limit warning can name
+            // every variant that contributed to the late-stage oscillation.
+            // Lazy-init keeps convergent loops allocation-free.
+            let unstableKeys: Set<string> | null = null;
             let lastClasses: ClsxClassValue[] = [];
             let lastStyle: StyleValue = {};
             let isFirstRun = true;
@@ -1489,15 +1496,22 @@ export function create({
                 return nextResolved;
               }
 
-              if (useDirectOutput && runState.remaining === 0) {
-                // Keep the direct output from the last allowed run. Rolling
-                // back here would drop it before the fallback copy below.
-                warnRefineLimit(
-                  runState,
-                  creationFrame,
+              if (
+                process.env.NODE_ENV !== "production" &&
+                runState.remaining < REFINE_UNSTABLE_TRACKING_WINDOW
+              ) {
+                if (!unstableKeys) unstableKeys = new Set<string>();
+                accumulateUnstableVariantKeys(
+                  unstableKeys,
                   workingResolved,
                   nextResolved,
                 );
+              }
+
+              if (useDirectOutput && runState.remaining === 0) {
+                // Keep the direct output from the last allowed run. Rolling
+                // back here would drop it before the fallback copy below.
+                warnRefineLimit(runState, creationFrame, unstableKeys);
                 return nextResolved;
               }
 
@@ -1513,17 +1527,11 @@ export function create({
                 lastStyle = nextStyle;
               }
 
-              priorResolved = workingResolved;
               workingResolved = nextResolved;
               isFirstRun = false;
             }
 
-            warnRefineLimit(
-              runState,
-              creationFrame,
-              priorResolved,
-              workingResolved,
-            );
+            warnRefineLimit(runState, creationFrame, unstableKeys);
 
             for (let i = 0; i < lastClasses.length; i++) {
               classesOut.push(lastClasses[i]);
@@ -1600,10 +1608,11 @@ export function create({
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
-            // Snapshot of `workingResolved` before each non-converging iteration
-            // so the refine-limit warning can diff against the final value and
-            // report which variant keys are still changing.
-            let priorResolved: Record<string, unknown> = resolved;
+            // Union of variant keys that differed on non-converging iterations
+            // inside the tracking window — see the compute loop above for the
+            // shared rationale. Lazy-init keeps convergent loops
+            // allocation-free.
+            let unstableKeys: Set<string> | null = null;
             let reachedLimit = true;
 
             while (runState.remaining > 0) {
@@ -1643,17 +1652,22 @@ export function create({
                 break;
               }
 
-              priorResolved = workingResolved;
+              if (
+                process.env.NODE_ENV !== "production" &&
+                runState.remaining < REFINE_UNSTABLE_TRACKING_WINDOW
+              ) {
+                if (!unstableKeys) unstableKeys = new Set<string>();
+                accumulateUnstableVariantKeys(
+                  unstableKeys,
+                  workingResolved,
+                  nextResolved,
+                );
+              }
               workingResolved = nextResolved;
             }
 
             if (reachedLimit) {
-              warnRefineLimit(
-                runState,
-                creationFrame,
-                priorResolved,
-                workingResolved,
-              );
+              warnRefineLimit(runState, creationFrame, unstableKeys);
             }
 
             return workingResolved;
