@@ -73,8 +73,8 @@ interface ComparisonSummary {
   removedBenchmarks: AggregatedBenchmark[];
   bundleSize?: BundleSizeComparison;
   hasSignificantChanges: boolean;
-  // Preliminary comparisons use this to decide whether one more round could
-  // turn a near-threshold, same-direction result into a final significant row.
+  // Preliminary two-round comparisons use this to decide whether confirmation
+  // rounds could turn a same-direction result into a final significant row.
   hasConfirmableChanges: boolean;
   // Number of rounds where both baseline and current produced data (i.e. the
   // count actually used for comparison), not the larger of the two raw counts.
@@ -330,9 +330,9 @@ function aggregateByKey(
   return aggregated;
 }
 
-// Direction-of-change agreement check across rounds. Up to four rounds require
-// unanimity. Five or more rounds tolerate a single dissenter so a one-off CI
-// hiccup cannot block an alert.
+// Material-change agreement check across rounds. Up to four rounds require
+// unanimity. Five or more rounds tolerate a single non-material or dissenting
+// run so a one-off CI hiccup cannot block an alert.
 function requiredAgreement(roundsCount: number) {
   if (roundsCount <= 1) return 1;
   if (roundsCount <= 4) return roundsCount;
@@ -352,7 +352,9 @@ function computeSignificance({
   const direction = Math.sign(medianPercent);
   let agreement = 0;
   for (const percent of perRoundPercents) {
-    if (Math.sign(percent) === direction) agreement += 1;
+    if (Math.sign(percent) !== direction) continue;
+    if (Math.abs(percent) <= THRESHOLD_PERCENT) continue;
+    agreement += 1;
   }
   const magnitudeOk = Math.abs(medianPercent) > THRESHOLD_PERCENT;
   const agreementOk = agreement >= requiredAgreement(perRoundPercents.length);
@@ -361,16 +363,18 @@ function computeSignificance({
 
 function isConfirmableChange(row: ComparisonRow) {
   if (row.significant) return false;
-  if (row.perRoundPercents.length <= 1) return false;
-  if (row.agreement !== row.perRoundPercents.length) return false;
+  if (row.perRoundPercents.length !== 2) return false;
 
   const direction = Math.sign(row.percent);
   if (direction === 0) return false;
 
-  return row.perRoundPercents.some((percent) => {
-    if (Math.sign(percent) !== direction) return false;
-    return Math.abs(percent) > THRESHOLD_PERCENT;
-  });
+  const sameDirection = row.perRoundPercents.every(
+    (percent) => Math.sign(percent) === direction,
+  );
+  const hasMaterialRound = row.perRoundPercents.some(
+    (percent) => Math.abs(percent) > THRESHOLD_PERCENT,
+  );
+  return sameDirection && hasMaterialRound;
 }
 
 function compare(): ComparisonSummary {
@@ -584,7 +588,7 @@ function formatRoundsSummary(pairedRoundsCount: number) {
   if (pairedRoundsCount <= 2) {
     return `Aggregated across ${pairedRoundsCount} interleaved rounds (preliminary).`;
   }
-  return `Aggregated across ${pairedRoundsCount} interleaved rounds; a change is flagged only when the median exceeds the threshold and rounds agree on direction.`;
+  return `Aggregated across ${pairedRoundsCount} interleaved rounds; a change is flagged only when the median exceeds the threshold and enough rounds independently exceed it in the same direction.`;
 }
 
 function formatMarkdown(summary: ComparisonSummary) {

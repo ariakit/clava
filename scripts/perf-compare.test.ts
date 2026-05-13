@@ -450,6 +450,26 @@ describe("perf compare", () => {
     expect(markdown).not.toMatch(/% :warning:/);
   });
 
+  test("does not flag when only direction agrees across rounds", () => {
+    const dir = createTempDir();
+    const baselineRounds = [100, 100, 100].map((hz) =>
+      createReport(dir, [{ name: "direction-only bench", hz, mean: 1 / hz }]),
+    );
+    const currentRounds = [102, 134, 132].map((hz) =>
+      createReport(dir, [{ name: "direction-only bench", hz, mean: 1 / hz }]),
+    );
+
+    const { markdown, summary } = runCompareRoundsResult({
+      baseline: baselineRounds,
+      current: currentRounds,
+    });
+
+    expect(summary.hasSignificantChanges).toBe(false);
+    expect(summary.hasConfirmableChanges).toBe(false);
+    expect(markdown).toContain("No significant performance changes detected.");
+    expect(markdown).not.toMatch(/% :rocket:/);
+  });
+
   test("flags an unanimous regression with four rounds", () => {
     const dir = createTempDir();
     const baselineRounds = [100, 100, 100, 100].map((hz) =>
