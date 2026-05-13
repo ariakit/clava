@@ -71,6 +71,7 @@ interface ComparisonSummary {
   rows: ComparisonRow[];
   newBenchmarks: AggregatedBenchmark[];
   removedBenchmarks: AggregatedBenchmark[];
+  bundleSize?: BundleSizeComparison;
   hasSignificantChanges: boolean;
   // Preliminary comparisons use this to decide whether one more round could
   // turn a near-threshold, same-direction result into a final significant row.
@@ -78,6 +79,38 @@ interface ComparisonSummary {
   // Number of rounds where both baseline and current produced data (i.e. the
   // count actually used for comparison), not the larger of the two raw counts.
   pairedRoundsCount: number;
+}
+
+interface BundleSizeReport {
+  minifiedBytes: number;
+  gzipBytes: number;
+}
+
+interface BundleSizeRow {
+  label: string;
+  baseline: number;
+  current: number;
+  delta: number;
+  percent: number;
+}
+
+interface BundleSizeComparison {
+  rows: BundleSizeRow[];
+}
+
+function createBundleSizeRow(
+  label: string,
+  baselineBytes: number,
+  currentBytes: number,
+): BundleSizeRow {
+  const delta = currentBytes - baselineBytes;
+  return {
+    label,
+    baseline: baselineBytes,
+    current: currentBytes,
+    delta,
+    percent: baselineBytes > 0 ? (delta / baselineBytes) * 100 : 0,
+  };
 }
 
 function readJsonFile(filePath: string): unknown {
@@ -93,10 +126,65 @@ function readJsonFile(filePath: string): unknown {
   }
 }
 
+function readOptionalJsonFile(filePath: string): unknown {
+  if (!existsSync(filePath)) return undefined;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf-8"));
+  } catch (error) {
+    console.warn(
+      `Warning: failed to parse JSON file at ${filePath}. Falling back to empty results.`,
+      error,
+    );
+    return undefined;
+  }
+}
+
 function getNumber(value: unknown): number {
   if (typeof value !== "number") return 0;
   if (!Number.isFinite(value)) return 0;
   return value;
+}
+
+function loadBundleSizeReport(name: string): BundleSizeReport | undefined {
+  const filePath = path.join(RESULTS_DIR, name);
+  const report = readOptionalJsonFile(filePath);
+  if (!report) return undefined;
+  if (typeof report !== "object") return undefined;
+  const { minifiedBytes, gzipBytes } = report as Partial<BundleSizeReport>;
+  const minified = getNumber(minifiedBytes);
+  const gzip = getNumber(gzipBytes);
+  if (minified <= 0 || gzip <= 0) {
+    console.warn(
+      `Warning: invalid bundle size report at ${filePath}. Skipping bundle-size comparison.`,
+    );
+    return undefined;
+  }
+  return {
+    minifiedBytes: minified,
+    gzipBytes: gzip,
+  };
+}
+
+function compareBundleSize(): BundleSizeComparison | undefined {
+  const baseline = loadBundleSizeReport("bundle-size-baseline.json");
+  const current = loadBundleSizeReport("bundle-size-current.json");
+  if (!baseline) return undefined;
+  if (!current) return undefined;
+
+  return {
+    rows: [
+      createBundleSizeRow(
+        "Minified",
+        baseline.minifiedBytes,
+        current.minifiedBytes,
+      ),
+      createBundleSizeRow(
+        "Minified + gzip",
+        baseline.gzipBytes,
+        current.gzipBytes,
+      ),
+    ],
+  };
 }
 
 function normalizeFilePath(filePath: string) {
@@ -288,6 +376,7 @@ function isConfirmableChange(row: ComparisonRow) {
 function compare(): ComparisonSummary {
   const baseline = aggregateByKey(loadRounds("baseline"));
   const current = aggregateByKey(loadRounds("current"));
+  const bundleSize = compareBundleSize();
 
   const rows: ComparisonRow[] = [];
   const newBenchmarks: AggregatedBenchmark[] = [];
@@ -313,7 +402,8 @@ function compare(): ComparisonSummary {
     for (const roundIndex of sharedRounds) {
       const baselineRound = baselineEntry.byRound.get(roundIndex);
       const currentRound = currentEntry.byRound.get(roundIndex);
-      if (!baselineRound || !currentRound) continue;
+      if (!baselineRound) continue;
+      if (!currentRound) continue;
       pairedRoundIndices.add(roundIndex);
       baselineHzShared.push(baselineRound.hz);
       currentHzShared.push(currentRound.hz);
@@ -372,6 +462,7 @@ function compare(): ComparisonSummary {
     rows,
     newBenchmarks,
     removedBenchmarks,
+    bundleSize,
     hasSignificantChanges: rows.some((row) => row.significant),
     hasConfirmableChanges: rows.some(isConfirmableChange),
     pairedRoundsCount: pairedRoundIndices.size,
@@ -389,6 +480,22 @@ function formatMs(value: number) {
 function formatPercent(value: number) {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(0)}%`;
+}
+
+function formatBytes(value: number) {
+  return `${Math.round(value).toLocaleString("en-US")} B`;
+}
+
+function formatBundleSizeChange(row: BundleSizeRow) {
+  const sign = row.delta > 0 ? "+" : "";
+  const percentSign = row.percent > 0 ? "+" : "";
+  let change = `${sign}${formatBytes(row.delta)} (${percentSign}${row.percent.toFixed(1)}%)`;
+  if (row.delta > 0) {
+    change += " :warning:";
+  } else if (row.delta < 0) {
+    change += " :rocket:";
+  }
+  return change;
 }
 
 function escapeTableCell(value: string) {
@@ -415,6 +522,24 @@ function formatBenchmarkRows(rows: ComparisonRow[]) {
       formatHz(row.current.hz),
       change,
       formatMs(row.current.mean),
+    ];
+    lines.push(`| ${cells.join(" | ")} |`);
+  }
+
+  return lines;
+}
+
+function formatBundleSizeRows(comparison: BundleSizeComparison) {
+  const lines: string[] = [];
+  lines.push("| Metric | Baseline | Current | Change |");
+  lines.push("|--------|----------|---------|--------|");
+
+  for (const row of comparison.rows) {
+    const cells = [
+      escapeTableCell(row.label),
+      formatBytes(row.baseline),
+      formatBytes(row.current),
+      formatBundleSizeChange(row),
     ];
     lines.push(`| ${cells.join(" | ")} |`);
   }
@@ -466,11 +591,21 @@ function formatMarkdown(summary: ComparisonSummary) {
     removedBenchmarks,
     hasSignificantChanges,
     pairedRoundsCount,
+    bundleSize,
   } = summary;
   const lines: string[] = [];
   const significantRows = rows.filter((row) => row.significant);
   const totalBenchmarks =
     rows.length + newBenchmarks.length + removedBenchmarks.length;
+
+  if (bundleSize) {
+    lines.push("## Bundle Size");
+    lines.push("");
+    lines.push(...formatBundleSizeRows(bundleSize));
+    lines.push("");
+    lines.push(":warning: = size increase - :rocket: = size decrease");
+    lines.push("");
+  }
 
   lines.push("## Performance");
   lines.push("");

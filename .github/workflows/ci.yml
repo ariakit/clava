@@ -123,6 +123,31 @@ jobs:
         working-directory: ${{ env.BASELINE_DIR }}
         run: pnpm build
 
+      - name: Measure bundle size
+        run: |
+          mkdir -p .perf-results
+
+          measure_bundle_size() {
+            local label="$1"
+            local source_root="$2"
+            local output="$3"
+
+            echo "::group::Bundle size - $label"
+            if ! pnpm bundle-size \
+              --source-root "$source_root" \
+              --output "$output"; then
+              echo "::warning::Failed to measure $label bundle size."
+            fi
+            echo "::endgroup::"
+          }
+
+          measure_bundle_size baseline \
+            "$BASELINE_DIR" \
+            .perf-results/bundle-size-baseline.json
+          measure_bundle_size current \
+            "$GITHUB_WORKSPACE" \
+            .perf-results/bundle-size-current.json
+
       - name: Run interleaved benchmarks
         run: |
           mkdir -p .perf-results
