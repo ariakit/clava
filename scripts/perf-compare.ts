@@ -132,7 +132,7 @@ function readOptionalJsonFile(filePath: string): unknown {
     return JSON.parse(readFileSync(filePath, "utf-8"));
   } catch (error) {
     console.warn(
-      `Warning: failed to parse JSON file at ${filePath}. Falling back to empty results.`,
+      `Warning: failed to parse JSON file at ${filePath}. Skipping bundle-size comparison.`,
       error,
     );
     return undefined;

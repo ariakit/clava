@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { build } from "vite";
 import { expect, test } from "vitest";
+import { withPackageBuildLock } from "./_build-lock.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const exec = promisify(execFile);
@@ -17,26 +18,29 @@ function buildPackage() {
 }
 
 test("build preserves the production warning guard for consumers", async () => {
-  await buildPackage();
+  await withPackageBuildLock(async () => {
+    await buildPackage();
 
-  const code = await readFile(join(root, "dist/index.js"), "utf8");
-  expect(code).toMatch(
-    /warnRefineLimit[\s\S]*?process\.env\.NODE_ENV === "production"[\s\S]*?console\.warn\(/,
-  );
+    const code = await readFile(join(root, "dist/index.js"), "utf8");
+    expect(code).toMatch(
+      /warnRefineLimit[\s\S]*?process\.env\.NODE_ENV === "production"[\s\S]*?console\.warn\(/,
+    );
+  });
 }, 60_000);
 
 test("vite removes warning logic from the production bundle", async () => {
-  await buildPackage();
+  await withPackageBuildLock(async () => {
+    await buildPackage();
 
-  const tempDir = await mkdtemp(join(tmpdir(), "clava-vite-"));
-  try {
-    const entry = join(tempDir, "entry.js");
-    const bundle = join(tempDir, "dist/bundle.js");
-    const clavaUrl = pathToFileURL(join(root, "dist/index.js")).href;
+    const tempDir = await mkdtemp(join(tmpdir(), "clava-vite-"));
+    try {
+      const entry = join(tempDir, "entry.js");
+      const bundle = join(tempDir, "dist/bundle.js");
+      const clavaUrl = pathToFileURL(join(root, "dist/index.js")).href;
 
-    await writeFile(
-      entry,
-      `
+      await writeFile(
+        entry,
+        `
         import { cv } from ${JSON.stringify(clavaUrl)};
 
         export const button = cv({
@@ -52,36 +56,37 @@ test("vite removes warning logic from the production bundle", async () => {
 
         button();
       `,
-    );
+      );
 
-    await build({
-      configFile: false,
-      logLevel: "silent",
-      root: tempDir,
-      mode: "production",
-      define: {
-        "process.env.NODE_ENV": JSON.stringify("production"),
-      },
-      build: {
-        emptyOutDir: true,
-        lib: {
-          entry,
-          fileName: () => "bundle.js",
-          formats: ["es"],
+      await build({
+        configFile: false,
+        logLevel: "silent",
+        root: tempDir,
+        mode: "production",
+        define: {
+          "process.env.NODE_ENV": JSON.stringify("production"),
         },
-        minify: true,
-        outDir: "dist",
-      },
-    });
+        build: {
+          emptyOutDir: true,
+          lib: {
+            entry,
+            fileName: () => "bundle.js",
+            formats: ["es"],
+          },
+          minify: true,
+          outDir: "dist",
+        },
+      });
 
-    const code = await readFile(bundle, "utf8");
-    expect(code).not.toContain("console.warn");
-    expect(code).not.toContain("Clava: Maximum refine iterations exceeded");
-    expect(code).not.toContain("Variant(s) that did not stabilize");
-    expect(code).not.toContain("Component created at");
-    expect(code).not.toContain("captureStackTrace");
-    expect(code).not.toMatch(/\.warned\b|["']warned["']/);
-  } finally {
-    await rm(tempDir, { force: true, recursive: true });
-  }
+      const code = await readFile(bundle, "utf8");
+      expect(code).not.toContain("console.warn");
+      expect(code).not.toContain("Clava: Maximum refine iterations exceeded");
+      expect(code).not.toContain("Variant(s) that did not stabilize");
+      expect(code).not.toContain("Component created at");
+      expect(code).not.toContain("captureStackTrace");
+      expect(code).not.toMatch(/\.warned\b|["']warned["']/);
+    } finally {
+      await rm(tempDir, { force: true, recursive: true });
+    }
+  });
 }, 60_000);
