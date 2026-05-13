@@ -12,7 +12,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 
 const resultsDir = ".perf-results";
-const scriptPath = path.join(import.meta.dirname, "perf-compare.ts");
+const scriptPath = path.join(import.meta.dirname, "index.ts");
 const tempDirs: string[] = [];
 
 interface Benchmark {
@@ -90,7 +90,7 @@ function runCompare({
     writeJson(dir, "bundle-size-current.json", bundleSizeCurrent);
   }
 
-  execFileSync(process.execPath, [scriptPath], {
+  execFileSync(process.execPath, [scriptPath, "perf-compare"], {
     cwd: dir,
     stdio: "pipe",
   });
@@ -125,7 +125,7 @@ function runCompareRoundsResult({
     writeJson(dir, "bundle-size-current.json", bundleSizeCurrent);
   }
 
-  execFileSync(process.execPath, [scriptPath], {
+  execFileSync(process.execPath, [scriptPath, "perf-compare"], {
     cwd: dir,
     stdio: "pipe",
   });
@@ -201,6 +201,27 @@ describe("perf compare", () => {
     expect(markdown).toContain("No baseline results available for comparison.");
   });
 
+  test("allows unused arguments", () => {
+    const dir = createTempDir();
+    const outputDir = path.join(dir, resultsDir);
+    mkdirSync(outputDir, { recursive: true });
+
+    execFileSync(
+      process.execPath,
+      [scriptPath, "perf-compare", "--ignored", "extra"],
+      {
+        cwd: dir,
+        stdio: "pipe",
+      },
+    );
+
+    const markdown = readFileSync(
+      path.join(outputDir, "comparison.md"),
+      "utf-8",
+    );
+    expect(markdown).toContain("No performance results found.");
+  });
+
   test("omits bundle size comparison when size results are partial", () => {
     const markdown = runCompare({
       bundleSizeBaseline: { minifiedBytes: 1000, gzipBytes: 500 },
@@ -221,7 +242,7 @@ describe("perf compare", () => {
     });
     writeFileSync(path.join(outputDir, "bundle-size-current.json"), "{");
 
-    execFileSync(process.execPath, [scriptPath], {
+    execFileSync(process.execPath, [scriptPath, "perf-compare"], {
       cwd: dir,
       stdio: "pipe",
     });
@@ -246,7 +267,7 @@ describe("perf compare", () => {
       ]),
     );
 
-    execFileSync(process.execPath, [scriptPath], {
+    execFileSync(process.execPath, [scriptPath, "perf-compare"], {
       cwd: dir,
       stdio: "pipe",
     });
@@ -293,7 +314,7 @@ describe("perf compare", () => {
     );
     writeJson(dir, "current.json", reportFor(dir, 80));
 
-    execFileSync(process.execPath, [scriptPath], {
+    execFileSync(process.execPath, [scriptPath, "perf-compare"], {
       cwd: dir,
       stdio: "pipe",
     });
@@ -649,7 +670,7 @@ describe("perf compare", () => {
       createReport(dir, [{ name: "current", hz: 100, mean: 0.01 }]),
     );
 
-    execFileSync(process.execPath, [scriptPath], {
+    execFileSync(process.execPath, [scriptPath, "perf-compare"], {
       cwd: dir,
       stdio: "pipe",
     });
