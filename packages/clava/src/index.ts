@@ -1388,31 +1388,7 @@ export function create({
 
     const compute: ComputeFn =
       !refine && extMetasWithRefineCount === 0
-        ? (
-            resolved,
-            userVariantProps,
-            skipKeys,
-            skipValues,
-            classesOut,
-            styleOut,
-            runState,
-            protectedVariants,
-            pendingProtectedVariants,
-            protectedVariantKeys,
-          ) => {
-            return computeOnce(
-              resolved,
-              userVariantProps,
-              skipKeys,
-              skipValues,
-              classesOut,
-              styleOut,
-              runState,
-              protectedVariants,
-              pendingProtectedVariants,
-              protectedVariantKeys,
-            );
-          }
+        ? computeOnce
         : (
             resolved,
             userVariantProps,
