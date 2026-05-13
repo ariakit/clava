@@ -1,5 +1,10 @@
 # clava
 
+## 0.4.2
+
+- Improved [`refine`](https://clava.style/docs/reference/refine) iteration warnings to show the latest changing variant values with a shorter component creation stack.
+- Fixed [`setDefaultVariants`](https://clava.style/docs/reference/refine#setdefaultvariants) calls with stable values to avoid extra [`refine`](https://clava.style/docs/reference/refine) passes.
+
 ## 0.4.1
 
 ### Improved refine iteration warning with debugging context
