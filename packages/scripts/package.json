@@ -1,0 +1,17 @@
+{
+  "name": "scripts",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "scripts": "./src/index.ts"
+  },
+  "type": "module",
+  "dependencies": {
+    "commander": "14.0.3",
+    "vite": "8.0.12"
+  },
+  "devDependencies": {
+    "test-utils": "workspace:*",
+    "vitest": "4.1.6"
+  }
+}

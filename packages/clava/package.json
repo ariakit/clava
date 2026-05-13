@@ -44,6 +44,7 @@
     "csstype": "^3.0.0"
   },
   "devDependencies": {
+    "test-utils": "workspace:*",
     "vite": "8.0.12"
   }
 }

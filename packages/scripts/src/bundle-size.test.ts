@@ -3,12 +3,12 @@ import { access, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { withPackageBuildLock } from "test-utils/build-lock";
 import { expect, test } from "vitest";
-import { withPackageBuildLock } from "../packages/clava/tests/_build-lock.ts";
 
 const exec = promisify(execFile);
-const root = path.join(import.meta.dirname, "..");
-const scriptPath = path.join(import.meta.dirname, "bundle-size.ts");
+const root = path.join(import.meta.dirname, "../../..");
+const scriptPath = path.join(import.meta.dirname, "index.ts");
 let buildPromise: Promise<unknown> | undefined;
 
 interface BundleSizeReport {
@@ -42,6 +42,7 @@ test("measures production bundle size", async () => {
 
       await exec(process.execPath, [
         scriptPath,
+        "bundle-size",
         "--source-root",
         root,
         "--output",
@@ -75,6 +76,7 @@ test("does not include source paths in measured size", async () => {
 
       await exec(process.execPath, [
         scriptPath,
+        "bundle-size",
         "--source-root",
         root,
         "--output",
@@ -82,6 +84,7 @@ test("does not include source paths in measured size", async () => {
       ]);
       await exec(process.execPath, [
         scriptPath,
+        "bundle-size",
         "--source-root",
         linkedRoot,
         "--output",

@@ -6,6 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { isDirectEntry } from "./is-direct-entry.ts";
 
 const RESULTS_DIR = path.join(process.cwd(), ".perf-results");
 const THRESHOLD_PERCENT = 10;
@@ -79,6 +80,11 @@ interface ComparisonSummary {
   // Number of rounds where both baseline and current produced data (i.e. the
   // count actually used for comparison), not the larger of the two raw counts.
   pairedRoundsCount: number;
+}
+
+export interface PerfCompareRunResult {
+  summary: ComparisonSummary;
+  markdown: string;
 }
 
 interface BundleSizeReport {
@@ -667,18 +673,25 @@ function formatMarkdown(summary: ComparisonSummary) {
   return lines.join("\n");
 }
 
-const summary = compare();
-const markdown = formatMarkdown(summary);
+export function runPerfCompare(): PerfCompareRunResult {
+  const summary = compare();
+  const markdown = formatMarkdown(summary);
 
-mkdirSync(RESULTS_DIR, { recursive: true });
-writeFileSync(
-  path.join(RESULTS_DIR, "comparison.json"),
-  JSON.stringify(
-    summary,
-    (_key, value) => (value instanceof Map ? [...value.entries()] : value),
-    2,
-  ),
-);
-writeFileSync(path.join(RESULTS_DIR, "comparison.md"), markdown);
+  mkdirSync(RESULTS_DIR, { recursive: true });
+  writeFileSync(
+    path.join(RESULTS_DIR, "comparison.json"),
+    JSON.stringify(
+      summary,
+      (_key, value) => (value instanceof Map ? [...value.entries()] : value),
+      2,
+    ),
+  );
+  writeFileSync(path.join(RESULTS_DIR, "comparison.md"), markdown);
 
-console.log(markdown);
+  return { summary, markdown };
+}
+
+if (isDirectEntry(import.meta.url)) {
+  const { markdown } = runPerfCompare();
+  console.log(markdown);
+}

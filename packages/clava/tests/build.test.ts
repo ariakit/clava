@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { withPackageBuildLock } from "test-utils/build-lock";
 import { build } from "vite";
 import { expect, test } from "vitest";
-import { withPackageBuildLock } from "./_build-lock.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const exec = promisify(execFile);

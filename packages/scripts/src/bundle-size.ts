@@ -4,19 +4,29 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 import { build } from "vite";
+import { isDirectEntry } from "./is-direct-entry.ts";
 
-interface Options {
+export interface BundleSizeOptions {
   sourceRoot: string;
   output: string;
 }
 
-function readOptions(): Options {
-  const args = process.argv.slice(2);
-  let sourceRoot = process.cwd();
-  let output = path.join(
-    process.cwd(),
-    ".perf-results/bundle-size-current.json",
-  );
+export interface BundleSizeResult {
+  minifiedBytes: number;
+  gzipBytes: number;
+}
+
+export interface BundleSizeRunResult {
+  result: BundleSizeResult;
+  stdout: string;
+}
+
+function readOptions(
+  args = process.argv.slice(2),
+  cwd = process.cwd(),
+): BundleSizeOptions {
+  let sourceRoot = cwd;
+  let output = path.join(cwd, ".perf-results/bundle-size-current.json");
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -38,7 +48,10 @@ function readOptions(): Options {
   };
 }
 
-async function measureBundleSize({ sourceRoot, output }: Options) {
+export async function measureBundleSize({
+  sourceRoot,
+  output,
+}: BundleSizeOptions): Promise<BundleSizeResult> {
   const packageEntry = path.join(sourceRoot, "packages/clava/dist/index.js");
   const tempDir = await mkdtemp(path.join(tmpdir(), "clava-bundle-size-"));
 
@@ -84,12 +97,27 @@ async function measureBundleSize({ sourceRoot, output }: Options) {
 
     await mkdir(path.dirname(output), { recursive: true });
     await writeFile(output, `${JSON.stringify(result, null, 2)}\n`);
-    console.log(
-      `Bundle size: ${(result.minifiedBytes / 1000).toFixed(2)} kB minified, ${(result.gzipBytes / 1000).toFixed(2)} kB gzip`,
-    );
+    return result;
   } finally {
     await rm(tempDir, { force: true, recursive: true });
   }
 }
 
-await measureBundleSize(readOptions());
+function formatResult(result: BundleSizeResult) {
+  return `Bundle size: ${(result.minifiedBytes / 1000).toFixed(2)} kB minified, ${(result.gzipBytes / 1000).toFixed(2)} kB gzip`;
+}
+
+export async function runBundleSize(
+  args?: string[],
+): Promise<BundleSizeRunResult> {
+  const result = await measureBundleSize(readOptions(args));
+  return {
+    result,
+    stdout: formatResult(result),
+  };
+}
+
+if (isDirectEntry(import.meta.url)) {
+  const { stdout } = await runBundleSize();
+  console.log(stdout);
+}
