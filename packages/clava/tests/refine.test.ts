@@ -714,6 +714,14 @@ for (const config of Object.values(CONFIGS)) {
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining("Maximum refine iterations exceeded"),
         );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+          ),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("Component created at:"),
+        );
       } finally {
         warn.mockRestore();
       }
@@ -737,6 +745,14 @@ for (const config of Object.values(CONFIGS)) {
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining("Maximum refine iterations exceeded"),
         );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+          ),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("Component created at:"),
+        );
       } finally {
         warn.mockRestore();
       }
@@ -759,6 +775,93 @@ for (const config of Object.values(CONFIGS)) {
       try {
         component();
         expect(warn).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+        warn.mockRestore();
+      }
+    });
+
+    test("refine warning names the variant key that did not stabilize", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          defaultVariants: { size: "sm", color: "red" },
+          refine: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        component();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+          ),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.not.stringContaining("did not stabilize: color"),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("refine warning includes the component creation stack", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          refine: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        component();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("Component created at:"),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("refine.test.ts"),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("refine warning omits the creation stack when cv ran in production", () => {
+      let captured = "";
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation((message: unknown) => {
+          captured = String(message);
+        });
+      vi.stubEnv("NODE_ENV", "production");
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          refine: ({ variants, setVariants }) => {
+            setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+          },
+        }),
+      );
+
+      try {
+        vi.unstubAllEnvs();
+        component();
+        expect(captured).toContain("Maximum refine iterations exceeded");
+        expect(captured).not.toContain("Component created at:");
       } finally {
         vi.unstubAllEnvs();
         warn.mockRestore();

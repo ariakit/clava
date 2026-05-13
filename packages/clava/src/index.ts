@@ -116,15 +116,91 @@ function areVariantsEqual(
   return true;
 }
 
-function warnRefineLimit(runState: RefineRunState): void {
+interface CreationFrame {
+  stack?: string;
+}
+
+// Captures the call site of the function passed in `skipFn` so refine-limit
+// warnings can point developers at the originating `cv()` call. Returns
+// `undefined` in production so bundlers that replace `process.env.NODE_ENV` at
+// build time can drop the entire warning machinery. The underlying `.stack`
+// string is formatted lazily on first access in every major engine (V8,
+// SpiderMonkey, JavaScriptCore), so holding the captured frame for the
+// lifetime of the component is cheap when no warning fires.
+function captureCreationFrame(skipFn: Function): CreationFrame | undefined {
+  if (process.env.NODE_ENV === "production") return undefined;
+  if (typeof Error.captureStackTrace === "function") {
+    const holder: CreationFrame = {};
+    Error.captureStackTrace(holder, skipFn);
+    return holder;
+  }
+  // Engines without `Error.captureStackTrace` (SpiderMonkey, JavaScriptCore)
+  // can't strip internal frames, but their `Error.stack` getter is still
+  // lazy, so returning the Error instance defers the format cost. The
+  // resulting trace includes 1–2 extra frames at the top from this helper and
+  // `cv` itself.
+  return new Error();
+}
+
+function formatCreationStack(frame: CreationFrame): string | undefined {
+  let stack = frame.stack;
+  if (!stack) return undefined;
+  // V8 prefixes the stack with a leading "Error" / "Error: message" line that
+  // isn't meaningful for a captured location — drop it.
+  const newlineIdx = stack.indexOf("\n");
+  if (newlineIdx > 0) {
+    const firstLine = stack.slice(0, newlineIdx);
+    if (firstLine === "Error" || firstLine.startsWith("Error:")) {
+      stack = stack.slice(newlineIdx + 1);
+    }
+  }
+  return stack;
+}
+
+function collectUnstableVariantKeys(
+  prev: Record<string, unknown>,
+  next: Record<string, unknown>,
+): string[] {
+  const keys: string[] = [];
+  for (const key in next) {
+    if (!Object.hasOwn(next, key)) continue;
+    if (!Object.is(prev[key], next[key])) keys.push(key);
+  }
+  for (const key in prev) {
+    if (!Object.hasOwn(prev, key)) continue;
+    if (Object.hasOwn(next, key)) continue;
+    keys.push(key);
+  }
+  return keys;
+}
+
+function warnRefineLimit(
+  runState: RefineRunState,
+  creationFrame: CreationFrame | undefined,
+  priorResolved: Record<string, unknown>,
+  nextResolved: Record<string, unknown>,
+): void {
   if (runState.warned) return;
   runState.warned = true;
   if (process.env.NODE_ENV !== "production") {
-    console.warn(
+    let message =
       "Clava: Maximum refine iterations exceeded. This can happen when a " +
-        "refine callback calls setVariants or setDefaultVariants, but one " +
-        "of the variants changes on every run.",
+      "refine callback calls setVariants or setDefaultVariants, but one " +
+      "of the variants changes on every run.";
+    const unstableKeys = collectUnstableVariantKeys(
+      priorResolved,
+      nextResolved,
     );
+    if (unstableKeys.length > 0) {
+      message += `\nVariant(s) that did not stabilize: ${unstableKeys.join(", ")}.`;
+    }
+    if (creationFrame) {
+      const creationStack = formatCreationStack(creationFrame);
+      if (creationStack) {
+        message += `\nComponent created at:\n${creationStack}`;
+      }
+    }
+    console.warn(message);
   }
 }
 
@@ -699,6 +775,18 @@ export function create({
     }
     const extMetasWithRefineCount = extMetasWithRefine.length;
     const shouldCollectChangedVariants = extMetasWithRefineCount > 0;
+
+    // Call-site frame captured at the `cv()` call site so refine-limit warnings
+    // can point developers at the component definition. Skipped entirely for
+    // components that can never enter the refine loop, and stripped in
+    // production via the NODE_ENV guard inside `captureCreationFrame`. The
+    // frame is captured at creation time but the underlying `.stack` string is
+    // formatted lazily on first access, so component creation stays cheap
+    // unless the warning actually fires.
+    const canTriggerRefineWarning = !!refine || extMetasWithRefineCount > 0;
+    const creationFrame = canTriggerRefineWarning
+      ? captureCreationFrame(cv)
+      : undefined;
 
     // Function variant keys inherited from extends, filtered through this
     // component's own variants: a static (object/shorthand) variant in this
@@ -1334,6 +1422,10 @@ export function create({
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
+            // Snapshot of `workingResolved` before each non-converging iteration
+            // so the refine-limit warning can diff against the final value and
+            // report which variant keys are still changing.
+            let priorResolved: Record<string, unknown> = resolved;
             let lastClasses: ClsxClassValue[] = [];
             let lastStyle: StyleValue = {};
             let isFirstRun = true;
@@ -1400,7 +1492,12 @@ export function create({
               if (useDirectOutput && runState.remaining === 0) {
                 // Keep the direct output from the last allowed run. Rolling
                 // back here would drop it before the fallback copy below.
-                warnRefineLimit(runState);
+                warnRefineLimit(
+                  runState,
+                  creationFrame,
+                  workingResolved,
+                  nextResolved,
+                );
                 return nextResolved;
               }
 
@@ -1416,11 +1513,17 @@ export function create({
                 lastStyle = nextStyle;
               }
 
+              priorResolved = workingResolved;
               workingResolved = nextResolved;
               isFirstRun = false;
             }
 
-            warnRefineLimit(runState);
+            warnRefineLimit(
+              runState,
+              creationFrame,
+              priorResolved,
+              workingResolved,
+            );
 
             for (let i = 0; i < lastClasses.length; i++) {
               classesOut.push(lastClasses[i]);
@@ -1497,6 +1600,10 @@ export function create({
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
+            // Snapshot of `workingResolved` before each non-converging iteration
+            // so the refine-limit warning can diff against the final value and
+            // report which variant keys are still changing.
+            let priorResolved: Record<string, unknown> = resolved;
             let reachedLimit = true;
 
             while (runState.remaining > 0) {
@@ -1536,11 +1643,17 @@ export function create({
                 break;
               }
 
+              priorResolved = workingResolved;
               workingResolved = nextResolved;
             }
 
             if (reachedLimit) {
-              warnRefineLimit(runState);
+              warnRefineLimit(
+                runState,
+                creationFrame,
+                priorResolved,
+                workingResolved,
+              );
             }
 
             return workingResolved;
