@@ -333,8 +333,13 @@ describe("non-idempotent transformClass", () => {
   });
 });
 
-const toUpperCase = (className: string) => className.toUpperCase();
-const toLowerCase = (className: string) => className.toLowerCase();
+function toUpperCase(className: string) {
+  return className.toUpperCase();
+}
+
+function toLowerCase(className: string) {
+  return className.toLowerCase();
+}
 
 describe("extend across `create()` factories", () => {
   // The extend's own `transformClass` must apply to its own classes even when
