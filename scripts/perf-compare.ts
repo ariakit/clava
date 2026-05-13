@@ -363,6 +363,9 @@ function computeSignificance({
 
 function isConfirmableChange(row: ComparisonRow) {
   if (row.significant) return false;
+  // Tied to the workflow's PERF_INITIAL_ROUNDS=2: confirmability is a
+  // preliminary signal. With any other initial-round count this returns false
+  // and the workflow skips confirmation unless a row is already significant.
   if (row.perRoundPercents.length !== 2) return false;
 
   const direction = Math.sign(row.percent);
