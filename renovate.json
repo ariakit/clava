@@ -19,6 +19,7 @@
         "/^oxlint/",
         "/^oxfmt/",
         "/^rolldown/",
+        "solid-js",
         "/^vite/",
         "/^commander/",
         "/^typescript/"
