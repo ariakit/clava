@@ -41,7 +41,7 @@
     "rolldown": "1.0.1",
     "rolldown-plugin-dts": "0.25.0",
     "scripts": "workspace:*",
-    "solid-js": "1.9.12",
+    "solid-js": "1.9.13",
     "typescript": "6.0.3",
     "vite": "8.0.13",
     "vitest": "4.1.6"
