@@ -58,6 +58,22 @@ function createReport(dir: string, benchmarks: Benchmark[]) {
   };
 }
 
+function createSplitRootReport(root: string, hz: number) {
+  return {
+    files: [
+      {
+        filepath: path.join(root, "benchmark/clava.bench.ts"),
+        groups: [
+          {
+            fullName: "benchmark/clava.bench.ts > cv",
+            benchmarks: [{ name: "split-roots bench", hz, mean: 1 / hz }],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function writeJson(dir: string, name: string, data: unknown) {
   const filePath = path.join(dir, resultsDir, name);
   writeFileSync(filePath, JSON.stringify(data), "utf-8");
@@ -293,26 +309,12 @@ describe("perf compare", () => {
     const outputDir = path.join(dir, resultsDir);
     mkdirSync(outputDir, { recursive: true });
 
-    const reportFor = (root: string, hz: number) => ({
-      files: [
-        {
-          filepath: path.join(root, "benchmark/clava.bench.ts"),
-          groups: [
-            {
-              fullName: "benchmark/clava.bench.ts > cv",
-              benchmarks: [{ name: "split-roots bench", hz, mean: 1 / hz }],
-            },
-          ],
-        },
-      ],
-    });
-
     writeJson(
       dir,
       "baseline.json",
-      reportFor("/runner-temp/perf-baseline", 100),
+      createSplitRootReport("/runner-temp/perf-baseline", 100),
     );
-    writeJson(dir, "current.json", reportFor(dir, 80));
+    writeJson(dir, "current.json", createSplitRootReport(dir, 80));
 
     execFileSync(process.execPath, [scriptPath, "perf-compare"], {
       cwd: dir,
