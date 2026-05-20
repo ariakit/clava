@@ -96,7 +96,7 @@ const toolbarButton = cv({
       true: "toolbar-button-active",
       false: "toolbar-button-idle",
     },
-    intent: (value: unknown) => {
+    intent: (value?: "primary" | "danger" | "neutral") => {
       if (value === "danger") {
         return {
           class: "toolbar-button-danger",
@@ -108,13 +108,8 @@ const toolbarButton = cv({
   },
   defaultVariants: {
     active: false,
-    intent: ({
-      defaultValue,
-      variants,
-    }: {
-      defaultValue: "primary" | "danger" | "neutral" | undefined;
-      variants: { size?: "sm" | "md" | "lg" };
-    }) => (variants.size === "lg" ? "neutral" : defaultValue),
+    intent: ({ defaultValue, variants }) =>
+      variants.size === "lg" ? "neutral" : defaultValue,
   },
   refine: ({ variants, addClass, addStyle }) => {
     if (variants.active) {
