@@ -98,7 +98,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine converges with NaN computed defaultVariants", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const component = getModeComponent(
         mode,
         cv({
@@ -116,20 +116,16 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      try {
-        const props = component();
-        expect(getStyleClass(props)).toEqual({
-          class: cls("nan refine-nan"),
-        });
-        expect(component.getVariants()).toEqual({ value: Number.NaN });
-        expect(warn).not.toHaveBeenCalled();
-      } finally {
-        warn.mockRestore();
-      }
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("nan refine-nan"),
+      });
+      expect(component.getVariants()).toEqual({ value: Number.NaN });
+      expect(warn).not.toHaveBeenCalled();
     });
 
     test("computed defaultVariants can clear inherited defaults", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const base = cv({
         variants: {
           invert: { true: "invert" },
@@ -145,22 +141,18 @@ for (const config of Object.values(CONFIGS)) {
       });
       const component = getModeComponent(mode, cv({ extend: [base] }));
 
-      try {
-        const props = component();
-        expect(getStyleClass(props)).toEqual({
-          class: cls("offset"),
-        });
-        expect(component.getVariants()).toEqual({
-          offset: true,
-        });
-        expect(warn).not.toHaveBeenCalled();
-      } finally {
-        warn.mockRestore();
-      }
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("offset"),
+      });
+      expect(component.getVariants()).toEqual({
+        offset: true,
+      });
+      expect(warn).not.toHaveBeenCalled();
     });
 
     test("computed defaultVariants use inherited defaults as defaultValue", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const calls = {
         layer: 0,
         frame: 0,
@@ -211,24 +203,20 @@ for (const config of Object.values(CONFIGS)) {
       });
       const component = getModeComponent(mode, cv({ extend: [control] }));
 
-      try {
-        const props = component();
-        expect(getStyleClass(props)).toEqual({
-          class: cls("layer offset frame control"),
-        });
-        expect(component.getVariants()).toEqual({
-          layer: true,
-          offset: true,
-          frame: true,
-          control: true,
-        });
-        expect(calls.layer).toBeGreaterThan(0);
-        expect(calls.frame).toBeGreaterThan(0);
-        expect(calls.control).toBeGreaterThan(0);
-        expect(warn).not.toHaveBeenCalled();
-      } finally {
-        warn.mockRestore();
-      }
+      const props = component();
+      expect(getStyleClass(props)).toEqual({
+        class: cls("layer offset frame control"),
+      });
+      expect(component.getVariants()).toEqual({
+        layer: true,
+        offset: true,
+        frame: true,
+        control: true,
+      });
+      expect(calls.layer).toBeGreaterThan(0);
+      expect(calls.frame).toBeGreaterThan(0);
+      expect(calls.control).toBeGreaterThan(0);
+      expect(warn).not.toHaveBeenCalled();
     });
 
     test("computed defaultVariants", () => {
@@ -736,7 +724,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine warns when variants keep changing", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const component = getModeComponent(
         mode,
         cv({
@@ -748,18 +736,14 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      try {
-        component();
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining("Maximum refine iterations exceeded"),
-        );
-      } finally {
-        warn.mockRestore();
-      }
+      component();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Maximum refine iterations exceeded"),
+      );
     });
 
     test("refine warning is shared across extended components", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: { size: "sm" },
@@ -769,32 +753,28 @@ for (const config of Object.values(CONFIGS)) {
       });
       const component = getModeComponent(mode, cv({ extend: [base] }));
 
-      try {
-        component();
-        expect(warn).toHaveBeenCalledTimes(1);
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining("Maximum refine iterations exceeded"),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(
-            /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
-          ),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(
-            /Latest variant changes before warning: [^\n]*\bsize: "(sm|lg)" -> "(sm|lg)"/,
-          ),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining("Component created at:"),
-        );
-      } finally {
-        warn.mockRestore();
-      }
+      component();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Maximum refine iterations exceeded"),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Latest variant changes before warning: [^\n]*\bsize: "(sm|lg)" -> "(sm|lg)"/,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Component created at:"),
+      );
     });
 
     test("getVariants warns when variants keep changing", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const component = getModeComponent(
         mode,
         cv({
@@ -806,31 +786,27 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      try {
-        component.getVariants();
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining("Maximum refine iterations exceeded"),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(
-            /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
-          ),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(
-            /Latest variant changes before warning: [^\n]*\bsize: "(sm|lg)" -> "(sm|lg)"/,
-          ),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining("Component created at:"),
-        );
-      } finally {
-        warn.mockRestore();
-      }
+      component.getVariants();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Maximum refine iterations exceeded"),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Latest variant changes before warning: [^\n]*\bsize: "(sm|lg)" -> "(sm|lg)"/,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Component created at:"),
+      );
     });
 
     test("refine warning is omitted in production", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.stubEnv("NODE_ENV", "production");
       const component = getModeComponent(
         mode,
@@ -848,12 +824,11 @@ for (const config of Object.values(CONFIGS)) {
         expect(warn).not.toHaveBeenCalled();
       } finally {
         vi.unstubAllEnvs();
-        warn.mockRestore();
       }
     });
 
     test("refine warning names the variant key that did not stabilize", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const component = getModeComponent(
         mode,
         cv({
@@ -868,25 +843,21 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      try {
-        component();
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(
-            /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
-          ),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.not.stringMatching(
-            /Variant\(s\) that did not stabilize: [^\n]*\bcolor\b/,
-          ),
-        );
-      } finally {
-        warn.mockRestore();
-      }
+      component();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.not.stringMatching(
+          /Variant\(s\) that did not stabilize: [^\n]*\bcolor\b/,
+        ),
+      );
     });
 
     test("refine warning reports keys that oscillate at different cadences", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       // `size` flips every iteration, `color` flips every other iteration, so
       // the final pair may agree on one of them — the warning must still name
       // both keys because each contributed to a transition.
@@ -912,30 +883,26 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      try {
-        component();
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(
-            /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
-          ),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(
-            /Variant\(s\) that did not stabilize: [^\n]*\bcolor\b/,
-          ),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringMatching(
-            /Latest variant changes before warning: [^\n]*\bsize\b[^\n]*\bcolor\b/,
-          ),
-        );
-      } finally {
-        warn.mockRestore();
-      }
+      component();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Variant\(s\) that did not stabilize: [^\n]*\bcolor\b/,
+        ),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Latest variant changes before warning: [^\n]*\bsize\b[^\n]*\bcolor\b/,
+        ),
+      );
     });
 
     test("refine warning includes the component creation stack", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const component = getModeComponent(
         mode,
         cv({
@@ -947,20 +914,16 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      try {
-        component();
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining("Component created at:"),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining("refine.test.ts"),
-        );
-        expect(warn).toHaveBeenCalledWith(
-          expect.not.stringContaining("node_modules"),
-        );
-      } finally {
-        warn.mockRestore();
-      }
+      component();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Component created at:"),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("refine.test.ts"),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.not.stringContaining("node_modules"),
+      );
     });
 
     test("refine warning fallback stack skips internal creation frames", () => {
@@ -972,7 +935,7 @@ for (const config of Object.values(CONFIGS)) {
       };
       const captureStackTrace = ErrorWithCaptureStackTrace.captureStackTrace;
       Reflect.deleteProperty(ErrorWithCaptureStackTrace, "captureStackTrace");
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const component = getModeComponent(
         mode,
         cv({
@@ -999,17 +962,15 @@ for (const config of Object.values(CONFIGS)) {
         if (captureStackTrace) {
           ErrorWithCaptureStackTrace.captureStackTrace = captureStackTrace;
         }
-        warn.mockRestore();
       }
     });
 
     test("refine warning omits the creation stack when cv ran in production", () => {
       let captured = "";
-      const warn = vi
-        .spyOn(console, "warn")
-        .mockImplementation((message: unknown) => {
-          captured = String(message);
-        });
+      using warn = vi.spyOn(console, "warn");
+      warn.mockImplementation((message: unknown) => {
+        captured = String(message);
+      });
       vi.stubEnv("NODE_ENV", "production");
       const component = getModeComponent(
         mode,
@@ -1029,7 +990,6 @@ for (const config of Object.values(CONFIGS)) {
         expect(captured).not.toContain("Component created at:");
       } finally {
         vi.unstubAllEnvs();
-        warn.mockRestore();
       }
     });
 
