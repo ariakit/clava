@@ -966,11 +966,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine warning omits the creation stack when cv ran in production", () => {
-      let captured = "";
-      using warn = vi.spyOn(console, "warn");
-      warn.mockImplementation((message: unknown) => {
-        captured = String(message);
-      });
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.stubEnv("NODE_ENV", "production");
       const component = getModeComponent(
         mode,
@@ -986,8 +982,9 @@ for (const config of Object.values(CONFIGS)) {
       try {
         vi.unstubAllEnvs();
         component();
-        expect(captured).toContain("Maximum refine iterations exceeded");
-        expect(captured).not.toContain("Component created at:");
+        const message = String(warn.mock.calls.at(-1)?.[0]);
+        expect(message).toContain("Maximum refine iterations exceeded");
+        expect(message).not.toContain("Component created at:");
       } finally {
         vi.unstubAllEnvs();
       }
