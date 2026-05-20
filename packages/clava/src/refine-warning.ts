@@ -145,8 +145,8 @@ export function warnRefineLimit({
   runState.warned = true;
   let message =
     "Clava: Maximum refine iterations exceeded. This can happen when a " +
-    "refine callback calls setVariants or setDefaultVariants, but one " +
-    "of the variants changes on every run.";
+    "computed default variant or refine callback changes one of the " +
+    "variants on every run.";
   if (unstableChanges && unstableChanges.size > 0) {
     message += `\nVariant(s) that did not stabilize: ${Array.from(unstableChanges.keys()).join(", ")}.`;
     message += `\nLatest variant changes before warning: ${formatVariantChanges(unstableChanges)}.`;

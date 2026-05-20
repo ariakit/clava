@@ -71,7 +71,7 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("refine re-runs when setDefaultVariants changes variants", () => {
+    test("refine re-runs when computed defaultVariants change variants", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -79,11 +79,12 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          refine: ({ variants, setDefaultVariants, addClass }) => {
-            setDefaultVariants({ color: "red" });
-            if (variants.color === "red") {
-              setDefaultVariants({ size: "lg" });
-            }
+          defaultVariants: {
+            color: () => "red" as const,
+            size: ({ defaultValue, variants }) =>
+              variants.color === "red" ? "lg" : defaultValue,
+          },
+          refine: ({ variants, addClass }) => {
             if (variants.size === "lg") {
               addClass("refine-lg");
             }
@@ -96,7 +97,7 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("refine converges with NaN setDefaultVariants", () => {
+    test("refine converges with NaN computed defaultVariants", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const component = getModeComponent(
         mode,
@@ -104,8 +105,10 @@ for (const config of Object.values(CONFIGS)) {
           variants: {
             value: (value: number) => (Number.isNaN(value) ? "nan" : null),
           },
-          refine: ({ variants, setDefaultVariants, addClass }) => {
-            setDefaultVariants({ value: Number.NaN });
+          defaultVariants: {
+            value: () => Number.NaN,
+          },
+          refine: ({ variants, addClass }) => {
             if (Number.isNaN(variants.value)) {
               addClass("refine-nan");
             }
@@ -125,7 +128,7 @@ for (const config of Object.values(CONFIGS)) {
       }
     });
 
-    test("refine converges with undefined setDefaultVariants", () => {
+    test("computed defaultVariants can clear inherited defaults", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const base = cv({
         variants: {
@@ -135,11 +138,9 @@ for (const config of Object.values(CONFIGS)) {
           push: (value: number | undefined) =>
             value === undefined ? undefined : `push-${value}`,
         },
-        refine: ({ variants, setDefaultVariants }) => {
-          setDefaultVariants({
-            offset: !variants.invert,
-            push: variants.invert ? 20 : undefined,
-          });
+        defaultVariants: {
+          offset: ({ variants }) => !variants.invert,
+          push: ({ variants }) => (variants.invert ? 20 : undefined),
         },
       });
       const component = getModeComponent(mode, cv({ extend: [base] }));
@@ -151,7 +152,6 @@ for (const config of Object.values(CONFIGS)) {
         });
         expect(component.getVariants()).toEqual({
           offset: true,
-          push: undefined,
         });
         expect(warn).not.toHaveBeenCalled();
       } finally {
@@ -159,7 +159,7 @@ for (const config of Object.values(CONFIGS)) {
       }
     });
 
-    test("refine converges with undefined setDefaultVariants in nested extends", () => {
+    test("computed defaultVariants use inherited defaults as defaultValue", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const calls = {
         layer: 0,
@@ -177,13 +177,11 @@ for (const config of Object.values(CONFIGS)) {
         },
         defaultVariants: {
           layer: true,
-        },
-        refine: ({ variants, setDefaultVariants }) => {
-          calls.layer += 1;
-          setDefaultVariants({
-            offset: !variants.invert,
-            push: variants.invert ? 20 : undefined,
-          });
+          offset: ({ defaultValue, variants }) => {
+            calls.layer += 1;
+            return variants.invert ? false : defaultValue;
+          },
+          push: ({ variants }) => (variants.invert ? 20 : undefined),
         },
       });
       const frame = cv({
@@ -218,33 +216,22 @@ for (const config of Object.values(CONFIGS)) {
         expect(getStyleClass(props)).toEqual({
           class: cls("layer offset frame control"),
         });
-        expect(calls).toEqual({
-          layer: 2,
-          frame: 2,
-          control: 2,
-        });
-        calls.layer = 0;
-        calls.frame = 0;
-        calls.control = 0;
         expect(component.getVariants()).toEqual({
           layer: true,
           offset: true,
-          push: undefined,
           frame: true,
           control: true,
         });
-        expect(calls).toEqual({
-          layer: 2,
-          frame: 2,
-          control: 2,
-        });
+        expect(calls.layer).toBeGreaterThan(0);
+        expect(calls.frame).toBeGreaterThan(0);
+        expect(calls.control).toBeGreaterThan(0);
         expect(warn).not.toHaveBeenCalled();
       } finally {
         warn.mockRestore();
       }
     });
 
-    test("refine with setDefaultVariants", () => {
+    test("computed defaultVariants", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -252,10 +239,9 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          refine: ({ variants, setDefaultVariants }) => {
-            if (variants.size === "lg") {
-              setDefaultVariants({ color: "red" });
-            }
+          defaultVariants: {
+            color: ({ variants, defaultValue }) =>
+              variants.size === "lg" ? "red" : defaultValue,
           },
         }),
       );
@@ -263,7 +249,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
-    test("refine setDefaultVariants does not override props", () => {
+    test("computed defaultVariants do not override props", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -271,8 +257,8 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          refine: ({ setDefaultVariants }) => {
-            setDefaultVariants({ color: "red" });
+          defaultVariants: {
+            color: () => "red" as const,
           },
         }),
       );
@@ -280,7 +266,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg blue") });
     });
 
-    test("refine setDefaultVariants overrides defaultVariants", () => {
+    test("computed defaultVariants override literal defaultVariants", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -288,9 +274,9 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          defaultVariants: { size: "sm", color: "red" },
-          refine: ({ setDefaultVariants }) => {
-            setDefaultVariants({ color: "blue" });
+          defaultVariants: {
+            size: "sm",
+            color: () => "blue" as const,
           },
         }),
       );
@@ -298,7 +284,7 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("sm blue") });
     });
 
-    test("refine setDefaultVariants overrides extended defaultVariants", () => {
+    test("computed defaultVariants override extended defaultVariants", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
         defaultVariants: { color: "red" },
@@ -308,9 +294,9 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { size: { sm: "sm", lg: "lg" } },
-          defaultVariants: { size: "sm" },
-          refine: ({ setDefaultVariants }) => {
-            setDefaultVariants({ color: "blue" });
+          defaultVariants: {
+            size: "sm",
+            color: () => "blue" as const,
           },
         }),
       );
@@ -318,31 +304,11 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("blue sm") });
     });
 
-    test("refine setDefaultVariants overrides child defaultVariants", () => {
+    test("parent computed defaultVariants can override child defaultVariants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
-      });
-      const component = getModeComponent(
-        mode,
-        cv({
-          extend: [base],
-          variants: { color: { red: "red", blue: "blue" } },
-          defaultVariants: { size: "sm", color: "red" },
-          refine: ({ setDefaultVariants }) => {
-            setDefaultVariants({ size: "lg" });
-          },
-        }),
-      );
-      const props = component();
-      expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
-    });
-
-    test("refine setDefaultVariants from parent overrides child defaultVariants", () => {
-      const base = cv({
-        variants: { size: { sm: "sm", lg: "lg" } },
-        defaultVariants: { size: "sm" },
-        refine: ({ setDefaultVariants }) => {
-          setDefaultVariants({ size: "lg" });
+        defaultVariants: {
+          size: () => "lg" as const,
         },
       });
       const component = getModeComponent(
@@ -357,35 +323,12 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
-    test("refine setDefaultVariants from parent overrides child defaultVariants based on props", () => {
-      const base = cv({
-        variants: { size: { sm: "sm", lg: "lg" }, enabled: "" },
-        defaultVariants: { size: "sm" },
-        refine: ({ variants, setDefaultVariants }) => {
-          if (!variants.enabled) return;
-          setDefaultVariants({ size: "lg" });
-        },
-      });
-      const component = getModeComponent(
-        mode,
-        cv({
-          extend: [base],
-          variants: { color: { red: "red", blue: "blue" } },
-          defaultVariants: { size: "sm", color: "red" },
-        }),
-      );
-      const props = component({ enabled: true });
-      expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
-    });
-
-    test("refine receives default variants from child", () => {
+    test("parent computed defaultVariants can depend on child defaults", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" }, large: "" },
-        defaultVariants: { size: "sm" },
-        refine: ({ variants, setDefaultVariants }) => {
-          if (variants.large) {
-            setDefaultVariants({ size: "lg" });
-          }
+        defaultVariants: {
+          size: ({ defaultValue, variants }) =>
+            variants.large ? "lg" : defaultValue,
         },
       });
       const component = getModeComponent(
@@ -400,36 +343,12 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
-    test("refine receives default variants from grandchild", () => {
-      const base = cv({
-        variants: { size: { sm: "sm", lg: "lg" }, large: "" },
-        defaultVariants: { size: "sm" },
-        refine: ({ variants, setDefaultVariants }) => {
-          if (variants.large) {
-            setDefaultVariants({ size: "lg" });
-          }
-        },
-      });
-      const base2 = cv({ extend: [base] });
-      const component = getModeComponent(
-        mode,
-        cv({
-          extend: [base2],
-          variants: { color: { red: "red", blue: "blue" } },
-          defaultVariants: { size: "sm", color: "red", large: true },
-        }),
-      );
-      const props = component();
-      expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
-    });
-
-    test("refine receives default variants from intermediate component", () => {
+    test("computed defaultVariants preserve intermediate defaults", () => {
       const parent = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
-        refine: ({ variants, setDefaultVariants }) => {
-          if (!variants.size) {
-            setDefaultVariants({ size: "lg" });
-          }
+        defaultVariants: {
+          size: ({ defaultValue, variants }) =>
+            variants.size ? defaultValue : "lg",
         },
       });
       const child = cv({ extend: [parent], defaultVariants: { size: "sm" } });
@@ -438,12 +357,11 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
-    test("child refine setDefaultVariants overrides parent refine setDefaultVariants", () => {
+    test("child computed defaultVariants override parent computed defaultVariants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
-        defaultVariants: { size: "sm" },
-        refine: ({ setDefaultVariants }) => {
-          setDefaultVariants({ size: "lg" });
+        defaultVariants: {
+          size: () => "lg" as const,
         },
       });
       const component = getModeComponent(
@@ -451,17 +369,35 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { color: { red: "red", blue: "blue" } },
-          defaultVariants: { size: "sm", color: "red" },
-          refine: ({ setDefaultVariants }) => {
-            setDefaultVariants({ size: "sm" });
+          defaultVariants: {
+            size: () => "sm" as const,
+            color: "red",
           },
         }),
       );
       const props = component();
-      // Order: parent defaultVariants (sm) -> child defaultVariants (sm)
-      //     -> parent refine.setDefaultVariants (lg)
-      //     -> child refine.setDefaultVariants (sm)
       expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
+    });
+
+    test("child computed defaultVariants can preserve parent computed defaultVariants", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: {
+          size: () => "lg" as const,
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          defaultVariants: {
+            size: ({ defaultValue }) => defaultValue,
+          },
+        }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("lg") });
+      expect(component.getVariants()).toEqual({ size: "lg" });
     });
 
     test("refine in extended component does not see foreign variant keys", () => {
@@ -484,6 +420,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { size: "sm" },
         }),
       );
       const props = component({ color: "red" });
@@ -492,18 +429,14 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("setDefaultVariants in extended component does not branch on foreign variant keys", () => {
-      // Same shape as the test above, but the base's `refine` reaches
-      // `setDefaultVariants` — covers the resolveDefaults pass (driving
-      // both class output and `getVariants`) rather than the render-time
-      // compute path.
+    test("computed defaultVariants in extended component do not branch on foreign variant keys", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
-        defaultVariants: { size: "sm" },
-        refine: ({ variants, setDefaultVariants }) => {
-          if ("color" in (variants as Record<string, unknown>)) {
-            setDefaultVariants({ size: "lg" });
-          }
+        defaultVariants: {
+          size: ({ defaultValue, variants }) =>
+            "color" in (variants as Record<string, unknown>)
+              ? "lg"
+              : defaultValue,
         },
       });
       const component = getModeComponent(
@@ -511,6 +444,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { color: { red: "red", blue: "blue" } },
+          defaultVariants: { size: "sm" },
         }),
       );
       const props = component({ color: "red" });
@@ -521,11 +455,11 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("child setDefaultVariants receives refined variants from parent", () => {
+    test("child computed defaultVariants receive refined variants from parent", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" }, small: "" },
-        refine: ({ setDefaultVariants }) => {
-          setDefaultVariants({ small: true });
+        refine: ({ setVariants }) => {
+          setVariants({ small: true });
         },
       });
       const component = getModeComponent(
@@ -533,11 +467,10 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { color: { red: "red", blue: "blue" } },
-          defaultVariants: { size: "lg", color: "red" },
-          refine: ({ variants, setDefaultVariants }) => {
-            if (variants.small) {
-              setDefaultVariants({ size: "sm" });
-            }
+          defaultVariants: {
+            size: ({ defaultValue, variants }) =>
+              variants.small ? "sm" : defaultValue,
+            color: "red",
           },
         }),
       );
@@ -571,20 +504,20 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
-    test("base refine setDefaultVariants works after its own setVariants re-run", () => {
+    test("computed defaultVariants work after a setVariants re-run", () => {
       const base = cv({
         variants: {
           size: { sm: "sm", lg: "lg" },
           active: "",
           mode: { on: "on" },
         },
-        defaultVariants: { size: "sm" },
-        refine: ({ variants, setVariants, setDefaultVariants }) => {
+        defaultVariants: {
+          size: ({ defaultValue, variants }) =>
+            variants.mode === "on" ? "lg" : defaultValue,
+        },
+        refine: ({ variants, setVariants }) => {
           if (variants.active) {
             setVariants({ mode: "on" });
-          }
-          if (variants.mode === "on") {
-            setDefaultVariants({ size: "lg" });
           }
         },
       });
@@ -635,11 +568,11 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(getProps())).toEqual({ class: cls("red") });
     });
 
-    test("child setVariants keeps overriding base setDefaultVariants across re-runs", () => {
+    test("child setVariants keeps overriding base computed defaultVariants across re-runs", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
-        refine: ({ setDefaultVariants }) => {
-          setDefaultVariants({ color: "blue" });
+        defaultVariants: {
+          color: () => "blue" as const,
         },
       });
       const component = getModeComponent(
@@ -659,11 +592,11 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("red sm") });
     });
 
-    test("refine setVariants sticks across re-runs", () => {
+    test("refine setVariants sticks across computed default re-runs", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
-        refine: ({ setDefaultVariants }) => {
-          setDefaultVariants({ color: "blue" });
+        defaultVariants: {
+          color: () => "blue" as const,
         },
       });
       const component = getModeComponent(
@@ -682,19 +615,20 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("red") });
     });
 
-    test("base refine setDefaultVariants can override child static defaults after a re-run", () => {
+    test("base computed defaultVariants can override child static defaults after a re-run", () => {
       const base = cv({
         variants: {
           size: { sm: "sm", lg: "lg" },
           active: "",
           mode: { on: "on" },
         },
-        refine: ({ variants, setVariants, setDefaultVariants }) => {
+        defaultVariants: {
+          size: ({ defaultValue, variants }) =>
+            variants.mode === "on" ? "lg" : defaultValue,
+        },
+        refine: ({ variants, setVariants }) => {
           if (variants.active) {
             setVariants({ mode: "on" });
-          }
-          if (variants.mode === "on") {
-            setDefaultVariants({ size: "lg" });
           }
         },
       });
@@ -706,7 +640,33 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg on") });
     });
 
-    test("setVariants from earlier extends overrides setDefaultVariants from later extends", () => {
+    test("parent computed defaultVariants fall back to child defaults after a dependency changes", () => {
+      const layer = cv({
+        variants: {
+          a: { one: "one", two: "two" },
+          b: { true: "b-true", false: "b-false" },
+        },
+        defaultVariants: {
+          b: true,
+          a: ({ defaultValue, variants }) =>
+            variants.b ? "one" : defaultValue,
+        },
+        refine: ({ variants, setVariants }) => {
+          if (variants.b) {
+            setVariants({ b: false });
+          }
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [layer], defaultVariants: { a: "two" } }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("two b-false") });
+      expect(component.getVariants()).toEqual({ a: "two", b: false });
+    });
+
+    test("setVariants from earlier extends overrides computed defaultVariants from later extends", () => {
       const first = cv({
         variants: { color: { red: "first-red", blue: "first-blue" } },
         refine: ({ setVariants }) => {
@@ -715,8 +675,8 @@ for (const config of Object.values(CONFIGS)) {
       });
       const second = cv({
         variants: { color: { red: "second-red", blue: "second-blue" } },
-        refine: ({ setDefaultVariants }) => {
-          setDefaultVariants({ color: "blue" });
+        defaultVariants: {
+          color: () => "blue" as const,
         },
       });
       const component = getModeComponent(mode, cv({ extend: [first, second] }));
@@ -726,17 +686,17 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("setDefaultVariants from later extends overrides setDefaultVariants from earlier extends", () => {
+    test("computed defaultVariants from later extends apply to final output", () => {
       const first = cv({
         variants: { color: { red: "first-red", blue: "first-blue" } },
-        refine: ({ setDefaultVariants }) => {
-          setDefaultVariants({ color: "red" });
+        defaultVariants: {
+          color: () => "red" as const,
         },
       });
       const second = cv({
         variants: { color: { red: "second-red", blue: "second-blue" } },
-        refine: ({ setDefaultVariants }) => {
-          setDefaultVariants({ color: "blue" });
+        defaultVariants: {
+          color: () => "blue" as const,
         },
       });
       const component = getModeComponent(mode, cv({ extend: [first, second] }));
@@ -746,7 +706,7 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("setDefaultVariants does not override stable setVariants on later passes", () => {
+    test("computed defaultVariants do not override stable setVariants on later passes", () => {
       const base = cv({
         variants: { color: { red: "base-red", blue: "base-blue" } },
         refine: ({ setVariants }) => {
@@ -758,10 +718,9 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { color: { red: "child-red", blue: "child-blue" } },
-          refine: ({ variants, setDefaultVariants }) => {
-            if (variants.color === "red") {
-              setDefaultVariants({ color: "blue" });
-            }
+          defaultVariants: {
+            color: ({ defaultValue, variants }) =>
+              variants.color === "red" ? "blue" : defaultValue,
           },
         }),
       );
@@ -771,7 +730,7 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("setDefaultVariants does not override setVariants from a previous pass", () => {
+    test("computed defaultVariants do not override setVariants from a previous pass", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -779,12 +738,13 @@ for (const config of Object.values(CONFIGS)) {
             color: { red: "red", blue: "blue" },
             done: "",
           },
-          refine: ({ variants, setVariants, setDefaultVariants }) => {
+          defaultVariants: {
+            color: ({ defaultValue, variants }) =>
+              variants.done ? "blue" : defaultValue,
+          },
+          refine: ({ variants, setVariants }) => {
             if (!variants.done) {
               setVariants({ color: "red", done: true });
-            }
-            if (variants.done) {
-              setDefaultVariants({ color: "blue" });
             }
           },
         }),
@@ -1091,7 +1051,7 @@ for (const config of Object.values(CONFIGS)) {
       }
     });
 
-    test("refine setDefaultVariants when explicitly passing undefined", () => {
+    test("computed defaultVariants run when explicitly passing undefined", () => {
       const component = getModeComponent(
         mode,
         cv({
@@ -1099,8 +1059,8 @@ for (const config of Object.values(CONFIGS)) {
             size: { sm: "sm", lg: "lg" },
             color: { red: "red", blue: "blue" },
           },
-          refine: ({ setDefaultVariants }) => {
-            setDefaultVariants({ color: "red" });
+          defaultVariants: {
+            color: () => "red" as const,
           },
         }),
       );

@@ -316,7 +316,9 @@ You can extend any component mode, including `baseButton.jsx`, `baseButton.html`
 
 ## Refine
 
-Use `refine` for compound conditions, dependent defaults, and final class/style adjustments. It receives the resolved variant values for the component and can return class/style output.
+Use computed `defaultVariants` for dependent defaults. A function entry receives the current default value for that key plus the resolved variants snapshot, and returns the next default value.
+
+Use `refine` for final variant overrides and class/style adjustments. It receives the resolved variant values for the component and can return class/style output.
 
 ```ts
 const toolbarButton = cv({
@@ -328,19 +330,13 @@ const toolbarButton = cv({
     },
     loading: "toolbar-button-loading",
   },
-  refine: ({
-    variants,
-    setVariants,
-    setDefaultVariants,
-    addClass,
-    addStyle,
-  }) => {
+  defaultVariants: {
+    intent: ({ defaultValue, variants }) =>
+      variants.size === "lg" ? "neutral" : defaultValue,
+  },
+  refine: ({ variants, setVariants, addClass, addStyle }) => {
     if (variants.loading) {
       setVariants({ pressed: false });
-    }
-
-    if (variants.size === "lg") {
-      setDefaultVariants({ intent: "neutral" });
     }
 
     if (variants.pressed && variants.intent === "brand") {
@@ -353,9 +349,24 @@ const toolbarButton = cv({
 });
 ```
 
-`setVariants()` overrides explicit props. `setDefaultVariants()` overrides static `defaultVariants` and inherited defaults, but it does not override a prop the user explicitly passed unless that prop value is `undefined`. `addClass()` and `addStyle()` append output without changing resolved variant values. `getVariants()` includes values changed by `setVariants()` and `setDefaultVariants()`.
+Computed `defaultVariants` do not override a prop the user explicitly passed unless that prop value is `undefined`. Return `defaultValue` to preserve the inherited or static default value. Return `undefined` to clear the default value. If a variant's value is a function, return that function from a computed default:
 
-When a `refine` callback changes variants, Clava re-runs the refine chain so later reads see the latest values. Re-runs are capped at 50 iterations, after which Clava stops and logs a warning in development.
+```ts
+const transform = (value: string) => value.toUpperCase();
+
+const input = cv({
+  variants: {
+    transform: (fn: (value: string) => string) => fn("example"),
+  },
+  defaultVariants: {
+    transform: () => transform,
+  },
+});
+```
+
+`setVariants()` overrides explicit props. `addClass()` and `addStyle()` append output without changing resolved variant values. `getVariants()` includes values changed by computed `defaultVariants` and `setVariants()`.
+
+When a computed default or `refine` callback changes variants, Clava re-runs the refine chain so later reads see the latest values. Re-runs are capped at 50 iterations, after which Clava stops and logs a warning in development.
 
 ## Splitting Props
 
@@ -539,7 +550,7 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 
 `component.style(props?)` returns only the resolved style value for that component mode.
 
-`component.getVariants(props?)` returns resolved variant values after static defaults, inherited defaults, and `refine` updates.
+`component.getVariants(props?)` returns resolved variant values after static defaults, inherited defaults, computed defaults, and `refine` updates.
 
 `component.propKeys` lists style props plus variant props for that component mode.
 

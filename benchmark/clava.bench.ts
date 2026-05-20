@@ -108,14 +108,18 @@ const toolbarButton = cv({
   },
   defaultVariants: {
     active: false,
+    intent: ({
+      defaultValue,
+      variants,
+    }: {
+      defaultValue: "primary" | "danger" | "neutral" | undefined;
+      variants: { size?: "sm" | "md" | "lg" };
+    }) => (variants.size === "lg" ? "neutral" : defaultValue),
   },
-  refine: ({ variants, addClass, addStyle, setDefaultVariants }) => {
+  refine: ({ variants, addClass, addStyle }) => {
     if (variants.active) {
       addClass("toolbar-button-pressed");
       addStyle({ transform: "translateY(1px)" });
-    }
-    if (variants.size === "lg") {
-      setDefaultVariants({ intent: "neutral" });
     }
   },
 });
