@@ -59,6 +59,33 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "sm" });
     });
 
+    test("getVariants omits undefined defaultVariants", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: undefined },
+        }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toStrictEqual({});
+      expect(Object.hasOwn(variants, "size")).toBe(false);
+    });
+
+    test("getVariants undefined defaultVariants clear inherited defaultVariants", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [base], defaultVariants: { size: undefined } }),
+      );
+      const variants = component.getVariants();
+      expect(variants).toStrictEqual({});
+      expect(Object.hasOwn(variants, "size")).toBe(false);
+    });
+
     test("getVariants returns variants set by refine setVariants", () => {
       const component = getModeComponent(
         mode,

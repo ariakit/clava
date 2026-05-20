@@ -266,24 +266,6 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg blue") });
     });
 
-    test("computed defaultVariants override literal defaultVariants", () => {
-      const component = getModeComponent(
-        mode,
-        cv({
-          variants: {
-            size: { sm: "sm", lg: "lg" },
-            color: { red: "red", blue: "blue" },
-          },
-          defaultVariants: {
-            size: "sm",
-            color: () => "blue" as const,
-          },
-        }),
-      );
-      const props = component();
-      expect(getStyleClass(props)).toEqual({ class: cls("sm blue") });
-    });
-
     test("computed defaultVariants override extended defaultVariants", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },

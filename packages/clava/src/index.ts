@@ -684,6 +684,10 @@ export function create({
           computedDefaultFns.push(value as ComputedDefaultVariantFn);
           continue;
         }
+        if (value === undefined) {
+          Reflect.deleteProperty(staticDefaults, name);
+          continue;
+        }
         staticDefaults[name] = value;
       }
     }
@@ -896,7 +900,19 @@ export function create({
         return input;
       }
 
-      let changed = false;
+      let hasOwnDisabledValue = false;
+      for (const key in input) {
+        if (!Object.hasOwn(input, key)) continue;
+        const value = input[key];
+        if (isOwnDisabledValue(key, value)) {
+          hasOwnDisabledValue = true;
+          break;
+        }
+      }
+      if (!hasOwnDisabledValue) {
+        return input;
+      }
+
       const filtered: Record<string, unknown> = {};
       for (const key in input) {
         if (!Object.hasOwn(input, key)) continue;
@@ -905,7 +921,6 @@ export function create({
           filtered[key] = value;
           continue;
         }
-        changed = true;
         const fallbackValue = fallback[key];
         if (
           fallbackValue !== undefined &&
@@ -915,7 +930,7 @@ export function create({
         }
       }
 
-      return changed ? filtered : input;
+      return filtered;
     };
 
     // Hot path: resolve variants by merging static defaults + extends'
