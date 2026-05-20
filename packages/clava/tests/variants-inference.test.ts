@@ -1,6 +1,8 @@
 import { describe, expectTypeOf, test } from "vitest";
 import { cv } from "../src/index.ts";
 
+const callback = (value: string) => value.toUpperCase();
+
 describe("variants type inference", () => {
   test("function variant infers parameter type as prop type", () => {
     const button = cv({
@@ -169,6 +171,85 @@ describe("variants type inference", () => {
       defaultVariants: {
         // @ts-expect-error string is not assignable to number
         size: "3",
+      },
+    });
+  });
+
+  test("computed defaultVariants infer defaultValue and variants", () => {
+    cv({
+      variants: {
+        size: (value: number) => `s-${value}`,
+        color: { red: "r", blue: "b" },
+      },
+      defaultVariants: {
+        size: ({ defaultValue, variants }) => {
+          expectTypeOf(defaultValue).toEqualTypeOf<number | undefined>();
+          expectTypeOf(variants.color).toEqualTypeOf<
+            "red" | "blue" | undefined
+          >();
+          return variants.color === "red" ? 10 : defaultValue;
+        },
+      },
+    });
+    cv({
+      variants: { size: (value: number) => `s-${value}` },
+      defaultVariants: {
+        // @ts-expect-error string is not assignable to number
+        size: () => "10",
+      },
+    });
+  });
+
+  test("function-valued defaultVariants must return the function", () => {
+    cv({
+      variants: {
+        transform: (value: (value: string) => string) => value("a"),
+      },
+      defaultVariants: {
+        transform: () => callback,
+      },
+    });
+    cv({
+      variants: {
+        transform: (value: (value: string) => string) => value("a"),
+      },
+      defaultVariants: {
+        // @ts-expect-error function values must be returned from a computed default
+        transform: callback,
+      },
+    });
+  });
+
+  test("mixed function-valued defaultVariants must return the function", () => {
+    cv({
+      variants: {
+        transform: (value: ((value: string) => string) | "none") => {
+          return value === "none" ? "none" : value("a");
+        },
+      },
+      defaultVariants: {
+        transform: "none",
+      },
+    });
+    cv({
+      variants: {
+        transform: (value: ((value: string) => string) | "none") => {
+          return value === "none" ? "none" : value("a");
+        },
+      },
+      defaultVariants: {
+        transform: () => callback,
+      },
+    });
+    cv({
+      variants: {
+        transform: (value: ((value: string) => string) | "none") => {
+          return value === "none" ? "none" : value("a");
+        },
+      },
+      defaultVariants: {
+        // @ts-expect-error function values must be returned from a computed default
+        transform: callback,
       },
     });
   });

@@ -254,7 +254,30 @@ type ExtractVariantValue<T> = T extends null
           : never;
 
 export type VariantValues<V> = {
-  [K in keyof V]?: ExtractVariantValue<V[K]>;
+  [K in keyof V]?: ExtractVariantValue<V[K]> | undefined;
+};
+
+interface DefaultVariantContext<V, K extends keyof V> {
+  defaultValue: ExtractVariantValue<V[K]> | undefined;
+  variants: Readonly<VariantValues<V>>;
+}
+
+type ComputedDefaultVariant<V, K extends keyof V> = (
+  context: DefaultVariantContext<V, K>,
+) => ExtractVariantValue<V[K]> | undefined;
+
+type NonFunctionVariantValue<T> = Exclude<T, (...args: any[]) => any>;
+
+type DefaultVariantValue<V, K extends keyof V> = [
+  NonFunctionVariantValue<ExtractVariantValue<V[K]>>,
+] extends [never]
+  ? ComputedDefaultVariant<V, K>
+  :
+      | NonFunctionVariantValue<ExtractVariantValue<V[K]>>
+      | ComputedDefaultVariant<V, K>;
+
+export type DefaultVariants<V> = {
+  [K in keyof V]?: DefaultVariantValue<V, K> | undefined;
 };
 
 export type StyleValue = CSS.Properties & {
@@ -269,7 +292,6 @@ export interface StyleClassValue {
 export interface RefineContext<V> {
   variants: VariantValues<V>;
   setVariants: (variants: VariantValues<V>) => void;
-  setDefaultVariants: (variants: VariantValues<V>) => void;
   addClass: (className: ClassValue) => void;
   addStyle: (style: StyleValue) => void;
 }

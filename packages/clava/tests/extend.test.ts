@@ -144,7 +144,7 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
-    test("extend disabled variant value with refine setDefaultVariants", () => {
+    test("extend disabled variant value with computed defaultVariants", () => {
       const base = cv({
         variants: {
           size: {
@@ -158,8 +158,8 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { size: { sm: null } },
-          refine: ({ setDefaultVariants }) => {
-            setDefaultVariants({ size: "lg" });
+          defaultVariants: {
+            size: () => "lg" as const,
           },
         }),
       );
@@ -173,17 +173,51 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: { size: { sm: null } },
-          refine: ({ setDefaultVariants }) => {
-            setDefaultVariants({
-              // @ts-expect-error disabled variant value cannot be set
-              size:
-                // no error
-                "sm",
-            });
+          defaultVariants: {
+            // @ts-expect-error disabled variant value cannot be set
+            size: () =>
+              // no error
+              "sm",
           },
         }),
       );
       expect(getStyleClass(invalidComponent())).toEqual({ class: "" });
+    });
+
+    test("extend filters disabled values from inherited computed defaultVariants", () => {
+      const base = cv({
+        variants: {
+          size: {
+            sm: { class: "base-sm", style: { fontSize: "12px" } },
+            lg: { class: "base-lg", style: { fontSize: "16px" } },
+          },
+        },
+        defaultVariants: {
+          size: () => "sm" as const,
+        },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: {
+            size: { sm: null },
+            color: { red: "red", blue: "blue" },
+          },
+          defaultVariants: {
+            size: "lg",
+            color: ({ variants }) => (variants.size === "lg" ? "blue" : "red"),
+          },
+        }),
+      );
+      expect(getStyleClass(component())).toEqual({
+        class: cls("base-lg blue"),
+        fontSize: "16px",
+      });
+      expect(component.getVariants()).toEqual({
+        size: "lg",
+        color: "blue",
+      });
     });
 
     test("extend disabled variant value with refine setVariants", () => {
