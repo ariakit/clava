@@ -24,6 +24,7 @@ import type { Variant, VariantProps } from "clava";
 - [Solid](#solid)
 - [`create()` And `cx()`](#create-and-cx)
 - [Type Helpers](#type-helpers)
+- [Comparison](#comparison)
 - [API Summary](#api-summary)
 
 ## Install
@@ -384,17 +385,17 @@ const button = cv({
       lg: "button-lg",
     },
   },
-}).jsx;
+});
 
 type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
 
 function Button(props: ButtonProps) {
   const [variantProps, buttonProps] = splitProps(props, button);
-  return <button {...buttonProps} {...button(variantProps)} />;
+  return <button {...buttonProps} {...button.jsx(variantProps)} />;
 }
 ```
 
-The first component source claims variant props plus styling props (`class`, `className`, and `style`, depending on the mode). Later component sources receive only their variant props. Array sources receive exactly the listed keys and do not claim styling props.
+The first component source claims variant props plus the styling props exposed by that component's `propKeys`. The base component claims `class`, `className`, and `style`; mode-specific components claim their own styling props. Later component sources receive only their variant props. Array sources receive exactly the listed keys and do not claim styling props.
 
 ```ts
 const [buttonProps, fieldProps, rest] = splitProps(props, button, field);
@@ -431,14 +432,14 @@ const button = cv({
       md: "button-md",
     },
   },
-}).jsx;
+});
 
 interface ButtonProps
   extends ComponentProps<"button">, VariantProps<typeof button> {}
 
 function Button(props: ButtonProps) {
   const [variantProps, buttonProps] = splitProps(props, button);
-  return <button {...buttonProps} {...button(variantProps)} />;
+  return <button {...buttonProps} {...button.jsx(variantProps)} />;
 }
 ```
 
@@ -459,13 +460,13 @@ const button = cv({
       md: "button-md",
     },
   },
-}).htmlObj;
+});
 
 type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
 
 function Button(props: ButtonProps) {
   const [variantProps, buttonProps] = splitProps(props, button);
-  return <button {...buttonProps} {...button(variantProps)} />;
+  return <button {...buttonProps} {...button.htmlObj(variantProps)} />;
 }
 ```
 
@@ -533,6 +534,36 @@ const icon = cv({
 ```
 
 The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleClassValue`, `JSXProps`, `HTMLProps`, `HTMLObjProps`, `CVComponent`, and `CVConfig`.
+
+## Comparison
+
+This table compares Clava with the packages used by the repository's alternative benchmark: `class-variance-authority@0.7.1`, `cva@1.0.0-beta.4`, `tailwind-variants/lite@3.2.2`, and `tailwind-variants@3.2.2`.
+
+| Feature                                              | Clava          | CVA v0             | CVA v1 beta        | TV Lite            | TV                 |
+| ---------------------------------------------------- | -------------- | ------------------ | ------------------ | ------------------ | ------------------ |
+| Typed variants and default variants                  | Yes            | Yes                | Yes                | Yes                | Yes                |
+| Boolean shorthand variants                           | Yes            | No                 | No                 | No                 | No                 |
+| Component extension or composition                   | `extend`       | No helper          | `compose()`        | `extend`           | `extend`           |
+| Cross-variant conditions                             | `refine()`     | `compoundVariants` | `compoundVariants` | `compoundVariants` | `compoundVariants` |
+| Function variant values                              | Yes            | No                 | No                 | No                 | No                 |
+| Computed default variants                            | Yes            | No                 | No                 | No                 | No                 |
+| Class and style prop output                          | Yes            | Classes only       | Classes only       | Classes only       | Classes only       |
+| JSX, HTML string, and hyphenated-object output modes | Yes            | No                 | No                 | No                 | No                 |
+| Built-in prop splitting for framework props          | `splitProps()` | No                 | No                 | No                 | No                 |
+| Dedicated slots API                                  | No             | No                 | No                 | Yes                | Yes                |
+| Built-in Tailwind conflict merging                   | No             | No                 | No                 | No                 | Yes                |
+
+The `pnpm perf-alternatives` benchmark resolves a composed Tailwind-style button with inherited variants, defaults, and cross-variant conditions. On Node v24.14.1, Vitest reported these results, where higher ops/sec is better:
+
+| Package                          |   Ops/sec | Relative to Clava |
+| -------------------------------- | --------: | ----------------: |
+| `clava@0.5.0`                    | 1,040,314 |             1.00x |
+| `class-variance-authority@0.7.1` |   426,132 |      2.44x slower |
+| `tailwind-variants/lite@3.2.2`   |   369,732 |      2.81x slower |
+| `tailwind-variants@3.2.2`        |   273,503 |      3.80x slower |
+| `cva@1.0.0-beta.4`               |   211,474 |      4.92x slower |
+
+Benchmark results vary by runtime and hardware, so treat them as a reproducible snapshot of this repository's composed-variant case rather than a universal ranking.
 
 ## API Summary
 
