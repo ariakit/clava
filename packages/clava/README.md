@@ -231,17 +231,19 @@ Variant values can be class values, arrays, `{ class, style }` objects, or [func
 
 ## Function Variants
 
-Add a function as a variant value when the prop should generate class/style output dynamically. The function's parameter type defines the prop type.
+Add a function as a variant value when the prop should generate class/style output dynamically. The function's parameter type defines the prop type. Method syntax works well for multi-line callbacks; compact one-line callbacks can stay as arrow-function property values.
 
 ```ts
 const grid = cv({
   class: "grid",
   variants: {
-    columns: (value: number) => ({
-      class: `grid-cols-${value}`,
-      style: { "--grid-columns": `${value}` },
-    }),
-    color: (value: string | null) => {
+    columns(value: number) {
+      return {
+        class: `grid-cols-${value}`,
+        style: { "--grid-columns": `${value}` },
+      };
+    },
+    color(value: string | null) {
       return value ? `text-${value}` : "text-current";
     },
   },
@@ -335,7 +337,7 @@ const toolbarButton = cv({
     intent: ({ defaultValue, variants }) =>
       variants.size === "lg" ? "neutral" : defaultValue,
   },
-  refine: ({ variants, setVariants, addClass, addStyle }) => {
+  refine({ variants, setVariants, addClass, addStyle }) {
     if (variants.loading) {
       setVariants({ pressed: false });
     }
@@ -387,7 +389,8 @@ const button = cv({
   },
 });
 
-type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
+interface ButtonProps
+  extends ComponentProps<"button">, VariantProps<typeof button> {}
 
 function Button(props: ButtonProps) {
   const [variantProps, buttonProps] = splitProps(props, button);
@@ -462,7 +465,8 @@ const button = cv({
   },
 });
 
-type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
+interface ButtonProps
+  extends ComponentProps<"button">, VariantProps<typeof button> {}
 
 function Button(props: ButtonProps) {
   const [variantProps, buttonProps] = splitProps(props, button);
@@ -505,7 +509,8 @@ Use `VariantProps<typeof component>` to add a Clava component's variant props to
 import type { ComponentProps } from "react";
 import type { VariantProps } from "clava";
 
-type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
+interface ButtonProps
+  extends ComponentProps<"button">, VariantProps<typeof button> {}
 ```
 
 Use `Variant<typeof component, "key">` to constrain a new variant map to the same values as another component's variant.

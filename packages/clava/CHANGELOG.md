@@ -18,7 +18,7 @@ const button = cv({
     size: { sm: "sm", lg: "lg" },
     intent: { neutral: "neutral", brand: "brand" },
   },
-  refine: ({ variants, setDefaultVariants }) => {
+  refine({ variants, setDefaultVariants }) {
     if (variants.size === "lg") {
       setDefaultVariants({ intent: "neutral" });
     }
@@ -111,7 +111,7 @@ Before:
 ```ts
 const button = cv({
   variants: { size: { sm: "sm", lg: "lg" } },
-  computed: ({ variants, addClass }) => {
+  computed({ variants, addClass }) {
     if (variants.size === "lg") {
       addClass("is-large");
     }
@@ -124,7 +124,7 @@ After:
 ```ts
 const button = cv({
   variants: { size: { sm: "sm", lg: "lg" } },
-  refine: ({ variants, addClass }) => {
+  refine({ variants, addClass }) {
     if (variants.size === "lg") {
       addClass("is-large");
     }

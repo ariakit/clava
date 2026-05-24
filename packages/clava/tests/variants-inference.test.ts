@@ -20,6 +20,25 @@ describe("variants type inference", () => {
     });
   });
 
+  test("method variant infers optional parameter type as prop type", () => {
+    const grid = cv({
+      variants: {
+        columns(value?: number) {
+          return `columns-${value}`;
+        },
+      },
+    });
+    expectTypeOf(grid.getVariants()).branded.toEqualTypeOf<{
+      columns?: number;
+    }>();
+    grid({ columns: 3 });
+    grid({ columns: undefined });
+    grid({
+      // @ts-expect-error string is not assignable to number
+      columns: "3",
+    });
+  });
+
   test("function variant infers union parameter type", () => {
     const button = cv({
       variants: {
@@ -200,6 +219,37 @@ describe("variants type inference", () => {
     });
   });
 
+  test("computed defaultVariants method infers defaultValue and variants", () => {
+    cv({
+      variants: {
+        compact: { true: "compact", false: "" },
+        size(value?: number) {
+          return `s-${value}`;
+        },
+      },
+      defaultVariants: {
+        size({ defaultValue, variants }) {
+          expectTypeOf(defaultValue).toEqualTypeOf<number | undefined>();
+          expectTypeOf(variants.compact).toEqualTypeOf<boolean | undefined>();
+          return variants.compact ? 2 : defaultValue;
+        },
+      },
+    });
+    cv({
+      variants: {
+        size(value?: number) {
+          return `s-${value}`;
+        },
+      },
+      defaultVariants: {
+        // @ts-expect-error string is not assignable to number
+        size() {
+          return "10";
+        },
+      },
+    });
+  });
+
   test("function-valued defaultVariants must return the function", () => {
     cv({
       variants: {
@@ -258,6 +308,24 @@ describe("variants type inference", () => {
     cv({
       variants: { size: (value: number) => `s-${value}` },
       refine: ({ variants, setVariants }) => {
+        expectTypeOf(variants.size).toEqualTypeOf<number | undefined>();
+        setVariants({ size: 10 });
+        setVariants({
+          // @ts-expect-error string not assignable to number
+          size: "10",
+        });
+      },
+    });
+  });
+
+  test("refine method infers context from method variants", () => {
+    cv({
+      variants: {
+        size(value?: number) {
+          return `s-${value}`;
+        },
+      },
+      refine({ variants, setVariants }) {
         expectTypeOf(variants.size).toEqualTypeOf<number | undefined>();
         setVariants({ size: 10 });
         setVariants({
