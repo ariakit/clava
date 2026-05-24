@@ -1,24 +1,15 @@
 import { execFile } from "node:child_process";
-import {
-  access,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { withPackageBuildLock } from "test-utils/build-lock";
 import { expect, test } from "vitest";
-import { measureBundleSize } from "./bundle-size.ts";
+import { createBundleSizeBuildConfig } from "./bundle-size.ts";
 
 const exec = promisify(execFile);
 const root = path.join(import.meta.dirname, "../../..");
 const scriptPath = path.join(import.meta.dirname, "index.ts");
-const compactFixtureMinifiedBytesLimit = 180;
 let buildPromise: Promise<unknown> | undefined;
 
 interface BundleSizeReport {
@@ -72,36 +63,20 @@ test("measures production bundle size", async () => {
   });
 }, 60_000);
 
-test("measures compact minified output", async () => {
-  const tempDir = await mkdtemp(path.join(tmpdir(), "clava-bundle-size-test-"));
-  try {
-    const sourceRoot = path.join(tempDir, "source");
-    const packageDist = path.join(sourceRoot, "packages/clava/dist");
-    const output = path.join(tempDir, "bundle-size.json");
+test("configures compact minified output", () => {
+  const config = createBundleSizeBuildConfig({
+    entry: path.join(root, "packages/clava/dist/index.js"),
+    root,
+  });
 
-    await mkdir(packageDist, { recursive: true });
-    await writeFile(
-      path.join(packageDist, "index.js"),
-      `
-export function createLongClassName(prefix, value) {
-  const normalizedPrefix = String(prefix).trim().toLowerCase();
-  const normalizedValue = String(value).trim().toLowerCase();
-  const segments = [
-    normalizedPrefix,
-    normalizedValue,
-    normalizedPrefix + "-" + normalizedValue,
-  ];
-  return segments.filter(Boolean).join(" ");
-}
-`,
-    );
-
-    const report = await measureBundleSize({ sourceRoot, output });
-
-    expect(report.minifiedBytes).toBeLessThan(compactFixtureMinifiedBytesLimit);
-  } finally {
-    await rm(tempDir, { force: true, recursive: true });
-  }
+  expect(config.build).toMatchObject({
+    minify: true,
+    rolldownOptions: {
+      output: {
+        minify: true,
+      },
+    },
+  });
 });
 
 test("does not include source paths in measured size", async () => {

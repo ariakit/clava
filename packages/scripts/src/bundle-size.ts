@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
-import { build } from "vite";
+import { type InlineConfig, build } from "vite";
 import { isDirectEntry } from "./is-direct-entry.ts";
 
 export interface BundleSizeOptions {
@@ -19,6 +19,43 @@ export interface BundleSizeResult {
 export interface BundleSizeRunResult {
   result: BundleSizeResult;
   stdout: string;
+}
+
+interface BundleSizeBuildConfigOptions {
+  entry: string;
+  root: string;
+}
+
+export function createBundleSizeBuildConfig({
+  entry,
+  root,
+}: BundleSizeBuildConfigOptions): InlineConfig {
+  return {
+    configFile: false,
+    logLevel: "silent",
+    root,
+    mode: "production",
+    define: {
+      "process.env.NODE_ENV": JSON.stringify("production"),
+    },
+    build: {
+      emptyOutDir: true,
+      lib: {
+        entry,
+        fileName: () => "bundle.js",
+        formats: ["es"],
+      },
+      minify: true,
+      outDir: "dist",
+      // Vite's default ES library output can optimize the chunk without
+      // compact-printing it, so force Rolldown to measure real minified code.
+      rolldownOptions: {
+        output: {
+          minify: true,
+        },
+      },
+    },
+  };
 }
 
 function readOptions(
@@ -64,32 +101,7 @@ export async function measureBundleSize({
     // surface plus its bundled runtime dependencies, not one tree-shaken use.
     await writeFile(entry, `export * from ${JSON.stringify(packageUrl)};\n`);
 
-    await build({
-      configFile: false,
-      logLevel: "silent",
-      root: tempDir,
-      mode: "production",
-      define: {
-        "process.env.NODE_ENV": JSON.stringify("production"),
-      },
-      build: {
-        emptyOutDir: true,
-        lib: {
-          entry,
-          fileName: () => "bundle.js",
-          formats: ["es"],
-        },
-        minify: true,
-        outDir: "dist",
-        // Vite's default ES library output can optimize the chunk without
-        // compact-printing it, so force Rolldown to measure real minified code.
-        rolldownOptions: {
-          output: {
-            minify: true,
-          },
-        },
-      },
-    });
+    await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
 
     // Rolldown's region comments include resolved module paths, which would
     // make identical bundles measure differently across worktree directories.
