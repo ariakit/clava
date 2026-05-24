@@ -525,6 +525,18 @@ test("cx joins class values", () => {
   ).toBe("(foo bar baz qux)");
 });
 
+test("cx ignores inherited class map keys", () => {
+  const { cx } = create();
+  const classMap = Object.create({ inherited: true }) as Record<
+    string,
+    unknown
+  >;
+  classMap.own = true;
+
+  expect(cx(classMap)).toBe("own");
+  expect(cvBase({ class: classMap })().class).toBe("own");
+});
+
 describe("Variant utility type", () => {
   test("matches variant keys from another component", () => {
     const base = cvBase({

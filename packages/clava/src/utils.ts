@@ -25,6 +25,7 @@ function classValueToString(value: ClassValue): string {
   if (!Array.isArray(value)) {
     let result = "";
     for (const key in value) {
+      if (!hasOwn.call(value, key)) continue;
       if (!value[key]) continue;
       if (result) result += " ";
       result += key;
