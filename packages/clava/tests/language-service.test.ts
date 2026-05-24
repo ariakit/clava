@@ -80,7 +80,10 @@ function createLanguageServiceHost(
 function createLanguageServiceFixture(
   consumerSource: string,
 ): LanguageServiceFixture {
-  const tempDir = mkdtempSync(join(workspaceDir, ".tmp-language-service-"));
+  const tempRoot = join(workspaceDir, ".tmp");
+  mkdirSync(tempRoot, { recursive: true });
+
+  const tempDir = mkdtempSync(join(tempRoot, "language-service-"));
   tempDirs.push(tempDir);
 
   const fixtureSourceDir = join(tempDir, "src");
@@ -134,6 +137,14 @@ afterEach(() => {
 });
 
 describe("TypeScript language service", () => {
+  test("creates fixtures inside the workspace .tmp directory", () => {
+    const fixture = createLanguageServiceFixture(getVariantFixtureSource());
+    const fixtureDir = dirname(fixture.consumerFile);
+    const fixturePrefix = join(workspaceDir, ".tmp", "language-service-");
+
+    expect(fixtureDir.startsWith(fixturePrefix)).toBe(true);
+  });
+
   test("goes to the local variant definition from a variant prop usage", () => {
     const fixture = createLanguageServiceFixture(getVariantFixtureSource());
     const definitionStart = getFixturePosition(
