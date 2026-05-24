@@ -81,6 +81,13 @@ export async function measureBundleSize({
         },
         minify: true,
         outDir: "dist",
+        // Vite's default ES library output can optimize the chunk without
+        // compact-printing it, so force Rolldown to measure real minified code.
+        rolldownOptions: {
+          output: {
+            minify: true,
+          },
+        },
       },
     });
 
