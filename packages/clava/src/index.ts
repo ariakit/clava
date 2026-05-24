@@ -1,4 +1,3 @@
-import clsx, { type ClassValue as ClsxClassValue } from "clsx";
 import {
   REFINE_UNSTABLE_TRACKING_WINDOW,
   type RefineRunState,
@@ -48,7 +47,7 @@ type ComputeFn = (
   userVariantProps: Record<string, unknown>,
   skipKeys: Set<string> | null,
   skipValues: Record<string, Set<string>> | null,
-  classesOut: ClsxClassValue[],
+  classesOut: CXClassValue[],
   styleOut: StyleValue,
   runState?: RefineRunState,
   protectedVariants?: Record<string, unknown> | null,
@@ -111,6 +110,65 @@ const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
 >;
 
 const MAX_REFINE_RUNS = 50;
+
+type CXClassDictionary = Record<string, unknown>;
+type CXClassArray = CXClassValue[];
+type CXClassValue =
+  | CXClassArray
+  | CXClassDictionary
+  | string
+  | number
+  | bigint
+  | null
+  | boolean
+  | undefined;
+
+function getClassName(value: CXClassValue): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return `${value}`;
+  if (typeof value !== "object") return "";
+  if (value == null) return "";
+
+  let className = "";
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const item = value[i];
+      if (!item) continue;
+      const itemClassName = getClassName(item);
+      if (itemClassName.length === 0) continue;
+      if (className.length > 0) {
+        className += " ";
+      }
+      className += itemClassName;
+    }
+    return className;
+  }
+
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (!value[key]) continue;
+    if (className.length > 0) {
+      className += " ";
+    }
+    className += key;
+  }
+  return className;
+}
+
+function joinClassValues(...values: CXClassValue[]): string {
+  let className = "";
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i];
+    if (!value) continue;
+    const valueClassName = getClassName(value);
+    if (valueClassName.length === 0) continue;
+    if (className.length > 0) {
+      className += " ";
+    }
+    className += valueClassName;
+  }
+  return className;
+}
 
 function areVariantsEqual(
   a: Record<string, unknown>,
@@ -588,7 +646,8 @@ function buildPrebuiltVariant(variantDef: unknown): PrebuiltVariant {
 export function create({
   transformClass = (className) => className,
 }: CreateParams = {}) {
-  const cx = (...classes: ClsxClassValue[]) => transformClass(clsx(...classes));
+  const cx = (...classes: CXClassValue[]) =>
+    transformClass(joinClassValues(...classes));
 
   const cv = <V extends Variants = {}, const E extends AnyComponent[] = []>(
     config: CVConfig<V, E> = {},
@@ -714,7 +773,7 @@ export function create({
     // `getComponentMeta` per render. Extends from a different `create()`
     // factory (different `transformClass` identity) need their contribution
     // transformed by their own `transformClass` before being joined into our
-    // class string — otherwise our outer `transformClass(clsx(allClasses))`
+    // class string — otherwise our outer `transformClass(joinClassValues(...))`
     // would be the only transform that runs, and the extend's factory would
     // be silently bypassed for any base coming from `extend: [otherFactoryCv]`.
     const extMetas: ComponentMeta[] = [];
@@ -1281,7 +1340,7 @@ export function create({
             // Isolated extend (different factory): gather its variant classes
             // into a scratch array, then push the joined string after applying
             // its own transformClass. Our outer transform applies on top.
-            const extClasses: ClsxClassValue[] = [];
+            const extClasses: CXClassValue[] = [];
             workingResolved = extMetas[i].compute(
               workingResolved,
               extUserVariantProps,
@@ -1297,11 +1356,9 @@ export function create({
               renderOnly,
             );
             if (extClasses.length > 0) {
-              const joined = clsx(extClasses);
+              const joined = joinClassValues(extClasses);
               if (joined.length > 0) {
-                classesOut.push(
-                  extMetas[i].transformClass(joined) as ClsxClassValue,
-                );
+                classesOut.push(extMetas[i].transformClass(joined));
               }
             }
           } else {
@@ -1407,7 +1464,7 @@ export function create({
           const v = variant.values[selectedKey];
           if (!v) continue;
           if (v.class != null) {
-            classesOut.push(v.class as ClsxClassValue);
+            classesOut.push(v.class as CXClassValue);
           }
           if (v.style) {
             Object.assign(styleOut, v.style);
@@ -1415,7 +1472,7 @@ export function create({
         } else if (variant.shorthand && selectedValue === true) {
           const v = variant.shorthand;
           if (v.class != null) {
-            classesOut.push(v.class as ClsxClassValue);
+            classesOut.push(v.class as CXClassValue);
           }
           if (v.style) {
             Object.assign(styleOut, v.style);
@@ -1444,7 +1501,7 @@ export function create({
         if (computedResult == null) continue;
         const r = extractClassAndStylePrebuilt(computedResult);
         if (r.class != null) {
-          classesOut.push(r.class as ClsxClassValue);
+          classesOut.push(r.class as CXClassValue);
         }
         if (r.style) {
           Object.assign(styleOut, r.style);
@@ -1455,7 +1512,7 @@ export function create({
       // function).
       if (cClasses) {
         for (let i = 0; i < cClasses.length; i++) {
-          classesOut.push(cClasses[i] as ClsxClassValue);
+          classesOut.push(cClasses[i] as CXClassValue);
         }
       }
       if (cStyle) {
@@ -1505,7 +1562,7 @@ export function create({
             // Latest variant changes from non-converging iterations inside the
             // tracking window. Lazy-init keeps convergent loops allocation-free.
             let unstableChanges: Map<string, VariantChange> | null = null;
-            let lastClasses: ClsxClassValue[] = [];
+            let lastClasses: CXClassValue[] = [];
             let lastStyle: StyleValue = {};
             let isFirstRun = true;
 
@@ -1522,7 +1579,7 @@ export function create({
               }
               const classCount = classesOut.length;
               const nextPendingProtectedVariants: Record<string, unknown> = {};
-              const nextClasses: ClsxClassValue[] = useDirectOutput
+              const nextClasses: CXClassValue[] = useDirectOutput
                 ? classesOut
                 : [];
               const nextStyle: StyleValue = useDirectOutput ? styleOut : {};
@@ -1866,16 +1923,16 @@ export function create({
       // Build allClasses directly. computedBaseClass already has all extend
       // bases joined with config.class — `compute` only adds variant classes
       // on top.
-      const allClasses: ClsxClassValue[] = [computedBaseClass];
+      const allClasses: CXClassValue[] = [computedBaseClass];
       const style: StyleValue = {};
       compute(resolved, userVariantProps, null, null, allClasses, style);
 
       // Apply user-provided class / className.
       if ("class" in propsRecord) {
-        allClasses.push(propsRecord.class as ClsxClassValue);
+        allClasses.push(propsRecord.class as CXClassValue);
       }
       if ("className" in propsRecord) {
-        allClasses.push(propsRecord.className as ClsxClassValue);
+        allClasses.push(propsRecord.className as CXClassValue);
       }
 
       // Apply user-provided style.
@@ -1899,7 +1956,7 @@ export function create({
       }
 
       return {
-        className: transformClass(clsx(allClasses)),
+        className: transformClass(joinClassValues(allClasses)),
         style,
       };
     };
@@ -1914,17 +1971,17 @@ export function create({
     };
 
     // Compute base class (without variants) — includes extended base classes.
-    // Plain `clsx` (no `transformClass`): `meta.baseClass` flows back into
-    // parent extends as `clsx` input and then through the single
-    // `transformClass(clsx(allClasses))` at render time, so applying it here
-    // would compound (double for own-render, triple+ for extend chains) and
-    // misbehave for non-idempotent transforms.
+    // Plain class joining (no `transformClass`): `meta.baseClass` flows back
+    // into parent extends as class input and then through the single
+    // `transformClass(joinClassValues(...))` at render time, so applying it
+    // here would compound (double for own-render, triple+ for extend chains)
+    // and misbehave for non-idempotent transforms.
     const computedBaseClass = hasExtend
-      ? clsx(
-          ...(extBaseClassesArr as ClsxClassValue[]),
-          config.class as ClsxClassValue,
+      ? joinClassValues(
+          ...(extBaseClassesArr as CXClassValue[]),
+          config.class as CXClassValue,
         )
-      : clsx(config.class as ClsxClassValue);
+      : joinClassValues(config.class as CXClassValue);
 
     // Shared closures across the default and modal components.
     const classFn = (props: ComponentProps<MergedVariants> = {}) => {

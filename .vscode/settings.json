@@ -1,7 +1,7 @@
 {
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.preferences.preferTypeOnlyAutoImports": true,
-  "tailwindCSS.classFunctions": ["clsx", "cx", "cv"],
+  "tailwindCSS.classFunctions": ["cx", "cv"],
   "oxc.typeAware": true,
   "editor.snippetSuggestions": "bottom",
   "editor.formatOnSave": true,

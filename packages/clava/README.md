@@ -131,7 +131,7 @@ button.variantKeys;
 
 ## Classes And Styles
 
-`class` values are passed through `clsx`, so strings, arrays, nested arrays, and falsy values work the same way they do in `clsx`.
+`class` values are passed through Clava's class-value helper, so strings, arrays, nested arrays, and falsy values work the same way they do in `cx()`.
 
 ```ts
 const box = cv({
@@ -589,6 +589,6 @@ Benchmark results vary by runtime and hardware, so treat them as a reproducible 
 
 `splitProps(props, source1, ...sources)` returns one object per source plus a final rest object.
 
-`cx(...classes)` joins class values with `clsx` and applies the factory's `transformClass`.
+`cx(...classes)` joins class values and applies the factory's `transformClass`.
 
 `create(options?)` returns isolated `{ cv, cx }` helpers. The only option is `transformClass?: (className: string) => string`.

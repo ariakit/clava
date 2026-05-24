@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vitest";
-import { cv } from "../src/index.ts";
+import { cv, cx } from "../src/index.ts";
 
 const proto = Object.prototype as Record<string, unknown>;
 
@@ -43,4 +43,10 @@ test("extend's resolver ignores polluted prototype on parent's refine", () => {
   });
   const child = cv({ extend: [base], class: "child" });
   expect(child({}).class).not.toContain("base-lg-detected");
+});
+
+test("cx ignores keys inherited from Object.prototype", () => {
+  proto.active = true;
+  expect(cx({})).toBe("");
+  expect(cx({ selected: true })).toBe("selected");
 });
