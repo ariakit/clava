@@ -1,5 +1,47 @@
 # clava
 
+## 0.6.0
+
+### Computed default variant parameters
+
+**BREAKING** if you're using computed `defaultVariants` functions in [`cv`](https://clava.style/docs/reference/cv).
+
+Computed `defaultVariants` functions now receive `defaultValue` and `variants` as separate parameters instead of a context object.
+
+Before:
+
+```ts
+const button = cv({
+  variants: {
+    size: { sm: "sm", lg: "lg" },
+    intent: { neutral: "neutral", brand: "brand" },
+  },
+  defaultVariants: {
+    intent: ({ defaultValue, variants }) =>
+      variants.size === "lg" ? "neutral" : defaultValue,
+  },
+});
+```
+
+After:
+
+```ts
+const button = cv({
+  variants: {
+    size: { sm: "sm", lg: "lg" },
+    intent: { neutral: "neutral", brand: "brand" },
+  },
+  defaultVariants: {
+    intent: (defaultValue, variants) =>
+      variants.size === "lg" ? "neutral" : defaultValue,
+  },
+});
+```
+
+### Other updates
+
+- Documented Clava's public TypeScript helper declarations with inline examples.
+
 ## 0.5.0
 
 ### Computed default variants
