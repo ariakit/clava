@@ -137,7 +137,7 @@ for (const config of Object.values(CONFIGS)) {
           },
           defaultVariants: {
             color: () => "red" as const,
-            size: ({ defaultValue, variants }) =>
+            size: (defaultValue, variants) =>
               variants.color === "red" ? "lg" : defaultValue,
           },
         }),
@@ -155,7 +155,7 @@ for (const config of Object.values(CONFIGS)) {
             color: { red: "red", blue: "blue" },
           },
           defaultVariants: {
-            color: ({ defaultValue, variants }) =>
+            color: (defaultValue, variants) =>
               variants.size === "lg" ? "blue" : defaultValue,
           },
         }),
@@ -271,7 +271,7 @@ for (const config of Object.values(CONFIGS)) {
           mode: { on: "on" },
         },
         defaultVariants: {
-          size: ({ defaultValue, variants }) =>
+          size: (defaultValue, variants) =>
             variants.mode === "on" ? "lg" : defaultValue,
         },
         refine: ({ variants, setVariants }) => {
@@ -356,7 +356,7 @@ for (const config of Object.values(CONFIGS)) {
           mode: { on: "on" },
         },
         defaultVariants: {
-          size: ({ defaultValue, variants }) =>
+          size: (defaultValue, variants) =>
             variants.mode === "on" ? "lg" : defaultValue,
         },
         refine: ({ variants, setVariants }) => {
@@ -422,7 +422,7 @@ for (const config of Object.values(CONFIGS)) {
           extend: [base],
           variants: { color: { red: "child-red", blue: "child-blue" } },
           defaultVariants: {
-            color: ({ defaultValue, variants }) =>
+            color: (defaultValue, variants) =>
               variants.color === "red" ? "blue" : defaultValue,
           },
         }),
@@ -440,7 +440,7 @@ for (const config of Object.values(CONFIGS)) {
             done: "",
           },
           defaultVariants: {
-            color: ({ defaultValue, variants }) =>
+            color: (defaultValue, variants) =>
               variants.done ? "blue" : defaultValue,
           },
           refine: ({ variants, setVariants }) => {

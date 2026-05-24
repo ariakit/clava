@@ -69,10 +69,10 @@ type ResolveRefineFn = (
   defaultResolved?: Record<string, unknown>,
 ) => Record<string, unknown>;
 
-type ComputedDefaultVariantFn = (context: {
-  defaultValue: unknown;
-  variants: Readonly<Record<string, unknown>>;
-}) => unknown;
+type ComputedDefaultVariantFn = (
+  defaultValue: unknown,
+  variants: Readonly<Record<string, unknown>>,
+) => unknown;
 
 // Internal metadata stored on components but hidden from public types.
 interface ComponentMeta {
@@ -1093,10 +1093,7 @@ export function create({
         const defaultValue = inheritedComputedDefaultKeys.has(key)
           ? variantSnapshot[key]
           : defaultResolved[key];
-        const value = computedDefaultFns[i]({
-          defaultValue,
-          variants: variantSnapshot,
-        });
+        const value = computedDefaultFns[i](defaultValue, variantSnapshot);
         if (hasAnyDisabled) {
           if (disabledVariantKeys.has(key)) continue;
           const valueKey = getVariantValueKey(value);

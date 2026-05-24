@@ -338,13 +338,9 @@ export type VariantValues<V> = {
   [K in keyof V]?: ExtractVariantValue<V[K]> | undefined;
 };
 
-interface DefaultVariantContext<V, K extends keyof V> {
-  defaultValue: ExtractVariantValue<V[K]> | undefined;
-  variants: Readonly<VariantValues<V>>;
-}
-
 type ComputedDefaultVariant<V, K extends keyof V> = (
-  context: DefaultVariantContext<V, K>,
+  defaultValue: ExtractVariantValue<V[K]> | undefined,
+  variants: Readonly<VariantValues<V>>,
 ) => ExtractVariantValue<V[K]> | undefined;
 
 type NonFunctionVariantValue<T> = Exclude<T, (...args: any[]) => any>;

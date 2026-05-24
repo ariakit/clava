@@ -206,7 +206,7 @@ for (const config of Object.values(CONFIGS)) {
           },
           defaultVariants: {
             size: "lg",
-            color: ({ variants }) => (variants.size === "lg" ? "blue" : "red"),
+            color: (_, variants) => (variants.size === "lg" ? "blue" : "red"),
           },
         }),
       );
