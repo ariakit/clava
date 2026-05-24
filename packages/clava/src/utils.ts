@@ -1,5 +1,6 @@
-import type * as CSS from "csstype";
 import type {
+  CSSPropertiesHyphen,
+  ClassValue,
   HTMLCSSProperties,
   JSXCSSProperties,
   StyleValue,
@@ -10,6 +11,51 @@ export type Mode = (typeof MODES)[number];
 
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const hasOwn = Object.prototype.hasOwnProperty;
+
+function classValueToString(value: ClassValue): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value !== "object" || value == null) {
+    return "";
+  }
+  if (!Array.isArray(value)) {
+    let result = "";
+    for (const key in value) {
+      if (!value[key]) continue;
+      if (result) result += " ";
+      result += key;
+    }
+    return result;
+  }
+
+  let result = "";
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    if (!item) continue;
+    const className = classValueToString(item);
+    if (!className) continue;
+    if (result) result += " ";
+    result += className;
+  }
+  return result;
+}
+
+export function joinClass(...classes: ClassValue[]) {
+  let result = "";
+  for (let i = 0; i < classes.length; i++) {
+    const value = classes[i];
+    if (!value) continue;
+    const className = classValueToString(value);
+    if (!className) continue;
+    if (result) result += " ";
+    result += className;
+  }
+  return result;
+}
 
 function isAsciiLetter(code: number) {
   if (code >= 65 && code <= 90) return true;
@@ -36,6 +82,9 @@ export function hyphenToCamel(str: string) {
   // CSS custom properties (variables) should not be converted
   if (str.length >= 2 && str.charCodeAt(0) === 45 && str.charCodeAt(1) === 45) {
     return str;
+  }
+  if (str.startsWith("-ms-")) {
+    str = `ms-${str.slice(4)}`;
   }
   // Fast path: no hyphen -> return as-is
   let hyphenIndex = str.indexOf("-");
@@ -81,6 +130,12 @@ export function camelToHyphen(str: string) {
   if (str.length >= 2 && str.charCodeAt(0) === 45 && str.charCodeAt(1) === 45) {
     return str;
   }
+  const msPrefix =
+    str.length > 2 &&
+    str.charCodeAt(0) === 109 &&
+    str.charCodeAt(1) === 115 &&
+    str.charCodeAt(2) >= 65 &&
+    str.charCodeAt(2) <= 90;
 
   let result = "";
   let lastIndex = 0;
@@ -96,7 +151,8 @@ export function camelToHyphen(str: string) {
   if (lastIndex === 0) {
     return str;
   }
-  return result + str.slice(lastIndex);
+  result += str.slice(lastIndex);
+  return msPrefix ? `-${result}` : result;
 }
 
 /**
@@ -110,6 +166,23 @@ export function parseLengthValue(value: string | number) {
     return value;
   }
   return `${value}px`;
+}
+
+const unitlessNumberProperties = new Set(
+  "KhtmlBoxFlex KhtmlBoxFlexGroup KhtmlBoxOrdinalGroup KhtmlOpacity MozAnimation MozAnimationIterationCount MozBorderImage MozBoxFlex MozBoxOrdinalGroup MozColumnCount MozColumns MozOpacity MozTabSize OAnimation OAnimationIterationCount OBorderImage OTabSize WebkitAnimation WebkitAnimationIterationCount WebkitBorderImage WebkitBorderImageSlice WebkitBoxFlex WebkitBoxFlexGroup WebkitBoxOrdinalGroup WebkitColumnCount WebkitColumns WebkitFlex WebkitFlexGrow WebkitFlexShrink WebkitInitialLetter WebkitLineClamp WebkitMaskBoxImage WebkitMaskBoxImageOutset WebkitMaskBoxImageSlice WebkitMaskBoxImageWidth WebkitOrder animation animationIterationCount aspectRatio borderImage borderImageOutset borderImageSlice borderImageWidth boxFlex boxFlexGroup boxOrdinalGroup columnCount columns fillOpacity flex flexGrow flexShrink floodOpacity fontSizeAdjust fontWeight glyphOrientationVertical gridArea gridColumn gridColumnEnd gridColumnStart gridRow gridRowEnd gridRowStart hyphenateLimitChars initialLetter lineClamp lineHeight maskBorder maskBorderOutset maskBorderSlice maskBorderWidth mathDepth maxLines msFlex msFlexPositive msHyphenateLimitChars msHyphenateLimitLines msOrder opacity order orphans scale shapeImageThreshold stopOpacity strokeDasharray strokeDashoffset strokeMiterlimit strokeOpacity strokeWidth tabSize widows zIndex zoom".split(
+    " ",
+  ),
+);
+
+function isUnitlessNumberProperty(property: string) {
+  return unitlessNumberProperties.has(property);
+}
+
+function parseStylePropertyValue(property: string, value: string | number) {
+  if (typeof value === "number" && isUnitlessNumberProperty(property)) {
+    return value;
+  }
+  return parseLengthValue(value);
 }
 
 /**
@@ -208,10 +281,10 @@ export function htmlObjStyleToStyleValue(style: HTMLCSSProperties) {
     if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
+    const property = hyphenToCamel(key);
     // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string>)[hyphenToCamel(key)] = parseLengthValue(
-      value as string | number,
-    );
+    (result as Record<string, string | number>)[property] =
+      parseStylePropertyValue(property, value as string | number);
   }
   return result;
 }
@@ -229,7 +302,8 @@ export function jsxStyleToStyleValue(style: JSXCSSProperties) {
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string>)[key] = parseLengthValue(
+    (result as Record<string, string | number>)[key] = parseStylePropertyValue(
+      key,
       value as string | number,
     );
   }
@@ -266,7 +340,7 @@ export function styleValueToHTMLStyle(style: StyleValue): string {
  * // { "background-color": "red", "font-size": "16px" }
  */
 export function styleValueToHTMLObjStyle(style: StyleValue) {
-  const result: CSS.PropertiesHyphen = {};
+  const result: HTMLCSSProperties = {};
   for (const key in style) {
     if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
@@ -292,9 +366,7 @@ export function styleValueToJSXStyle(style: StyleValue) {
  * isHTMLObjStyle({ "background-color": "red" }); // true
  * isHTMLObjStyle({ backgroundColor: "red" }); // false
  */
-export function isHTMLObjStyle(
-  style: CSS.Properties<any> | CSS.PropertiesHyphen<any>,
-): style is CSS.PropertiesHyphen {
+export function isHTMLObjStyle(style: object): style is CSSPropertiesHyphen {
   for (const key in style) {
     if (!hasOwn.call(style, key)) continue;
     // Quick exclusion of CSS custom properties (--foo)

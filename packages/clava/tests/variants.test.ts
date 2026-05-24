@@ -94,7 +94,10 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           variants: {
             color: {
-              red: { class: "text-red", style: { backgroundColor: "red" } },
+              red: {
+                class: { "text-red": true, "text-blue": false },
+                style: { backgroundColor: "red" },
+              },
               blue: { class: "text-blue", style: { backgroundColor: "blue" } },
             },
           },
@@ -104,6 +107,23 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({
         class: cls("text-red"),
         backgroundColor: "red",
+      });
+    });
+
+    test("variant with array class map", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            color: {
+              red: ["text-red", { "text-bold": true, "text-blue": false }],
+            },
+          },
+        }),
+      );
+      const props = component({ color: "red" });
+      expect(getStyleClass(props)).toEqual({
+        class: cls("text-red text-bold"),
       });
     });
 

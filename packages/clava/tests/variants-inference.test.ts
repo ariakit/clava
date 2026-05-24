@@ -275,8 +275,11 @@ describe("variants type inference", () => {
         b: (_: number) => null,
         c: (_: number) => undefined,
         d: (_: number) => ["x", "y"],
-        e: (_: number) => ({ class: "c", style: { color: "red" } }),
-        f: (_: number) => ({ style: { color: "red" } }),
+        e: (_: number) => ["x", { y: true }],
+        // @ts-expect-error object class maps must be inside an array or `class`
+        f: (_: number) => ({ x: true }),
+        g: (_: number) => ({ class: "c", style: { color: "red" } }),
+        h: (_: number) => ({ style: { color: "red" } }),
       },
     });
   });

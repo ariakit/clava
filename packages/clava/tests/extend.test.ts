@@ -339,7 +339,7 @@ describe("non-idempotent transformClass", () => {
   // A non-idempotent transform: prefixing each word with `tw-`. Applying it
   // twice yields `tw-tw-foo`, so the engine must invoke it exactly once per
   // class word — even when extend chains pipe extended base classes back into
-  // a parent's `clsx` and through the same transform at render time.
+  // a parent's class join and through the same transform at render time.
   const { cv } = create({
     transformClass: (className) =>
       className
@@ -415,7 +415,7 @@ describe("extend across `create()` factories", () => {
     const component = cvLower({ extend: [base], class: "child" });
     // The extend uppercases its own contribution, then the parent's
     // transformClass runs on the joined string and lowercases everything —
-    // mirrors main's `parentTransform(clsx(extTransform(extOutput), …))`.
+    // mirrors main's `parentTransform(join(extTransform(extOutput), …))`.
     expect(component({ size: "sm" }).class).toBe("base child sm");
   });
 });

@@ -1,10 +1,15 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
+import { cv } from "../src/index.ts";
 import type {
   HTMLCSSProperties,
   JSXCSSProperties,
   StyleClassProps,
   StyleValue,
 } from "../src/types.ts";
+import {
+  htmlObjStyleToStyleValue,
+  styleValueToHTMLObjStyle,
+} from "../src/utils.ts";
 import {
   CONFIGS,
   assertDefaultProps,
@@ -18,6 +23,61 @@ import {
   getModeComponent,
   getStyleClass,
 } from "./_utils.ts";
+
+test("style types preserve the CSS property surface", () => {
+  const style = {
+    aspectRatio: 1,
+    display: "block",
+    position: "absolute",
+    scale: 1,
+    width: "100%",
+  } satisfies StyleValue;
+  const htmlStyle = {
+    color: "red",
+    display: "block",
+    "font-size": 16,
+    "-ms-flex": 1,
+  } satisfies HTMLCSSProperties;
+  const invalidDescriptor = {
+    // @ts-expect-error CSS at-rule descriptors are not style properties
+    fontDisplay: "swap",
+  } satisfies StyleValue;
+  const invalidTime = {
+    // @ts-expect-error time properties require strings
+    animationDuration: 100,
+  } satisfies JSXCSSProperties;
+  const invalidPosition = {
+    // @ts-expect-error constrained CSS properties reject unknown strings
+    position: "somewhere",
+  } satisfies StyleValue;
+  const invalidOrient = {
+    // @ts-expect-error constrained vendor properties reject unknown strings
+    WebkitBoxOrient: "sideways",
+  } satisfies StyleValue;
+
+  expect(style).toEqual({
+    aspectRatio: 1,
+    display: "block",
+    position: "absolute",
+    scale: 1,
+    width: "100%",
+  });
+  expect(htmlStyle).toEqual({
+    color: "red",
+    display: "block",
+    "font-size": 16,
+    "-ms-flex": 1,
+  });
+  expect(invalidDescriptor).toEqual({ fontDisplay: "swap" });
+  expect(invalidTime).toEqual({ animationDuration: 100 });
+  expect(invalidPosition).toEqual({ position: "somewhere" });
+  expect(invalidOrient).toEqual({ WebkitBoxOrient: "sideways" });
+  expect(htmlObjStyleToStyleValue({ "-ms-flex": 1 })).toEqual({ msFlex: 1 });
+  expect(styleValueToHTMLObjStyle({ msFlex: 1 })).toEqual({ "-ms-flex": 1 });
+  expect(cv({ style: { msFlex: 1 } }).htmlObj().style).toEqual({
+    "-ms-flex": 1,
+  });
+});
 
 for (const config of [CONFIGS.default, CONFIGS.uppercase]) {
   const mode = getConfigMode(config);
@@ -173,6 +233,15 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("foo bar") });
     });
 
+    test("object class", () => {
+      const component = getModeComponent(
+        mode,
+        cv({ class: { foo: true, bar: false, baz: 1, qux: 0 } }),
+      );
+      const props = component();
+      expect(getStyleClass(props)).toEqual({ class: cls("foo baz") });
+    });
+
     test("nested array class", () => {
       const component = getModeComponent(
         mode,
@@ -242,6 +311,26 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
+    test("style accepts common camelCase properties", () => {
+      cv({ style: { display: "block", position: "absolute", width: "100%" } });
+    });
+
+    test("style accepts unitless numeric properties", () => {
+      const component = getModeComponent(
+        mode,
+        cv({ style: { aspectRatio: 1, opacity: 0.5, scale: 1 } }),
+      );
+      const props = component({
+        style: { aspectRatio: 2, opacity: 0.75, scale: 1.25 },
+      });
+      expect(getStyleClass(props)).toEqual({
+        class: "",
+        aspectRatio: expect.toBeOneOf([2, "2"]),
+        opacity: expect.toBeOneOf([0.75, "0.75"]),
+        scale: expect.toBeOneOf([1.25, "1.25"]),
+      });
+    });
+
     test("style does not accept numbers", () => {
       const component = getModeComponent(
         mode,
@@ -258,6 +347,15 @@ for (const config of Object.values(CONFIGS)) {
         class: "",
         backgroundColor: "red",
         fontSize: expect.toBeOneOf(["16", "16px"]),
+      });
+    });
+
+    test("style does not accept hyphenated properties", () => {
+      cv({
+        style: {
+          // @ts-expect-error generated styles use camelCase property names
+          "font-size": "16px",
+        },
       });
     });
 

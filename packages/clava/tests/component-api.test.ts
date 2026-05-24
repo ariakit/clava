@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
-import { type Variant, cv as cvBase } from "../src/index.ts";
+import { type Variant, create, cv as cvBase } from "../src/index.ts";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -512,6 +512,19 @@ test("propKeys are mode-specific", () => {
   expect(component.htmlObj.propKeys).toEqual(["class", "style", "size"]);
 });
 
+test("cx joins class values", () => {
+  const { cx } = create({
+    transformClass: (className) => `(${className})`,
+  });
+
+  expect(
+    cx("foo", 1n, ["bar", false, [2n, "baz", 0]], {
+      qux: true,
+      quux: false,
+    }),
+  ).toBe("(foo bar baz qux)");
+});
+
 describe("Variant utility type", () => {
   test("matches variant keys from another component", () => {
     const base = cvBase({
@@ -541,6 +554,22 @@ describe("Variant utility type", () => {
           lg: "bar-lg",
           // @ts-expect-error
           xl: "bar-xl",
+        } satisfies Variant<typeof base, "foo">,
+      },
+    });
+  });
+
+  test("rejects standalone class object maps", () => {
+    const base = cvBase({
+      variants: { foo: { sm: "foo-sm", lg: "foo-lg" } },
+    });
+    cvBase({
+      extend: [base],
+      variants: {
+        bar: {
+          // @ts-expect-error class object maps must use a `class` wrapper
+          sm: { "bar-sm": true },
+          lg: ["bar-lg", { "bar-active": true }],
         } satisfies Variant<typeof base, "foo">,
       },
     });

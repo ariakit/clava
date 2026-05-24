@@ -94,13 +94,6 @@ importers:
         version: 4.3.0
 
   packages/clava:
-    dependencies:
-      clsx:
-        specifier: ^2.0.0
-        version: 2.1.1
-      csstype:
-        specifier: ^3.0.0
-        version: 3.2.3
     devDependencies:
       test-utils:
         specifier: workspace:*
