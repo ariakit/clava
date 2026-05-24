@@ -224,9 +224,8 @@ export type {
  *
  * @example
  * ```ts
- * import { cv } from "clava";
+ * import { type VariantProps, cv } from "clava";
  * import type { ComponentProps } from "react";
- * import type { VariantProps } from "clava";
  *
  * const button = cv({
  *   variants: {
@@ -235,7 +234,9 @@ export type {
  *   },
  * });
  *
- * type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
+ * interface ButtonProps
+ *   extends ComponentProps<"button">,
+ *     VariantProps<typeof button> {}
  *
  * const props: ButtonProps = {
  *   size: "lg",
@@ -290,8 +291,7 @@ export type Variant<
  *
  * @example
  * ```ts
- * import { cv } from "clava";
- * import type { CVConfig } from "clava";
+ * import { type CVConfig, cv } from "clava";
  *
  * const config: CVConfig<{
  *   tone: { info: string; danger: string };

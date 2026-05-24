@@ -37,8 +37,7 @@ export type StyleProperty = JSXCSSProperties | HTMLCSSProperties | string;
  *
  * @example
  * ```ts
- * import { cv } from "clava";
- * import type { JSXProps } from "clava";
+ * import { type JSXProps, cv } from "clava";
  *
  * const button = cv({ class: "button" });
  * const props: JSXProps = button.jsx();
@@ -55,8 +54,7 @@ export interface JSXProps {
  *
  * @example
  * ```ts
- * import { cv } from "clava";
- * import type { HTMLProps } from "clava";
+ * import { type HTMLProps, cv } from "clava";
  *
  * const button = cv({ style: { color: "red" } });
  * const props: HTMLProps = button.html();
@@ -73,8 +71,7 @@ export interface HTMLProps {
  *
  * @example
  * ```ts
- * import { cv } from "clava";
- * import type { HTMLObjProps } from "clava";
+ * import { type HTMLObjProps, cv } from "clava";
  *
  * const button = cv({ style: { fontSize: "16px" } });
  * const props: HTMLObjProps = button.htmlObj();
@@ -91,8 +88,7 @@ export interface HTMLObjProps {
  *
  * @example
  * ```ts
- * import { cv } from "clava";
- * import type { StyleClassProps } from "clava";
+ * import { type StyleClassProps, cv } from "clava";
  *
  * const button = cv({ class: "button" });
  * const props: StyleClassProps = button();
@@ -249,8 +245,7 @@ export interface ModalComponent<V, R extends ComponentResult> {
  *
  * @example
  * ```ts
- * import { cv } from "clava";
- * import type { CVComponent } from "clava";
+ * import { type CVComponent, cv } from "clava";
  *
  * const button: CVComponent<{
  *   size: { sm: string; lg: string };
