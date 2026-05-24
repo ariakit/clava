@@ -231,7 +231,7 @@ Variant values can be class values, arrays, `{ class, style }` objects, or [func
 
 ## Function Variants
 
-Add a function as a variant value when the prop should generate class/style output dynamically. The function's parameter type defines the prop type. Method syntax works well for multi-line callbacks; compact one-line computed defaults can stay as arrow-function property values.
+Add a function as a variant value when the prop should generate class/style output dynamically. The function's parameter type defines the prop type. Method syntax works well for multi-line callbacks; compact one-line callbacks can stay as arrow-function property values.
 
 ```ts
 const grid = cv({
