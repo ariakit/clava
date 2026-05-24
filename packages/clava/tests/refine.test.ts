@@ -81,7 +81,7 @@ for (const config of Object.values(CONFIGS)) {
           },
           defaultVariants: {
             color: () => "red" as const,
-            size: ({ defaultValue, variants }) =>
+            size: (defaultValue, variants) =>
               variants.color === "red" ? "lg" : defaultValue,
           },
           refine: ({ variants, addClass }) => {
@@ -135,8 +135,8 @@ for (const config of Object.values(CONFIGS)) {
             value === undefined ? undefined : `push-${value}`,
         },
         defaultVariants: {
-          offset: ({ variants }) => !variants.invert,
-          push: ({ variants }) => (variants.invert ? 20 : undefined),
+          offset: (_, variants) => !variants.invert,
+          push: (_, variants) => (variants.invert ? 20 : undefined),
         },
       });
       const component = getModeComponent(mode, cv({ extend: [base] }));
@@ -169,11 +169,11 @@ for (const config of Object.values(CONFIGS)) {
         },
         defaultVariants: {
           layer: true,
-          offset: ({ defaultValue, variants }) => {
+          offset: (defaultValue, variants) => {
             calls.layer += 1;
             return variants.invert ? false : defaultValue;
           },
-          push: ({ variants }) => (variants.invert ? 20 : undefined),
+          push: (_, variants) => (variants.invert ? 20 : undefined),
         },
       });
       const frame = cv({
@@ -228,7 +228,7 @@ for (const config of Object.values(CONFIGS)) {
             color: { red: "red", blue: "blue" },
           },
           defaultVariants: {
-            color: ({ variants, defaultValue }) =>
+            color: (defaultValue, variants) =>
               variants.size === "lg" ? "red" : defaultValue,
           },
         }),
@@ -297,7 +297,7 @@ for (const config of Object.values(CONFIGS)) {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" }, large: "" },
         defaultVariants: {
-          size: ({ defaultValue, variants }) =>
+          size: (defaultValue, variants) =>
             variants.large ? "lg" : defaultValue,
         },
       });
@@ -317,7 +317,7 @@ for (const config of Object.values(CONFIGS)) {
       const parent = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: {
-          size: ({ defaultValue, variants }) =>
+          size: (defaultValue, variants) =>
             variants.size ? defaultValue : "lg",
         },
       });
@@ -361,7 +361,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           defaultVariants: {
-            size: ({ defaultValue }) => defaultValue,
+            size: (defaultValue) => defaultValue,
           },
         }),
       );
@@ -403,7 +403,7 @@ for (const config of Object.values(CONFIGS)) {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: {
-          size: ({ defaultValue, variants }) =>
+          size: (defaultValue, variants) =>
             "color" in (variants as Record<string, unknown>)
               ? "lg"
               : defaultValue,
@@ -438,7 +438,7 @@ for (const config of Object.values(CONFIGS)) {
           extend: [base],
           variants: { color: { red: "red", blue: "blue" } },
           defaultVariants: {
-            size: ({ defaultValue, variants }) =>
+            size: (defaultValue, variants) =>
               variants.small ? "sm" : defaultValue,
             color: "red",
           },
@@ -482,7 +482,7 @@ for (const config of Object.values(CONFIGS)) {
           mode: { on: "on" },
         },
         defaultVariants: {
-          size: ({ defaultValue, variants }) =>
+          size: (defaultValue, variants) =>
             variants.mode === "on" ? "lg" : defaultValue,
         },
         refine: ({ variants, setVariants }) => {
@@ -593,7 +593,7 @@ for (const config of Object.values(CONFIGS)) {
           mode: { on: "on" },
         },
         defaultVariants: {
-          size: ({ defaultValue, variants }) =>
+          size: (defaultValue, variants) =>
             variants.mode === "on" ? "lg" : defaultValue,
         },
         refine: ({ variants, setVariants }) => {
@@ -618,8 +618,7 @@ for (const config of Object.values(CONFIGS)) {
         },
         defaultVariants: {
           b: true,
-          a: ({ defaultValue, variants }) =>
-            variants.b ? "one" : defaultValue,
+          a: (defaultValue, variants) => (variants.b ? "one" : defaultValue),
         },
         refine: ({ variants, setVariants }) => {
           if (variants.b) {
@@ -689,7 +688,7 @@ for (const config of Object.values(CONFIGS)) {
           extend: [base],
           variants: { color: { red: "child-red", blue: "child-blue" } },
           defaultVariants: {
-            color: ({ defaultValue, variants }) =>
+            color: (defaultValue, variants) =>
               variants.color === "red" ? "blue" : defaultValue,
           },
         }),
@@ -709,7 +708,7 @@ for (const config of Object.values(CONFIGS)) {
             done: "",
           },
           defaultVariants: {
-            color: ({ defaultValue, variants }) =>
+            color: (defaultValue, variants) =>
               variants.done ? "blue" : defaultValue,
           },
           refine: ({ variants, setVariants }) => {

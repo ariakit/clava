@@ -108,7 +108,7 @@ const toolbarButton = cv({
   },
   defaultVariants: {
     active: false,
-    intent: ({ defaultValue, variants }) =>
+    intent: (defaultValue, variants) =>
       variants.size === "lg" ? "neutral" : defaultValue,
   },
   refine: ({ variants, addClass, addStyle }) => {

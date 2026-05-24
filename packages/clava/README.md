@@ -319,7 +319,7 @@ You can extend any component mode, including `baseButton.jsx`, `baseButton.html`
 
 ## Refine
 
-Use computed `defaultVariants` for dependent defaults. A function entry receives the current default value for that key plus the resolved variants snapshot, and returns the next default value.
+Use computed `defaultVariants` for dependent defaults. A function entry receives the current default value for that key as the first parameter and the resolved variants snapshot as the second parameter, then returns the next default value.
 
 Use `refine` for final variant overrides and class/style adjustments. It receives the resolved variant values for the component and can return class/style output.
 
@@ -334,7 +334,7 @@ const toolbarButton = cv({
     loading: "toolbar-button-loading",
   },
   defaultVariants: {
-    intent: ({ defaultValue, variants }) =>
+    intent: (defaultValue, variants) =>
       variants.size === "lg" ? "neutral" : defaultValue,
   },
   refine({ variants, setVariants, addClass, addStyle }) {

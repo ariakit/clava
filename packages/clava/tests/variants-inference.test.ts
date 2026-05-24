@@ -201,7 +201,7 @@ describe("variants type inference", () => {
         color: { red: "r", blue: "b" },
       },
       defaultVariants: {
-        size: ({ defaultValue, variants }) => {
+        size: (defaultValue, variants) => {
           expectTypeOf(defaultValue).toEqualTypeOf<number | undefined>();
           expectTypeOf(variants.color).toEqualTypeOf<
             "red" | "blue" | undefined
@@ -228,7 +228,7 @@ describe("variants type inference", () => {
         },
       },
       defaultVariants: {
-        size({ defaultValue, variants }) {
+        size(defaultValue, variants) {
           expectTypeOf(defaultValue).toEqualTypeOf<number | undefined>();
           expectTypeOf(variants.compact).toEqualTypeOf<boolean | undefined>();
           return variants.compact ? 2 : defaultValue;
