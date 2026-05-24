@@ -218,12 +218,63 @@ export type {
   CVComponent,
 };
 
+/**
+ * Extracts the variant props inferred for a Clava component. Use it to add a
+ * component's variant props to framework component props.
+ *
+ * @example
+ * ```ts
+ * import { cv } from "clava";
+ * import type { ComponentProps } from "react";
+ * import type { VariantProps } from "clava";
+ *
+ * const button = cv({
+ *   variants: {
+ *     size: { sm: "button-sm", lg: "button-lg" },
+ *     disabled: { true: "button-disabled", false: "" },
+ *   },
+ * });
+ *
+ * type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
+ *
+ * const props: ButtonProps = {
+ *   size: "lg",
+ *   disabled: true,
+ * };
+ * ```
+ */
 export type VariantProps<T extends Pick<AnyComponent, "getVariants">> =
   ReturnType<T["getVariants"]>;
 
 // Variant props expose booleans, but variant object keys are always strings.
 type VariantKey<T> = T extends boolean ? "true" | "false" : Extract<T, string>;
 
+/**
+ * Constrains a variant map to the same value keys as a variant on another
+ * component. Boolean variants are represented with `"true"` and `"false"`
+ * object keys.
+ *
+ * @example
+ * ```ts
+ * import { type Variant, cv } from "clava";
+ *
+ * const button = cv({
+ *   variants: {
+ *     size: { sm: "button-sm", lg: "button-lg" },
+ *   },
+ * });
+ *
+ * const icon = cv({
+ *   extend: [button],
+ *   variants: {
+ *     size: {
+ *       sm: "icon-sm",
+ *       lg: "icon-lg",
+ *     } satisfies Variant<typeof button, "size">,
+ *   },
+ * });
+ * ```
+ */
 export type Variant<
   T extends Pick<AnyComponent, "getVariants">,
   K extends keyof VariantProps<T>,
@@ -232,6 +283,33 @@ export type Variant<
   ClassValue | StyleClassValue
 >;
 
+/**
+ * The configuration object accepted by `cv()`. It defines base class/style
+ * output, variants, default variants, component extensions, and refinement
+ * logic.
+ *
+ * @example
+ * ```ts
+ * import { cv } from "clava";
+ * import type { CVConfig } from "clava";
+ *
+ * const config: CVConfig<{
+ *   tone: { info: string; danger: string };
+ * }> = {
+ *   variants: {
+ *     tone: {
+ *       info: "alert-info",
+ *       danger: "alert-danger",
+ *     },
+ *   },
+ *   defaultVariants: {
+ *     tone: "info",
+ *   },
+ * };
+ *
+ * const alert = cv(config);
+ * ```
+ */
 export interface CVConfig<
   V extends Variants = {},
   E extends AnyComponent[] = [],
