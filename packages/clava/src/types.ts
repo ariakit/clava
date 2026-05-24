@@ -1,5 +1,20 @@
 import type * as CSS from "csstype";
 
+/**
+ * A class value accepted by Clava. It supports strings, numbers, booleans,
+ * nullish values, and nested arrays.
+ *
+ * @example
+ * ```ts
+ * import type { ClassValue } from "clava";
+ *
+ * const className: ClassValue = [
+ *   "button",
+ *   false && "button-hidden",
+ *   ["button-primary"],
+ * ];
+ * ```
+ */
 export type ClassValue =
   | string
   | number
@@ -17,21 +32,68 @@ export type CSSProperties = CSS.Properties;
 
 export type StyleProperty = JSXCSSProperties | HTMLCSSProperties | string;
 
+/**
+ * The prop object returned by a component's `.jsx()` mode.
+ *
+ * @example
+ * ```ts
+ * import { type JSXProps, cv } from "clava";
+ *
+ * const button = cv({ class: "button" });
+ * const props: JSXProps = button.jsx();
+ * ```
+ */
 export interface JSXProps {
   className: string;
   style: JSXCSSProperties;
 }
 
+/**
+ * The prop object returned by a component's `.html()` mode. The `style` value
+ * is serialized as an HTML style string.
+ *
+ * @example
+ * ```ts
+ * import { type HTMLProps, cv } from "clava";
+ *
+ * const button = cv({ style: { color: "red" } });
+ * const props: HTMLProps = button.html();
+ * ```
+ */
 export interface HTMLProps {
   class: string;
   style: string;
 }
 
+/**
+ * The prop object returned by a component's `.htmlObj()` mode. The `style`
+ * value uses hyphenated CSS property names.
+ *
+ * @example
+ * ```ts
+ * import { type HTMLObjProps, cv } from "clava";
+ *
+ * const button = cv({ style: { fontSize: "16px" } });
+ * const props: HTMLObjProps = button.htmlObj();
+ * ```
+ */
 export interface HTMLObjProps {
   class: string;
   style: HTMLCSSProperties;
 }
 
+/**
+ * The default prop object returned by a Clava component. It uses `class`
+ * rather than `className` and keeps styles as a normalized object.
+ *
+ * @example
+ * ```ts
+ * import { type StyleClassProps, cv } from "clava";
+ *
+ * const button = cv({ class: "button" });
+ * const props: StyleClassProps = button();
+ * ```
+ */
 export interface StyleClassProps {
   class: string;
   style: StyleValue;
@@ -177,6 +239,25 @@ export interface ModalComponent<V, R extends ComponentResult> {
   propKeys: (keyof V | ComponentPropKey<R>)[];
 }
 
+/**
+ * A callable Clava component returned by `cv()`. It includes the default
+ * output mode plus `.jsx()`, `.html()`, and `.htmlObj()` mode helpers.
+ *
+ * @example
+ * ```ts
+ * import { type CVComponent, cv } from "clava";
+ *
+ * const button: CVComponent<{
+ *   size: { sm: string; lg: string };
+ * }> = cv({
+ *   variants: {
+ *     size: { sm: "button-sm", lg: "button-lg" },
+ *   },
+ * });
+ *
+ * button.jsx({ size: "lg" });
+ * ```
+ */
 export interface CVComponent<
   V extends Variants = {},
   E extends AnyComponent[] = [],
@@ -280,10 +361,38 @@ export type DefaultVariants<V> = {
   [K in keyof V]?: DefaultVariantValue<V, K> | undefined;
 };
 
+/**
+ * A normalized style object accepted by Clava config, variant, and refine
+ * style entries. CSS custom properties are supported with string values.
+ *
+ * @example
+ * ```ts
+ * import type { StyleValue } from "clava";
+ *
+ * const style: StyleValue = {
+ *   color: "red",
+ *   "--button-accent": "oklch(62% 0.2 250)",
+ * };
+ * ```
+ */
 export type StyleValue = CSS.Properties & {
   [key: `--${string}`]: string;
 };
 
+/**
+ * A value that contributes both class and style output from a base config,
+ * variant value, function variant, or refine callback.
+ *
+ * @example
+ * ```ts
+ * import type { StyleClassValue } from "clava";
+ *
+ * const tone: StyleClassValue = {
+ *   class: "button-primary",
+ *   style: { color: "white" },
+ * };
+ * ```
+ */
 export interface StyleClassValue {
   style?: StyleValue;
   class?: ClassValue;

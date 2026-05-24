@@ -389,7 +389,8 @@ const button = cv({
   },
 });
 
-type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
+interface ButtonProps
+  extends ComponentProps<"button">, VariantProps<typeof button> {}
 
 function Button(props: ButtonProps) {
   const [variantProps, buttonProps] = splitProps(props, button);
@@ -464,7 +465,8 @@ const button = cv({
   },
 });
 
-type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
+interface ButtonProps
+  extends ComponentProps<"button">, VariantProps<typeof button> {}
 
 function Button(props: ButtonProps) {
   const [variantProps, buttonProps] = splitProps(props, button);
@@ -507,7 +509,8 @@ Use `VariantProps<typeof component>` to add a Clava component's variant props to
 import type { ComponentProps } from "react";
 import type { VariantProps } from "clava";
 
-type ButtonProps = ComponentProps<"button"> & VariantProps<typeof button>;
+interface ButtonProps
+  extends ComponentProps<"button">, VariantProps<typeof button> {}
 ```
 
 Use `Variant<typeof component, "key">` to constrain a new variant map to the same values as another component's variant.
