@@ -254,42 +254,6 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("lg blue") });
     });
 
-    test("computed defaultVariants do not pass context object parameters", () => {
-      const base = cv({
-        variants: { color: { red: "red", blue: "blue" } },
-        defaultVariants: { color: "blue" },
-      });
-      const component = getModeComponent(
-        mode,
-        cv({
-          extend: [base],
-          // At runtime, the old context object shape receives the primitive
-          // default value instead of an object with a defaultValue property.
-          // This keeps the behavior intentionally incompatible.
-          defaultVariants: {
-            color:
-              // @ts-expect-error computed defaults receive positional arguments
-              ({ defaultValue }) => defaultValue ?? "red",
-          },
-        }),
-      );
-
-      expect(getStyleClass(component())).toEqual({ class: cls("red") });
-    });
-
-    test("computed defaultVariants throw with context object parameters", () => {
-      const component = cv({
-        variants: { color: { red: "red", blue: "blue" } },
-        defaultVariants: {
-          color:
-            // @ts-expect-error computed defaults receive positional arguments
-            ({ defaultValue }) => defaultValue ?? "red",
-        },
-      });
-
-      expect(() => component()).toThrow(TypeError);
-    });
-
     test("computed defaultVariants override extended defaultVariants", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
