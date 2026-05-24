@@ -1,10 +1,20 @@
 import { execFile } from "node:child_process";
-import { access, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
+import {
+  access,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { withPackageBuildLock } from "test-utils/build-lock";
+import { build } from "vite";
 import { expect, test } from "vitest";
+import { createBundleSizeBuildConfig } from "./bundle-size.ts";
 
 const exec = promisify(execFile);
 const root = path.join(import.meta.dirname, "../../..");
@@ -60,6 +70,41 @@ test("measures production bundle size", async () => {
       await rm(tempDir, { force: true, recursive: true });
     }
   });
+}, 60_000);
+
+test("emits compact minified output", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "clava-bundle-size-test-"));
+  try {
+    const entry = path.join(tempDir, "entry.js");
+    const fixture = path.join(tempDir, "fixture.js");
+    const bundle = path.join(tempDir, "dist/bundle.js");
+
+    await writeFile(
+      fixture,
+      `
+export function createLongClassName(prefix, value) {
+  const normalizedPrefix = String(prefix).trim().toLowerCase();
+  const normalizedValue = String(value).trim().toLowerCase();
+  const segments = [
+    normalizedPrefix,
+    normalizedValue,
+    normalizedPrefix + "-" + normalizedValue,
+  ];
+  return segments.filter(Boolean).join(" ");
+}
+`,
+    );
+    await writeFile(
+      entry,
+      `export * from ${JSON.stringify(pathToFileURL(fixture).href)};\n`,
+    );
+
+    await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
+
+    expect((await readFile(bundle, "utf-8")).trim()).not.toContain("\n");
+  } finally {
+    await rm(tempDir, { force: true, recursive: true });
+  }
 }, 60_000);
 
 test("does not include source paths in measured size", async () => {
