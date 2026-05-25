@@ -233,26 +233,33 @@ Variant values can be class values, arrays, `{ class, style }` objects, or [func
 
 Add a function as a variant value when the prop should generate class/style output dynamically. The function's parameter type defines the prop type. Method syntax works well for multi-line callbacks; compact one-line callbacks can stay as arrow-function property values.
 
+When function variants emit Tailwind utilities, keep utility names static so Tailwind can detect them at build time. Pass dynamic CSS values through variables instead of building utilities like `` `grid-cols-${value}` ``.
+
 ```ts
 const grid = cv({
   class: "grid",
   variants: {
     columns(value: number) {
       return {
-        class: `grid-cols-${value}`,
-        style: { "--grid-columns": `${value}` },
+        class: "grid-cols-(--grid-columns)",
+        style: { "--grid-columns": `repeat(${value}, minmax(0, 1fr))` },
       };
     },
     color(value: string | null) {
-      return value ? `text-${value}` : "text-current";
+      return value
+        ? {
+            class: "text-(--text-color)",
+            style: { "--text-color": value },
+          }
+        : "text-current";
     },
   },
 });
 
 grid({ columns: 3, color: null });
 // {
-//   class: "grid grid-cols-3 text-current",
-//   style: { "--grid-columns": "3" },
+//   class: "grid grid-cols-(--grid-columns) text-current",
+//   style: { "--grid-columns": "repeat(3, minmax(0, 1fr))" },
 // }
 ```
 
