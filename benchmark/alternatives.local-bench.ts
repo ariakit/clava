@@ -1,6 +1,7 @@
 import { cva as cva0 } from "class-variance-authority";
-import { cv } from "clava";
+import { create, cv } from "clava";
 import { compose, cva as cva1 } from "cva";
+import { twMerge } from "tailwind-merge";
 import { tv } from "tailwind-variants";
 import { tv as tvLite } from "tailwind-variants/lite";
 import { bench, describe } from "vitest";
@@ -26,6 +27,7 @@ const packageVersions = {
     benchmarkPackageJson.dependencies["class-variance-authority"],
   clava: clavaPackageJson.version,
   cva: benchmarkPackageJson.dependencies.cva,
+  "tailwind-merge": benchmarkPackageJson.dependencies["tailwind-merge"],
   "tailwind-variants": benchmarkPackageJson.dependencies["tailwind-variants"],
 } as const;
 
@@ -152,50 +154,59 @@ const intentPlaceholders = {
   },
 } as const;
 
-const clavaSurface = cv({
-  class: surfaceBase,
-  variants: surfaceVariants,
-  defaultVariants: surfaceDefaultVariants,
-});
+function createClavaProduct(createCv: typeof cv) {
+  const clavaSurface = createCv({
+    class: surfaceBase,
+    variants: surfaceVariants,
+    defaultVariants: surfaceDefaultVariants,
+  });
 
-const clavaInteraction = cv({
-  extend: [clavaSurface],
-  class: interactionBase,
-  variants: interactionVariants,
-  defaultVariants: interactionDefaultVariants,
-  refine: ({ variants, addClass }) => {
-    if (variants.disabled) {
-      addClass("hover:bg-current hover:text-current");
-    }
-    if (variants.pressed && variants.intent === "primary") {
-      addClass("bg-blue-800 ring-1 ring-blue-900");
-    }
-    if (variants.pressed && variants.intent === "danger") {
-      addClass("bg-red-800 ring-1 ring-red-900");
-    }
-  },
-});
+  const clavaInteraction = createCv({
+    extend: [clavaSurface],
+    class: interactionBase,
+    variants: interactionVariants,
+    defaultVariants: interactionDefaultVariants,
+    refine: ({ variants, addClass }) => {
+      if (variants.disabled) {
+        addClass("hover:bg-current hover:text-current");
+      }
+      if (variants.pressed && variants.intent === "primary") {
+        addClass("bg-blue-800 ring-1 ring-blue-900");
+      }
+      if (variants.pressed && variants.intent === "danger") {
+        addClass("bg-red-800 ring-1 ring-red-900");
+      }
+    },
+  });
 
-const clavaProduct = cv({
-  extend: [clavaInteraction],
-  class: productBase,
-  variants: productVariants,
-  defaultVariants: productDefaultVariants,
-  refine: ({ variants, addClass }) => {
-    if (variants.size === "lg" && variants.emphasis === "high") {
-      addClass("tracking-wide");
-    }
-    if (variants.intent === "neutral" && variants.emphasis === "high") {
-      addClass("bg-zinc-100 ring-zinc-300");
-    }
-    if (variants.loading) {
-      addClass("pointer-events-none");
-    }
-    if (variants.icon === "only") {
-      addClass("justify-center");
-    }
-  },
-});
+  return createCv({
+    extend: [clavaInteraction],
+    class: productBase,
+    variants: productVariants,
+    defaultVariants: productDefaultVariants,
+    refine: ({ variants, addClass }) => {
+      if (variants.size === "lg" && variants.emphasis === "high") {
+        addClass("tracking-wide");
+      }
+      if (variants.intent === "neutral" && variants.emphasis === "high") {
+        addClass("bg-zinc-100 ring-zinc-300");
+      }
+      if (variants.loading) {
+        addClass("pointer-events-none");
+      }
+      if (variants.icon === "only") {
+        addClass("justify-center");
+      }
+    },
+  });
+}
+
+const clavaProduct = createClavaProduct(cv);
+const { cv: cvTwMerge } = create({ transformClass: twMerge });
+const clavaProductWithTwMerge = createClavaProduct(cvTwMerge);
+const clavaTwMergeLabel = `${packageLabel("clava")} + ${packageLabel(
+  "tailwind-merge",
+)}`;
 
 const cvaSurface = cva1({
   base: surfaceBase,
@@ -307,6 +318,14 @@ describe("alternatives: resolve composed tailwind variants", () => {
     packageLabel("clava"),
     () => {
       consume(clavaProduct(resolveProps).class);
+    },
+    options,
+  );
+
+  bench(
+    clavaTwMergeLabel,
+    () => {
+      consume(clavaProductWithTwMerge(resolveProps).class);
     },
     options,
   );
