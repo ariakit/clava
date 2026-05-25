@@ -246,12 +246,11 @@ const grid = cv({
       };
     },
     color(value: string | null) {
-      return value
-        ? {
-            class: "text-(--text-color)",
-            style: { "--text-color": value },
-          }
-        : "text-current";
+      if (!value) return "text-current";
+      return {
+        class: "text-(--text-color)",
+        style: { "--text-color": value },
+      };
     },
   },
 });
