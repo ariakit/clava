@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -26,6 +26,43 @@ for (const config of Object.values(CONFIGS)) {
       );
       const props = component({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("large") });
+    });
+
+    test("function variant is not called when value is undefined", () => {
+      const size = vi.fn((value: "sm" | "lg") =>
+        value === "sm" ? "small" : "large",
+      );
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size },
+        }),
+      );
+
+      const defaultProps = component();
+      const undefinedProps = component({ size: undefined });
+
+      expect(getStyleClass(defaultProps)).toEqual({ class: "" });
+      expect(getStyleClass(undefinedProps)).toEqual({ class: "" });
+      expect(size).not.toHaveBeenCalled();
+    });
+
+    test("function variant uses defaultVariants when prop is undefined", () => {
+      const size = vi.fn((value: "sm" | "lg") =>
+        value === "sm" ? "small" : "large",
+      );
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+
+      const props = component({ size: undefined });
+
+      expect(getStyleClass(props)).toEqual({ class: cls("small") });
+      expect(size).toHaveBeenCalledExactlyOnceWith("sm");
     });
 
     test("function variant with style", () => {
