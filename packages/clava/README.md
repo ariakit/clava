@@ -542,7 +542,7 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 
 ## Comparison
 
-This table compares Clava with the packages used by the repository's alternative benchmark: `class-variance-authority@0.7.1`, `cva@1.0.0-beta.4`, `tailwind-variants/lite@3.2.2`, and `tailwind-variants@3.2.2`.
+This table compares Clava with the packages used by the repository's alternative benchmark: `class-variance-authority@0.7.1`, `cva@1.0.0-beta.4`, `tailwind-variants/lite@3.2.2`, `tailwind-variants@3.2.2`, and `tailwind-merge@3.6.0` through Clava's `transformClass`.
 
 | Feature                                              | Clava          | CVA v0             | CVA v1 beta        | TV Lite            | TV                 |
 | ---------------------------------------------------- | -------------- | ------------------ | ------------------ | ------------------ | ------------------ |
@@ -560,13 +560,14 @@ This table compares Clava with the packages used by the repository's alternative
 
 The `pnpm perf-alternatives` benchmark resolves a composed Tailwind-style button with inherited variants, defaults, and cross-variant conditions. On Node v24.14.1, Vitest reported these results, where higher ops/sec is better:
 
-| Package                          |   Ops/sec | Relative to Clava |
-| -------------------------------- | --------: | ----------------: |
-| `clava@0.5.0`                    | 1,040,314 |             1.00x |
-| `class-variance-authority@0.7.1` |   426,132 |      2.44x slower |
-| `tailwind-variants/lite@3.2.2`   |   369,732 |      2.81x slower |
-| `tailwind-variants@3.2.2`        |   273,503 |      3.80x slower |
-| `cva@1.0.0-beta.4`               |   211,474 |      4.92x slower |
+| Package                              |   Ops/sec | Relative to Clava |
+| ------------------------------------ | --------: | ----------------: |
+| `clava@0.6.0`                        | 1,093,632 |             1.00x |
+| `clava@0.6.0 + tailwind-merge@3.6.0` |   535,392 |      2.04x slower |
+| `class-variance-authority@0.7.1`     |   445,527 |      2.45x slower |
+| `tailwind-variants/lite@3.2.2`       |   377,985 |      2.89x slower |
+| `tailwind-variants@3.2.2`            |   286,653 |      3.82x slower |
+| `cva@1.0.0-beta.4`                   |   218,829 |      5.00x slower |
 
 Benchmark results vary by runtime and hardware, so treat them as a reproducible snapshot of this repository's composed-variant case rather than a universal ranking.
 
