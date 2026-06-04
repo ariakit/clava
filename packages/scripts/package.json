@@ -12,6 +12,6 @@
   },
   "devDependencies": {
     "test-utils": "workspace:*",
-    "vitest": "4.1.7"
+    "vitest": "4.1.8"
   }
 }
