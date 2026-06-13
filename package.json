@@ -54,5 +54,5 @@
       "oxlint --type-aware --type-check"
     ]
   },
-  "packageManager": "pnpm@11.5.2"
+  "packageManager": "pnpm@11.5.3"
 }
