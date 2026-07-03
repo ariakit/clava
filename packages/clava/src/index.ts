@@ -105,10 +105,7 @@ interface ComponentWithMeta {
   [META_KEY]?: ComponentMeta;
 }
 
-const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({}) as Record<
-  string,
-  unknown
->;
+const EMPTY_DEFAULTS: Record<string, unknown> = Object.freeze({});
 
 const MAX_REFINE_RUNS = 50;
 
@@ -355,10 +352,10 @@ function normalizeStyle(style: unknown): StyleValue {
     return htmlStyleToStyleValue(style);
   }
   if (typeof style === "object" && style != null) {
-    if (isHTMLObjStyle(style as Record<string, unknown>)) {
-      return htmlObjStyleToStyleValue(style as Record<string, string | number>);
+    if (isHTMLObjStyle(style)) {
+      return htmlObjStyleToStyleValue(style);
     }
-    return jsxStyleToStyleValue(style as Record<string, string | number>);
+    return jsxStyleToStyleValue(style);
   }
   return {};
 }
@@ -1374,9 +1371,7 @@ export function create({
             if (extClasses.length > 0) {
               const joined = clsx(extClasses);
               if (joined.length > 0) {
-                classesOut.push(
-                  extMetas[i].transformClass(joined) as ClsxClassValue,
-                );
+                classesOut.push(extMetas[i].transformClass(joined));
               }
             }
           } else {
@@ -1482,7 +1477,7 @@ export function create({
           const v = variant.values[selectedKey];
           if (!v) continue;
           if (v.class != null) {
-            classesOut.push(v.class as ClsxClassValue);
+            classesOut.push(v.class);
           }
           if (v.style) {
             Object.assign(styleOut, v.style);
@@ -1490,7 +1485,7 @@ export function create({
         } else if (variant.shorthand && selectedValue === true) {
           const v = variant.shorthand;
           if (v.class != null) {
-            classesOut.push(v.class as ClsxClassValue);
+            classesOut.push(v.class);
           }
           if (v.style) {
             Object.assign(styleOut, v.style);
@@ -1519,7 +1514,7 @@ export function create({
         if (computedResult == null) continue;
         const r = extractClassAndStylePrebuilt(computedResult);
         if (r.class != null) {
-          classesOut.push(r.class as ClsxClassValue);
+          classesOut.push(r.class);
         }
         if (r.style) {
           Object.assign(styleOut, r.style);
