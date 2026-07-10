@@ -57,7 +57,14 @@ export function hyphenToCamel(str: string) {
 
     const code = str.charCodeAt(nextIndex);
     if (isAsciiLetter(code)) {
-      result += str[nextIndex].toUpperCase();
+      const isMicrosoftPrefix =
+        hyphenIndex === 0 &&
+        code === 109 &&
+        str.charCodeAt(2) === 115 &&
+        str.charCodeAt(3) === 45;
+      result += isMicrosoftPrefix
+        ? str[nextIndex]
+        : str[nextIndex].toUpperCase();
       lastIndex = nextIndex + 1;
     } else {
       result += "-";
@@ -87,6 +94,9 @@ export function camelToHyphen(str: string) {
   for (let i = 0; i < str.length; i++) {
     const code = str.charCodeAt(i);
     if (code < 65 || code > 90) continue;
+    if (i === 2 && str.charCodeAt(0) === 109 && str.charCodeAt(1) === 115) {
+      result += "-";
+    }
     result += str.slice(lastIndex, i);
     result += "-";
     result += str[i].toLowerCase();
