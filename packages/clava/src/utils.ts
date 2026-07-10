@@ -174,7 +174,51 @@ export function htmlStyleToStyleValue(styleString: string) {
       i++;
     }
     const valStart = i;
-    while (i < len && styleString.charCodeAt(i) !== 59) {
+    let quote = 0;
+    let parenthesisDepth = 0;
+    while (i < len) {
+      const c = styleString.charCodeAt(i);
+      if (c === 92) {
+        i += i + 1 < len ? 2 : 1;
+        continue;
+      }
+      if (quote) {
+        if (c === quote) {
+          quote = 0;
+        }
+        i++;
+        continue;
+      }
+      if (c === 47 && styleString.charCodeAt(i + 1) === 42) {
+        i += 2;
+        while (i < len) {
+          if (
+            styleString.charCodeAt(i) === 42 &&
+            styleString.charCodeAt(i + 1) === 47
+          ) {
+            i += 2;
+            break;
+          }
+          i++;
+        }
+        continue;
+      }
+      if (c === 34 || c === 39) {
+        quote = c;
+        i++;
+        continue;
+      }
+      if (c === 40) {
+        parenthesisDepth++;
+        i++;
+        continue;
+      }
+      if (c === 41 && parenthesisDepth) {
+        parenthesisDepth--;
+        i++;
+        continue;
+      }
+      if (c === 59 && parenthesisDepth === 0) break;
       i++;
     }
     let valEnd = i;
