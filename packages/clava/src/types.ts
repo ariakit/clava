@@ -24,9 +24,15 @@ export type ClassValue =
   | void
   | ClassValue[];
 
-export type JSXCSSProperties = CSS.Properties<string | number>;
+export interface JSXCSSProperties extends CSS.Properties<string | number> {
+  [key: `--${string}`]: string | number;
+}
 
-export type HTMLCSSProperties = CSS.PropertiesHyphen<string | number>;
+export interface HTMLCSSProperties extends CSS.PropertiesHyphen<
+  string | number
+> {
+  [key: `--${string}`]: string | number;
+}
 
 export type CSSProperties = CSS.Properties;
 
@@ -359,7 +365,8 @@ export type DefaultVariants<V> = {
 
 /**
  * A normalized style object accepted by Clava config, variant, and refine
- * style entries. CSS custom properties are supported with string values.
+ * style entries. CSS custom properties are supported with string and number
+ * values.
  *
  * @example
  * ```ts
@@ -368,12 +375,13 @@ export type DefaultVariants<V> = {
  * const style: StyleValue = {
  *   color: "red",
  *   "--button-accent": "oklch(62% 0.2 250)",
+ *   "--button-scale": 1.1,
  * };
  * ```
  */
-export type StyleValue = CSS.Properties & {
-  [key: `--${string}`]: string;
-};
+export interface StyleValue extends CSS.Properties {
+  [key: `--${string}`]: string | number;
+}
 
 /**
  * A value that contributes both class and style output from a base config,
