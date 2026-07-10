@@ -589,6 +589,28 @@ for (const config of Object.values(CONFIGS)) {
   });
 }
 
+test("splitProps ignores inherited props from component sources", () => {
+  const component = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
+  const props = Object.setPrototypeOf({ id: "test" }, { size: "lg" });
+
+  const [variantProps, otherProps] = splitProps(props, component);
+  expect(variantProps).toEqual({});
+  expect(otherProps).toEqual({ id: "test" });
+});
+
+test("splitProps ignores inherited props from array sources", () => {
+  const props = Object.setPrototypeOf({ id: "test" }, { disabled: true });
+
+  const [idProps, disabledProps, otherProps] = splitProps(
+    props,
+    ["id"],
+    ["disabled"],
+  );
+  expect(idProps).toEqual({ id: "test" });
+  expect(disabledProps).toEqual({});
+  expect(otherProps).toEqual({});
+});
+
 test.each([
   [
     "missing getVariants",
