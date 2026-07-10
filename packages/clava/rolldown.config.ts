@@ -8,6 +8,11 @@ export default defineConfig({
   platform: "neutral",
   output: {
     cleanDir: true,
+    comments: {
+      annotation: true,
+      jsdoc: false,
+      legal: true,
+    },
     format: "es",
     sourcemap: true,
   },

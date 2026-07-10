@@ -483,7 +483,7 @@ function Button(props: ButtonProps) {
 
 ## `create()` And `cx()`
 
-The package-level `cv` and `cx` come from `create()` with no class transform. Use `create({ transformClass })` when every generated class string should pass through a transform, such as a prefixer or CSS-module lookup.
+The package-level `cv` and `cx` behave like the helpers returned by `create()` with no class transform. Use `create({ transformClass })` when every generated class string should pass through a transform, such as a prefixer or CSS-module lookup.
 
 ```ts
 import { create } from "clava";

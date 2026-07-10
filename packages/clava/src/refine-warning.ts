@@ -1,3 +1,5 @@
+import { hasOwn } from "./utils.ts";
+
 export interface CreationFrame {
   stack?: string;
 }
@@ -102,14 +104,14 @@ export function accumulateUnstableVariantChanges(
   next: Record<string, unknown>,
 ): void {
   for (const key in next) {
-    if (!Object.hasOwn(next, key)) continue;
+    if (!hasOwn(next, key)) continue;
     if (!Object.is(prev[key], next[key])) {
       setVariantChange(into, key, prev[key], next[key]);
     }
   }
   for (const key in prev) {
-    if (!Object.hasOwn(prev, key)) continue;
-    if (Object.hasOwn(next, key)) continue;
+    if (!hasOwn(prev, key)) continue;
+    if (hasOwn(next, key)) continue;
     setVariantChange(into, key, prev[key], undefined);
   }
 }
