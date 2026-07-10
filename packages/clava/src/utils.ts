@@ -296,13 +296,9 @@ export function htmlStyleToStyleValue(styleString: string) {
  * htmlObjStyleToStyleValue({ "background-color": "red", "font-size": "16px" });
  * // { backgroundColor: "red", fontSize: "16px" }
  */
-export function htmlObjStyleToStyleValue(style: HTMLCSSProperties): StyleValue;
 export function htmlObjStyleToStyleValue(
   style: CSS.PropertiesHyphen<string | number>,
-): StyleValue;
-export function htmlObjStyleToStyleValue(
-  style: CSS.PropertiesHyphen<string | number>,
-) {
+): StyleValue {
   const result: StyleValue = {};
   for (const key in style) {
     if (!hasOwn.call(style, key)) continue;
@@ -324,11 +320,9 @@ export function htmlObjStyleToStyleValue(
  * jsxStyleToStyleValue({ backgroundColor: "red", fontSize: 16 });
  * // { backgroundColor: "red", fontSize: "16px" }
  */
-export function jsxStyleToStyleValue(style: JSXCSSProperties): StyleValue;
 export function jsxStyleToStyleValue(
   style: CSS.Properties<string | number>,
-): StyleValue;
-export function jsxStyleToStyleValue(style: CSS.Properties<string | number>) {
+): StyleValue {
   const result: StyleValue = {};
   for (const key in style) {
     if (!hasOwn.call(style, key)) continue;

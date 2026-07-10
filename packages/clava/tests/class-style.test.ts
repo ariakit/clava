@@ -329,7 +329,7 @@ for (const config of Object.values(CONFIGS)) {
         class: "",
         backgroundColor: "red",
         "--custom-var": "value",
-        "--custom-number": expect.toBeOneOf([1, "1"]),
+        "--custom-number": mode === "html" ? "1" : 1,
       });
     });
 
