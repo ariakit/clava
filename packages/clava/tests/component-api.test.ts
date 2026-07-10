@@ -119,6 +119,39 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ tone: "quiet", size: "lg" });
     });
 
+    test("getVariants filters unknown keys before extended computed defaults", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: () => "sm" as const },
+      });
+      const component = getModeComponent(mode, cv({ extend: [base] }));
+      let unknownReads = 0;
+      let inheritedSetterCalls = 0;
+      const props = {};
+      Object.defineProperty(props, "unknown", {
+        enumerable: true,
+        get: () => {
+          unknownReads += 1;
+          return "value";
+        },
+      });
+      Object.defineProperty(props, "__proto__", {
+        enumerable: true,
+        value: {
+          set size(_value: unknown) {
+            inheritedSetterCalls += 1;
+          },
+        },
+      });
+      Object.defineProperty(props, "size", {
+        enumerable: true,
+        value: "lg",
+      });
+      expect(component.getVariants(props)).toEqual({ size: "lg" });
+      expect(unknownReads).toBe(0);
+      expect(inheritedSetterCalls).toBe(0);
+    });
+
     test("getVariants returns default variants", () => {
       const component = getModeComponent(
         mode,

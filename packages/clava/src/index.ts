@@ -1973,22 +1973,19 @@ export function create({
       };
     };
 
-    let variantKeySet: Set<string> | undefined;
     const getVariants = (variants?: VariantValues<MergedVariants>) => {
       const variantsRecord = variants ?? EMPTY_DEFAULTS;
       let variantProps = variantsRecord;
-      for (const key in variantsRecord) {
-        if (!Object.hasOwn(variantsRecord, key)) continue;
-        variantKeySet ??= new Set(variantKeys);
-        if (variantKeySet.has(key)) continue;
+      // Extended refinement copies user props, so filter before unknown
+      // accessors or prototype keys can be observed by Object.assign.
+      if (variants && extMetasWithRefineCount > 0) {
         variantProps = {};
         for (let i = 0; i < variantKeysLength; i++) {
-          const variantKey = variantKeys[i];
-          if (Object.hasOwn(variantsRecord, variantKey)) {
-            variantProps[variantKey] = variantsRecord[variantKey];
+          const key = variantKeys[i];
+          if (Object.hasOwn(variantsRecord, key)) {
+            variantProps[key] = variantsRecord[key];
           }
         }
-        break;
       }
       let resolvedVariants = resolveVariantsHot(variantProps);
       if (resolveRefine) {
