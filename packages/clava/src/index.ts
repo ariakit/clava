@@ -78,8 +78,8 @@ type ComputedDefaultVariantFn = (
 interface ComponentMeta {
   baseClass: string;
   staticDefaults: Record<string, unknown>;
-  // Returns variant classes + style for this component, used by extending
-  // components. Top-level rendering also routes through this.
+  // Performs a single compute pass for extending components, returning the
+  // resolved variants while pushing classes and styles into the output values.
   compute: ComputeFn;
   resolveRefine: ResolveRefineFn | null;
   // Reference identity is used to detect mixed-factory `extend`. When a
@@ -1549,25 +1549,8 @@ export function create({
             pendingProtectedVariants,
             protectedVariantKeys,
             incomingDefaultResolved = resolved,
-            renderOnly = false,
           ) => {
-            if (renderOnly || runState) {
-              return computeOnce(
-                resolved,
-                userVariantProps,
-                skipKeys,
-                skipValues,
-                classesOut,
-                styleOut,
-                runState,
-                protectedVariants,
-                pendingProtectedVariants,
-                protectedVariantKeys,
-                incomingDefaultResolved,
-                renderOnly,
-              );
-            }
-            runState ??= { remaining: MAX_REFINE_RUNS };
+            runState = { remaining: MAX_REFINE_RUNS };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
@@ -1806,19 +1789,7 @@ export function create({
             protectedVariantKeys,
             incomingDefaultResolved = resolved,
           ) => {
-            if (runState) {
-              return resolveRefineOnce(
-                resolved,
-                userVariantProps,
-                filterOwnVariants,
-                runState,
-                protectedVariants,
-                pendingProtectedVariants,
-                protectedVariantKeys,
-                incomingDefaultResolved,
-              );
-            }
-            runState ??= { remaining: MAX_REFINE_RUNS };
+            runState = { remaining: MAX_REFINE_RUNS };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
             let workingResolved = resolved;
@@ -2026,8 +1997,8 @@ export function create({
     const meta: ComponentMeta = {
       baseClass: computedBaseClass,
       staticDefaults,
-      compute,
-      resolveRefine,
+      compute: computeOnce,
+      resolveRefine: resolveRefine ? resolveRefineOnce : null,
       transformClass,
       functionVariantKeys,
       computedDefaultKeys,
