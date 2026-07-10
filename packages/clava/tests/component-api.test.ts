@@ -60,6 +60,21 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "lg" });
     });
 
+    test("getVariants reads non-enumerable declared variant keys", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+        }),
+      );
+      const props = Object.defineProperty({}, "size", {
+        value: "lg",
+        enumerable: false,
+      });
+      expect(component.getVariants(props)).toEqual({ size: "lg" });
+    });
+
     test("getVariants excludes unknown variant keys from refine", () => {
       let refinedVariants: Record<string, unknown> | undefined;
       const component = getModeComponent(

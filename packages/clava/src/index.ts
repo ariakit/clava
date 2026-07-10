@@ -1017,10 +1017,9 @@ export function create({
       const defaults: Record<string, unknown> = {};
       Object.assign(defaults, staticDefaults);
 
-      // Apply propsVariants on top (filter undefined). propsVariants is
-      // contractually variant-only here — callers building from a full props
-      // object filter to variant keys before calling.
-      for (const k in propsVariants) {
+      // Apply propsVariants on top (filter undefined).
+      for (let i = 0; i < variantKeysLength; i++) {
+        const k = variantKeys[i];
         if (!Object.hasOwn(propsVariants, k)) continue;
         const v = propsVariants[k];
         if (v === undefined) continue;
@@ -1974,14 +1973,22 @@ export function create({
       };
     };
 
+    let variantKeySet: Set<string> | undefined;
     const getVariants = (variants?: VariantValues<MergedVariants>) => {
       const variantsRecord = variants ?? EMPTY_DEFAULTS;
-      const variantProps: Record<string, unknown> = {};
-      for (let i = 0; i < variantKeysLength; i++) {
-        const key = variantKeys[i];
-        if (Object.hasOwn(variantsRecord, key)) {
-          variantProps[key] = variantsRecord[key];
+      let variantProps = variantsRecord;
+      for (const key in variantsRecord) {
+        if (!Object.hasOwn(variantsRecord, key)) continue;
+        variantKeySet ??= new Set(variantKeys);
+        if (variantKeySet.has(key)) continue;
+        variantProps = {};
+        for (let i = 0; i < variantKeysLength; i++) {
+          const variantKey = variantKeys[i];
+          if (Object.hasOwn(variantsRecord, variantKey)) {
+            variantProps[variantKey] = variantsRecord[variantKey];
+          }
         }
+        break;
       }
       let resolvedVariants = resolveVariantsHot(variantProps);
       if (resolveRefine) {
