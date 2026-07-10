@@ -118,6 +118,16 @@ describe("htmlStyleToStyleValue", () => {
     });
   });
 
+  test("preserves a hex escape followed by a line feed inside strings", () => {
+    const value = '"\\41\n;bar"';
+    const style = htmlStyleToStyleValue(`content: ${value}; color: red;`);
+
+    expect(style).toEqual({
+      content: value,
+      color: "red",
+    });
+  });
+
   test("preserves semicolons in quoted custom properties", () => {
     const style = htmlStyleToStyleValue(
       "--tokens: 'primary;secondary'; color: red;",

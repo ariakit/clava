@@ -51,6 +51,23 @@ function getUrlMatch(match: number, code: number) {
 
 function getEscapeEnd(styleString: string, index: number, end: number) {
   if (index + 1 >= end) return end;
+  if (getHexDigitValue(styleString.charCodeAt(index + 1)) !== -1) {
+    let escapeEnd = index + 1;
+    let digits = 0;
+    while (escapeEnd < end && digits < 6) {
+      if (getHexDigitValue(styleString.charCodeAt(escapeEnd)) === -1) break;
+      escapeEnd++;
+      digits++;
+    }
+    const whitespace = styleString.charCodeAt(escapeEnd);
+    if (isCSSWhitespace(whitespace)) {
+      escapeEnd +=
+        whitespace === 13 && styleString.charCodeAt(escapeEnd + 1) === 10
+          ? 2
+          : 1;
+    }
+    return escapeEnd;
+  }
   if (
     styleString.charCodeAt(index + 1) === 13 &&
     styleString.charCodeAt(index + 2) === 10
