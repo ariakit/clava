@@ -12,6 +12,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const exec = promisify(execFile);
 let buildPromise: Promise<unknown> | undefined;
 
+interface PackResult {
+  files: { path: string }[];
+}
+
 function buildPackage() {
   buildPromise ??= exec("pnpm", ["--dir", root, "build"]);
   return buildPromise;
@@ -27,6 +31,62 @@ test("build preserves the production warning guard for consumers", async () => {
     );
   });
 }, 60_000);
+
+test("package contains only published files", async () => {
+  await withPackageBuildLock(async () => {
+    await buildPackage();
+
+    const { stdout } = await exec("pnpm", ["pack", "--dry-run", "--json"], {
+      cwd: root,
+    });
+    const result = JSON.parse(stdout) as PackResult;
+
+    const expectedFiles = new Set([
+      "CHANGELOG.md",
+      "README.md",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "dist/index.js.map",
+      "license",
+      "package.json",
+      "src/index.ts",
+      "src/refine-warning.ts",
+      "src/types.ts",
+      "src/utils.ts",
+    ]);
+    const files = new Set(result.files.map((file) => file.path));
+    const missing = [...expectedFiles].filter((file) => !files.has(file));
+    const extra = [...files].filter((file) => !expectedFiles.has(file));
+
+    expect(extra).toEqual([]);
+    expect(missing).toEqual([]);
+  });
+}, 60_000);
+
+test("source condition loads the package source", async () => {
+  await exec(
+    process.execPath,
+    [
+      "--conditions=source",
+      "--input-type=module",
+      "--eval",
+      `
+        const resolved = import.meta.resolve("clava");
+        if (!resolved.endsWith("/src/index.ts")) {
+          throw new Error(\`Expected source condition, got \${resolved}\`);
+        }
+
+        import { cv } from "clava";
+
+        const button = cv({ class: "button" });
+        if (button().class !== "button") {
+          throw new Error("The source condition did not load Clava");
+        }
+      `,
+    ],
+    { cwd: root },
+  );
+});
 
 test("vite removes warning logic from the production bundle", async () => {
   await withPackageBuildLock(async () => {

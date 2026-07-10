@@ -26,6 +26,13 @@
     "type": "opencollective",
     "url": "https://opencollective.com/ariakit"
   },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "license"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
