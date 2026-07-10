@@ -1551,7 +1551,7 @@ export function create({
             incomingDefaultResolved = resolved,
             renderOnly = false,
           ) => {
-            if (renderOnly) {
+            if (renderOnly || runState) {
               return computeOnce(
                 resolved,
                 userVariantProps,
@@ -1564,7 +1564,7 @@ export function create({
                 pendingProtectedVariants,
                 protectedVariantKeys,
                 incomingDefaultResolved,
-                true,
+                renderOnly,
               );
             }
             runState ??= { remaining: MAX_REFINE_RUNS };
@@ -1806,6 +1806,18 @@ export function create({
             protectedVariantKeys,
             incomingDefaultResolved = resolved,
           ) => {
+            if (runState) {
+              return resolveRefineOnce(
+                resolved,
+                userVariantProps,
+                filterOwnVariants,
+                runState,
+                protectedVariants,
+                pendingProtectedVariants,
+                protectedVariantKeys,
+                incomingDefaultResolved,
+              );
+            }
             runState ??= { remaining: MAX_REFINE_RUNS };
             protectedVariants ??= {};
             protectedVariantKeys ??= new Set<string>();
