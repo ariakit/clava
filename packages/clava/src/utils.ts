@@ -170,27 +170,20 @@ function hasVendorPrefix(property: string, prefix: string) {
   return property.startsWith(prefix);
 }
 
+// "ms" is used in JSX, while camelizing hyphenated properties produces "Ms".
+const vendorPrefixes = ["Webkit", "Moz", "ms", "Ms", "O"];
+
 function isUnitlessNumberProperty(property: string) {
   if (unitlessNumberProperties.has(property)) return true;
 
-  let prefixLength = 0;
-  if (hasVendorPrefix(property, "Webkit")) {
-    prefixLength = 6;
-  } else if (hasVendorPrefix(property, "Moz")) {
-    prefixLength = 3;
-  } else if (hasVendorPrefix(property, "ms")) {
-    prefixLength = 2;
-  } else if (hasVendorPrefix(property, "Ms")) {
-    prefixLength = 2;
-  } else if (hasVendorPrefix(property, "O")) {
-    prefixLength = 1;
+  for (const prefix of vendorPrefixes) {
+    if (!hasVendorPrefix(property, prefix)) continue;
+    const firstCode = property.charCodeAt(prefix.length);
+    const unprefixedProperty =
+      String.fromCharCode(firstCode + 32) + property.slice(prefix.length + 1);
+    return unitlessNumberProperties.has(unprefixedProperty);
   }
-  if (!prefixLength) return false;
-
-  const firstCode = property.charCodeAt(prefixLength);
-  const unprefixedProperty =
-    String.fromCharCode(firstCode + 32) + property.slice(prefixLength + 1);
-  return unitlessNumberProperties.has(unprefixedProperty);
+  return false;
 }
 
 function normalizeStyleValue(property: string, value: string | number) {

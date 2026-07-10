@@ -89,6 +89,7 @@ for (const config of [CONFIGS.jsx]) {
           lineHeight: 1.5,
           flexGrow: 1,
           WebkitLineClamp: 2,
+          msFlexPositive: 1,
           "--columns": 3,
           marginTop: 4,
         },
@@ -100,6 +101,7 @@ for (const config of [CONFIGS.jsx]) {
         lineHeight: 1.5,
         flexGrow: 1,
         WebkitLineClamp: 2,
+        msFlexPositive: 1,
         "--columns": 3,
         marginTop: "4px",
       });
@@ -181,6 +183,7 @@ for (const config of [CONFIGS.htmlObj]) {
           "line-height": 1.5,
           "flex-grow": 1,
           "-webkit-line-clamp": 2,
+          "-ms-flex-positive": 1,
           "--columns": 3,
           "margin-top": 4,
         },
@@ -192,6 +195,7 @@ for (const config of [CONFIGS.htmlObj]) {
         "line-height": 1.5,
         "flex-grow": 1,
         "-webkit-line-clamp": 2,
+        "-ms-flex-positive": 1,
         "--columns": 3,
         "margin-top": "4px",
       });
