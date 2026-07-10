@@ -282,15 +282,11 @@ type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
   ? ExtractVariants<First> & MergeExtendedVariants<Rest>
   : {};
 
-// Returns a component's effective variants — merged with its own extends —
-// so that a later intermediate component's static variant correctly hides a
-// grandparent's function variant from further descendants. Using a raw
-// intersection here would re-expose the grandparent function through the
-// type chain even after the middle layer replaced it.
-type ExtractVariants<T> =
-  T extends CVComponent<infer V, infer E, any>
-    ? MergeVariantMaps<V, MergeExtendedVariants<E>>
-    : {};
+// Returns a component's effective variants so an intermediate component's
+// static variant hides a grandparent's function variant from descendants.
+// CVComponent and its mode helpers instantiate ModalComponent with the already
+// merged MergeVariants<V, E>, so inferring V yields that effective chain.
+type ExtractVariants<T> = T extends ModalComponent<infer V, any> ? V : {};
 
 // A function value in `variants` (a function variant) replaces any inherited
 // variant for the same key. An object value merges value-by-value with an
