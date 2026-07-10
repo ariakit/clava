@@ -281,10 +281,7 @@ type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
 // grandparent's function variant from further descendants. Using a raw
 // intersection here would re-expose the grandparent function through the
 // type chain even after the middle layer replaced it.
-type ExtractVariants<T> =
-  T extends CVComponent<infer V, infer E, any>
-    ? MergeVariantMaps<V, MergeExtendedVariants<E>>
-    : {};
+type ExtractVariants<T> = T extends ModalComponent<infer V, any> ? V : {};
 
 // A function value in `variants` (a function variant) replaces any inherited
 // variant for the same key. An object value merges value-by-value with an

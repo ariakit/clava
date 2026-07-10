@@ -177,6 +177,44 @@ describe("variants type inference", () => {
     });
   });
 
+  test("modal components preserve inherited variants when extended", () => {
+    const base = cv({
+      variants: { size: { sm: "sm", lg: "lg" } },
+    });
+    const jsx = cv({ extend: [base.jsx] });
+    const html = cv({ extend: [base.html] });
+    const htmlObj = cv({ extend: [base.htmlObj] });
+
+    expectTypeOf(jsx.getVariants()).toEqualTypeOf<{
+      size?: "sm" | "lg";
+    }>();
+    expectTypeOf(html.getVariants()).toEqualTypeOf<{
+      size?: "sm" | "lg";
+    }>();
+    expectTypeOf(htmlObj.getVariants()).toEqualTypeOf<{
+      size?: "sm" | "lg";
+    }>();
+
+    jsx({ size: "sm" });
+    html({ size: "lg" });
+    htmlObj({ size: "sm" });
+
+    expectTypeOf(() => {
+      jsx({
+        // @ts-expect-error inherited JSX modal variant rejects unknown values
+        size: "md",
+      });
+      html({
+        // @ts-expect-error inherited HTML modal variant rejects unknown values
+        size: "md",
+      });
+      htmlObj({
+        // @ts-expect-error inherited HTML object modal variant rejects unknown values
+        size: "md",
+      });
+    }).toBeFunction();
+  });
+
   test("defaultVariants infers types from merged variants", () => {
     cv({
       variants: {
