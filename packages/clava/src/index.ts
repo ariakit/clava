@@ -535,7 +535,7 @@ function splitPropsImpl(
   const selfKeysLength = selfKeys.length;
   for (let i = 0; i < selfKeysLength; i++) {
     const key = selfKeys[i];
-    if (key !== undefined && key in props) {
+    if (key !== undefined && Object.hasOwn(props, key)) {
       selfResult[key] = props[key];
     }
   }
@@ -557,7 +557,7 @@ function splitPropsImpl(
     const effectiveKeysLength = effectiveKeys.length;
     for (let i = 0; i < effectiveKeysLength; i++) {
       const key = effectiveKeys[i];
-      if (key !== undefined && key in props) {
+      if (key !== undefined && Object.hasOwn(props, key)) {
         sourceResult[key] = props[key];
       }
     }
