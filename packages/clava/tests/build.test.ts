@@ -36,12 +36,12 @@ test("package contains only published files", async () => {
   await withPackageBuildLock(async () => {
     await buildPackage();
 
-    const { stdout } = await exec("npm", ["pack", "--dry-run", "--json"], {
+    const { stdout } = await exec("pnpm", ["pack", "--dry-run", "--json"], {
       cwd: root,
     });
-    const [result] = JSON.parse(stdout) as PackResult[];
+    const result = JSON.parse(stdout) as PackResult;
 
-    const expectedFiles = [
+    const expectedFiles = new Set([
       "CHANGELOG.md",
       "README.md",
       "dist/index.d.ts",
@@ -53,11 +53,13 @@ test("package contains only published files", async () => {
       "src/refine-warning.ts",
       "src/types.ts",
       "src/utils.ts",
-    ];
-    const files = result?.files.map((file) => file.path);
+    ]);
+    const files = new Set(result.files.map((file) => file.path));
+    const missing = [...expectedFiles].filter((file) => !files.has(file));
+    const extra = [...files].filter((file) => !expectedFiles.has(file));
 
-    expect(files).toHaveLength(expectedFiles.length);
-    expect(files).toEqual(expect.arrayContaining(expectedFiles));
+    expect(extra).toEqual([]);
+    expect(missing).toEqual([]);
   });
 }, 60_000);
 
