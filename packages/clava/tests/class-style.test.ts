@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
+import { cv } from "../src/index.ts";
 import type {
   HTMLCSSProperties,
   JSXCSSProperties,
@@ -18,6 +19,22 @@ import {
   getModeComponent,
   getStyleClass,
 } from "./_utils.ts";
+
+test("serializes Microsoft-prefixed properties through public modes", () => {
+  const component = cv({ style: { msTransition: "none" } });
+  expect(component.html().style).toBe("-ms-transition: none;");
+  expect(component.htmlObj().style).toEqual({ "-ms-transition": "none" });
+});
+
+test("parses Microsoft-prefixed properties through public inputs", () => {
+  const component = cv();
+  expect(component({ style: "-ms-transition: none" }).style).toEqual({
+    msTransition: "none",
+  });
+  expect(component({ style: { "-ms-transition": "none" } }).style).toEqual({
+    msTransition: "none",
+  });
+});
 
 for (const config of [CONFIGS.default, CONFIGS.uppercase]) {
   const mode = getConfigMode(config);
