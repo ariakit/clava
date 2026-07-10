@@ -304,27 +304,29 @@ export function htmlStyleToStyleValue(styleString: string) {
         continue;
       }
       if (c === 40) {
-        let nextIndex = i + 1;
-        while (
-          nextIndex < len &&
-          isCSSWhitespace(styleString.charCodeAt(nextIndex))
-        ) {
-          nextIndex++;
-        }
-        const next = styleString.charCodeAt(nextIndex);
-        if (urlMatch === 3 && next !== 34 && next !== 39) {
-          i++;
-          while (i < len) {
-            const urlChar = styleString.charCodeAt(i);
-            if (urlChar === 92) {
-              i = getEscapeEnd(styleString, i, len);
-              continue;
-            }
-            i++;
-            if (urlChar === 41) break;
+        if (urlMatch === 3) {
+          let nextIndex = i + 1;
+          while (
+            nextIndex < len &&
+            isCSSWhitespace(styleString.charCodeAt(nextIndex))
+          ) {
+            nextIndex++;
           }
-          urlMatch = 0;
-          continue;
+          const next = styleString.charCodeAt(nextIndex);
+          if (next !== 34 && next !== 39) {
+            i++;
+            while (i < len) {
+              const urlChar = styleString.charCodeAt(i);
+              if (urlChar === 92) {
+                i = getEscapeEnd(styleString, i, len);
+                continue;
+              }
+              i++;
+              if (urlChar === 41) break;
+            }
+            urlMatch = 0;
+            continue;
+          }
         }
         if (blockDepth < MAX_PACKED_BLOCK_DEPTH) {
           blockStack = blockStack * 4 + 1;
