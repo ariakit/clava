@@ -80,6 +80,32 @@ for (const config of [CONFIGS.jsx]) {
       expect(props.style).toEqual({});
       expectTypeOf(props.style).toEqualTypeOf<JSXCSSProperties>();
     });
+
+    test("numeric style values use property-aware units", () => {
+      const props = cv().jsx({
+        style: {
+          opacity: 0.5,
+          zIndex: 2,
+          lineHeight: 1.5,
+          flexGrow: 1,
+          WebkitLineClamp: 2,
+          msFlexPositive: 1,
+          "--columns": 3,
+          marginTop: 4,
+        },
+      });
+      expectTypeOf(props.style).toEqualTypeOf<JSXCSSProperties>();
+      expect(props.style).toEqual({
+        opacity: 0.5,
+        zIndex: 2,
+        lineHeight: 1.5,
+        flexGrow: 1,
+        WebkitLineClamp: 2,
+        msFlexPositive: 1,
+        "--columns": 3,
+        marginTop: "4px",
+      });
+    });
   });
 }
 
@@ -108,6 +134,14 @@ for (const config of [CONFIGS.html]) {
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe("");
       expect(props.style).toBe("");
+    });
+
+    test("numeric style values use property-aware units", () => {
+      const component = getModeComponent(mode, cv());
+      const props = component({
+        style: { opacity: 0.5, "--columns": 3, marginTop: 4 },
+      });
+      expect(props.style).toBe("opacity: 0.5; --columns: 3; margin-top: 4px;");
     });
   });
 }
@@ -139,6 +173,32 @@ for (const config of [CONFIGS.htmlObj]) {
       expect(props.class).toBe("");
       expect(props.style).toEqual({});
       expectTypeOf(props.style).toEqualTypeOf<HTMLCSSProperties>();
+    });
+
+    test("numeric style values use property-aware units", () => {
+      const props = cv().htmlObj({
+        style: {
+          opacity: 0.5,
+          "z-index": 2,
+          "line-height": 1.5,
+          "flex-grow": 1,
+          "-webkit-line-clamp": 2,
+          "-ms-flex-positive": 1,
+          "--columns": 3,
+          "margin-top": 4,
+        },
+      });
+      expectTypeOf(props.style).toEqualTypeOf<HTMLCSSProperties>();
+      expect(props.style).toEqual({
+        opacity: 0.5,
+        "z-index": 2,
+        "line-height": 1.5,
+        "flex-grow": 1,
+        "-webkit-line-clamp": 2,
+        "-ms-flex-positive": 1,
+        "--columns": 3,
+        "margin-top": "4px",
+      });
     });
   });
 }
@@ -262,15 +322,18 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("style with custom property", () => {
-      const component = getModeComponent(
-        mode,
-        cv({ style: { backgroundColor: "red", "--custom-var": "value" } }),
-      );
+      const style = {
+        backgroundColor: "red",
+        "--custom-var": "value",
+        "--custom-number": 1,
+      } satisfies StyleValue;
+      const component = getModeComponent(mode, cv({ style }));
       const props = component();
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
         "--custom-var": "value",
+        "--custom-number": mode === "html" ? "1" : 1,
       });
     });
 

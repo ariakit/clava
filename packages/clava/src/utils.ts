@@ -11,9 +11,74 @@ export type Mode = (typeof MODES)[number];
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const hasOwn = Object.prototype.hasOwnProperty;
 
+// Keep this explicit so normalization does not depend on browser globals.
+// Vendor-prefixed variants are derived below instead of duplicating the list.
+const unitlessNumberProperties = new Set([
+  "animationIterationCount",
+  "aspectRatio",
+  "borderImage",
+  "borderImageOutset",
+  "borderImageSlice",
+  "borderImageWidth",
+  "boxFlex",
+  "boxFlexGroup",
+  "boxOrdinalGroup",
+  "columnCount",
+  "columns",
+  "fillOpacity",
+  "flex",
+  "flexGrow",
+  "flexNegative",
+  "flexOrder",
+  "flexPositive",
+  "flexShrink",
+  "floodOpacity",
+  "fontSizeAdjust",
+  "fontWeight",
+  "gridArea",
+  "gridColumn",
+  "gridColumnEnd",
+  "gridColumnSpan",
+  "gridColumnStart",
+  "gridRow",
+  "gridRowEnd",
+  "gridRowSpan",
+  "gridRowStart",
+  "hyphenateLimitChars",
+  "initialLetter",
+  "lineClamp",
+  "lineHeight",
+  "maskBorder",
+  "maskBorderOutset",
+  "maskBorderSlice",
+  "maskBorderWidth",
+  "mathDepth",
+  "maxLines",
+  "opacity",
+  "order",
+  "orphans",
+  "scale",
+  "shapeImageThreshold",
+  "stopOpacity",
+  "strokeDasharray",
+  "strokeDashoffset",
+  "strokeMiterlimit",
+  "strokeOpacity",
+  "strokeWidth",
+  "tabSize",
+  "widows",
+  "zIndex",
+  "zoom",
+]);
+
 function isAsciiLetter(code: number) {
   if (code >= 65 && code <= 90) return true;
   return code >= 97 && code <= 122;
+}
+
+function isCustomProperty(property: string) {
+  if (property.length < 2) return false;
+  return property.charCodeAt(0) === 45 && property.charCodeAt(1) === 45;
 }
 
 /**
@@ -34,7 +99,7 @@ export function getClassPropertyName(mode: Mode) {
  */
 export function hyphenToCamel(str: string) {
   // CSS custom properties (variables) should not be converted
-  if (str.length >= 2 && str.charCodeAt(0) === 45 && str.charCodeAt(1) === 45) {
+  if (isCustomProperty(str)) {
     return str;
   }
   // Fast path: no hyphen -> return as-is
@@ -78,7 +143,7 @@ export function hyphenToCamel(str: string) {
  */
 export function camelToHyphen(str: string) {
   // CSS custom properties (variables) should not be converted
-  if (str.length >= 2 && str.charCodeAt(0) === 45 && str.charCodeAt(1) === 45) {
+  if (isCustomProperty(str)) {
     return str;
   }
 
@@ -99,14 +164,36 @@ export function camelToHyphen(str: string) {
   return result + str.slice(lastIndex);
 }
 
-/**
- * Parses a length value, adding "px" if it's a number.
- * @example
- * parseLengthValue(16); // "16px"
- * parseLengthValue("2em"); // "2em"
- */
-export function parseLengthValue(value: string | number) {
+function hasVendorPrefix(property: string, prefix: string) {
+  const nextCode = property.charCodeAt(prefix.length);
+  if (nextCode < 65 || nextCode > 90) return false;
+  return property.startsWith(prefix);
+}
+
+// "ms" is used in JSX, while camelizing hyphenated properties produces "Ms".
+const vendorPrefixes = ["Webkit", "Moz", "ms", "Ms", "O"];
+
+function isUnitlessNumberProperty(property: string) {
+  if (unitlessNumberProperties.has(property)) return true;
+
+  for (const prefix of vendorPrefixes) {
+    if (!hasVendorPrefix(property, prefix)) continue;
+    const firstCode = property.charCodeAt(prefix.length);
+    const unprefixedProperty =
+      String.fromCharCode(firstCode + 32) + property.slice(prefix.length + 1);
+    return unitlessNumberProperties.has(unprefixedProperty);
+  }
+  return false;
+}
+
+function normalizeStyleValue(property: string, value: string | number) {
   if (typeof value === "string") {
+    return value;
+  }
+  if (isCustomProperty(property)) {
+    return value;
+  }
+  if (isUnitlessNumberProperty(property)) {
     return value;
   }
   return `${value}px`;
@@ -202,14 +289,18 @@ export function htmlStyleToStyleValue(styleString: string) {
  * htmlObjStyleToStyleValue({ "background-color": "red", "font-size": "16px" });
  * // { backgroundColor: "red", fontSize: "16px" }
  */
-export function htmlObjStyleToStyleValue(style: HTMLCSSProperties) {
+export function htmlObjStyleToStyleValue(
+  style: CSS.PropertiesHyphen<string | number>,
+): StyleValue {
   const result: StyleValue = {};
   for (const key in style) {
     if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
+    const property = hyphenToCamel(key);
     // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string>)[hyphenToCamel(key)] = parseLengthValue(
+    (result as Record<string, string | number>)[property] = normalizeStyleValue(
+      property,
       value as string | number,
     );
   }
@@ -222,14 +313,17 @@ export function htmlObjStyleToStyleValue(style: HTMLCSSProperties) {
  * jsxStyleToStyleValue({ backgroundColor: "red", fontSize: 16 });
  * // { backgroundColor: "red", fontSize: "16px" }
  */
-export function jsxStyleToStyleValue(style: JSXCSSProperties) {
+export function jsxStyleToStyleValue(
+  style: CSS.Properties<string | number>,
+): StyleValue {
   const result: StyleValue = {};
   for (const key in style) {
     if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string>)[key] = parseLengthValue(
+    (result as Record<string, string | number>)[key] = normalizeStyleValue(
+      key,
       value as string | number,
     );
   }
@@ -266,7 +360,7 @@ export function styleValueToHTMLStyle(style: StyleValue): string {
  * // { "background-color": "red", "font-size": "16px" }
  */
 export function styleValueToHTMLObjStyle(style: StyleValue) {
-  const result: CSS.PropertiesHyphen = {};
+  const result: HTMLCSSProperties = {};
   for (const key in style) {
     if (!hasOwn.call(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
@@ -298,13 +392,7 @@ export function isHTMLObjStyle(
   for (const key in style) {
     if (!hasOwn.call(style, key)) continue;
     // Quick exclusion of CSS custom properties (--foo)
-    if (
-      key.length >= 2 &&
-      key.charCodeAt(0) === 45 &&
-      key.charCodeAt(1) === 45
-    ) {
-      continue;
-    }
+    if (isCustomProperty(key)) continue;
     if (key.indexOf("-") !== -1) return true;
   }
   return false;

@@ -142,13 +142,14 @@ box().class;
 // "box rounded"
 ```
 
-Config styles use camelCase CSS property names and string values. CSS custom properties are supported.
+Config styles use camelCase CSS property names. CSS custom properties accept string or number values.
 
 ```ts
 const card = cv({
   style: {
     paddingBlock: "8px",
     "--card-accent": "oklch(62% 0.2 250)",
+    "--card-scale": 1.05,
   },
 });
 ```
