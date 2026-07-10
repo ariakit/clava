@@ -199,20 +199,18 @@ describe("variants type inference", () => {
     html({ size: "lg" });
     htmlObj({ size: "sm" });
 
-    expectTypeOf(() => {
-      jsx({
-        // @ts-expect-error inherited JSX modal variant rejects unknown values
-        size: "md",
-      });
-      html({
-        // @ts-expect-error inherited HTML modal variant rejects unknown values
-        size: "md",
-      });
-      htmlObj({
-        // @ts-expect-error inherited HTML object modal variant rejects unknown values
-        size: "md",
-      });
-    }).toBeFunction();
+    jsx({
+      // @ts-expect-error inherited JSX modal variant rejects unknown values
+      size: "md",
+    });
+    html({
+      // @ts-expect-error inherited HTML modal variant rejects unknown values
+      size: "md",
+    });
+    htmlObj({
+      // @ts-expect-error inherited HTML object modal variant rejects unknown values
+      size: "md",
+    });
   });
 
   test("defaultVariants infers types from merged variants", () => {
