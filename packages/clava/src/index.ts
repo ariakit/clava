@@ -1017,10 +1017,9 @@ export function create({
       const defaults: Record<string, unknown> = {};
       Object.assign(defaults, staticDefaults);
 
-      // Apply propsVariants on top (filter undefined). propsVariants is
-      // contractually variant-only here — callers building from a full props
-      // object filter to variant keys before calling.
-      for (const k in propsVariants) {
+      // Apply propsVariants on top (filter undefined).
+      for (let i = 0; i < variantKeysLength; i++) {
+        const k = variantKeys[i];
         if (!Object.hasOwn(propsVariants, k)) continue;
         const v = propsVariants[k];
         if (v === undefined) continue;
@@ -1975,7 +1974,19 @@ export function create({
     };
 
     const getVariants = (variants?: VariantValues<MergedVariants>) => {
-      const variantProps = variants ?? EMPTY_DEFAULTS;
+      const variantsRecord = variants ?? EMPTY_DEFAULTS;
+      let variantProps = variantsRecord;
+      // Extended refinement copies user props, so filter before unknown
+      // accessors or prototype keys can be observed by Object.assign.
+      if (variants && extMetasWithRefineCount > 0) {
+        variantProps = {};
+        for (let i = 0; i < variantKeysLength; i++) {
+          const key = variantKeys[i];
+          if (Object.hasOwn(variantsRecord, key)) {
+            variantProps[key] = variantsRecord[key];
+          }
+        }
+      }
       let resolvedVariants = resolveVariantsHot(variantProps);
       if (resolveRefine) {
         resolvedVariants = resolveRefine(resolvedVariants, variantProps, false);
