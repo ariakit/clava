@@ -1975,7 +1975,14 @@ export function create({
     };
 
     const getVariants = (variants?: VariantValues<MergedVariants>) => {
-      const variantProps = variants ?? EMPTY_DEFAULTS;
+      const variantsRecord = variants ?? EMPTY_DEFAULTS;
+      const variantProps: Record<string, unknown> = {};
+      for (let i = 0; i < variantKeysLength; i++) {
+        const key = variantKeys[i];
+        if (Object.hasOwn(variantsRecord, key)) {
+          variantProps[key] = variantsRecord[key];
+        }
+      }
       let resolvedVariants = resolveVariantsHot(variantProps);
       if (resolveRefine) {
         resolvedVariants = resolveRefine(resolvedVariants, variantProps, false);

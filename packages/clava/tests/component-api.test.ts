@@ -47,6 +47,63 @@ for (const config of Object.values(CONFIGS)) {
       expect(variants).toEqual({ size: "lg" });
     });
 
+    test("getVariants ignores unknown variant keys", () => {
+      const component = getModeComponent(
+        mode,
+        cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
+      );
+      const variants = component.getVariants({
+        size: "lg",
+        // @ts-expect-error unknown is not a declared variant
+        unknown: "value",
+      });
+      expect(variants).toEqual({ size: "lg" });
+    });
+
+    test("getVariants excludes unknown variant keys from refine", () => {
+      let refinedVariants: Record<string, unknown> | undefined;
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            color: { red: "red", blue: "blue" },
+          },
+          refine: ({ variants, setVariants }) => {
+            refinedVariants = { ...variants };
+            setVariants({ color: "red" });
+          },
+        }),
+      );
+      const variants = component.getVariants({
+        size: "lg",
+        // @ts-expect-error unknown is not a declared variant
+        unknown: "value",
+      });
+      expect(refinedVariants).toEqual({ size: "lg", color: "red" });
+      expect(variants).toEqual({ size: "lg", color: "red" });
+    });
+
+    test("getVariants preserves inherited variant keys while ignoring unknown keys", () => {
+      const base = cv({
+        variants: { tone: { quiet: "quiet", loud: "loud" } },
+      });
+      const component = getModeComponent(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { sm: "sm", lg: "lg" } },
+        }),
+      );
+      const variants = component.getVariants({
+        tone: "quiet",
+        size: "lg",
+        // @ts-expect-error unknown is not a declared variant
+        unknown: "value",
+      });
+      expect(variants).toEqual({ tone: "quiet", size: "lg" });
+    });
+
     test("getVariants returns default variants", () => {
       const component = getModeComponent(
         mode,
