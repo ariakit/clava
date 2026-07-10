@@ -11,9 +11,53 @@ export type Mode = (typeof MODES)[number];
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const hasOwn = Object.prototype.hasOwnProperty;
 
+// Base-4 opener codes remain exactly representable through this depth.
+const MAX_PACKED_BLOCK_DEPTH = 26;
+
 function isAsciiLetter(code: number) {
   if (code >= 65 && code <= 90) return true;
   return code >= 97 && code <= 122;
+}
+
+function isCSSWhitespace(code: number) {
+  return code === 32 || code === 9 || code === 10 || code === 12 || code === 13;
+}
+
+function isCSSNewline(code: number) {
+  return code === 10 || code === 12 || code === 13;
+}
+
+function isIdentifierCode(code: number) {
+  if (isAsciiLetter(code)) return true;
+  if (code >= 48 && code <= 57) return true;
+  if (code === 45 || code === 95) return true;
+  return code === 0 || code >= 128;
+}
+
+function getHexDigitValue(code: number) {
+  if (code >= 48 && code <= 57) return code - 48;
+  if (code >= 65 && code <= 70) return code - 55;
+  if (code >= 97 && code <= 102) return code - 87;
+  return -1;
+}
+
+function getUrlMatch(match: number, code: number) {
+  const lowerCode = code | 32;
+  if (match === 0 && lowerCode === 117) return 1;
+  if (match === 1 && lowerCode === 114) return 2;
+  if (match === 2 && lowerCode === 108) return 3;
+  return 4;
+}
+
+function getEscapeEnd(styleString: string, index: number, end: number) {
+  if (index + 1 >= end) return end;
+  if (
+    styleString.charCodeAt(index + 1) === 13 &&
+    styleString.charCodeAt(index + 2) === 10
+  ) {
+    return index + 3;
+  }
+  return index + 2;
 }
 
 /**
@@ -128,7 +172,7 @@ export function htmlStyleToStyleValue(styleString: string) {
     // Skip leading whitespace and stray semicolons
     while (i < len) {
       const c = styleString.charCodeAt(i);
-      if (c !== 32 && c !== 9 && c !== 10 && c !== 13 && c !== 59) break;
+      if (c !== 59 && !isCSSWhitespace(c)) break;
       i++;
     }
     if (i >= len) break;
@@ -151,7 +195,7 @@ export function htmlStyleToStyleValue(styleString: string) {
     // Trim trailing whitespace from property name
     while (propEnd > propStart) {
       const c = styleString.charCodeAt(propEnd - 1);
-      if (c !== 32 && c !== 9 && c !== 10 && c !== 13) break;
+      if (!isCSSWhitespace(c)) break;
       propEnd--;
     }
     if (propEnd === propStart) {
@@ -170,61 +214,166 @@ export function htmlStyleToStyleValue(styleString: string) {
     // Skip whitespace before value
     while (i < len) {
       const c = styleString.charCodeAt(i);
-      if (c !== 32 && c !== 9 && c !== 10 && c !== 13) break;
+      if (!isCSSWhitespace(c)) break;
       i++;
     }
     const valStart = i;
     let quote = 0;
-    let parenthesisDepth = 0;
+    let blockDepth = 0;
+    let blockStack = 0;
+    let blockOverflow: number[] | undefined;
+    let urlMatch = 0;
     while (i < len) {
       const c = styleString.charCodeAt(i);
-      if (c === 92) {
-        i += i + 1 < len ? 2 : 1;
-        continue;
-      }
       if (quote) {
-        if (c === quote) {
+        if (c === 92) {
+          i = getEscapeEnd(styleString, i, len);
+          continue;
+        }
+        if (c === quote || isCSSNewline(c)) {
           quote = 0;
         }
         i++;
         continue;
       }
       if (c === 47 && styleString.charCodeAt(i + 1) === 42) {
-        i += 2;
-        while (i < len) {
-          if (
-            styleString.charCodeAt(i) === 42 &&
-            styleString.charCodeAt(i + 1) === 47
-          ) {
-            i += 2;
-            break;
-          }
-          i++;
-        }
+        const commentEnd = styleString.indexOf("*/", i + 2);
+        i = commentEnd === -1 ? len : commentEnd + 2;
+        urlMatch = 0;
         continue;
       }
       if (c === 34 || c === 39) {
         quote = c;
+        urlMatch = 0;
         i++;
+        continue;
+      }
+      if (c === 92) {
+        let escapeEnd = i + 1;
+        if (escapeEnd >= len) {
+          i = len;
+          continue;
+        }
+        let escapedCode = styleString.charCodeAt(escapeEnd);
+        if (isCSSNewline(escapedCode)) {
+          urlMatch = 0;
+          i = getEscapeEnd(styleString, i, len);
+          continue;
+        }
+        if (getHexDigitValue(escapedCode) !== -1) {
+          escapedCode = 0;
+          let digits = 0;
+          while (escapeEnd < len && digits < 6) {
+            const digitValue = getHexDigitValue(
+              styleString.charCodeAt(escapeEnd),
+            );
+            if (digitValue === -1) break;
+            escapedCode = escapedCode * 16 + digitValue;
+            escapeEnd++;
+            digits++;
+          }
+          const whitespace = styleString.charCodeAt(escapeEnd);
+          if (isCSSWhitespace(whitespace)) {
+            escapeEnd +=
+              whitespace === 13 && styleString.charCodeAt(escapeEnd + 1) === 10
+                ? 2
+                : 1;
+          }
+        } else {
+          escapeEnd++;
+        }
+        urlMatch = getUrlMatch(urlMatch, escapedCode);
+        i = escapeEnd;
         continue;
       }
       if (c === 40) {
-        parenthesisDepth++;
+        let nextIndex = i + 1;
+        while (
+          nextIndex < len &&
+          isCSSWhitespace(styleString.charCodeAt(nextIndex))
+        ) {
+          nextIndex++;
+        }
+        const next = styleString.charCodeAt(nextIndex);
+        if (urlMatch === 3 && next !== 34 && next !== 39) {
+          i++;
+          while (i < len) {
+            const urlChar = styleString.charCodeAt(i);
+            if (urlChar === 92) {
+              i = getEscapeEnd(styleString, i, len);
+              continue;
+            }
+            i++;
+            if (urlChar === 41) break;
+          }
+          urlMatch = 0;
+          continue;
+        }
+        if (blockDepth < MAX_PACKED_BLOCK_DEPTH) {
+          blockStack = blockStack * 4 + 1;
+        } else {
+          (blockOverflow ||= []).push(1);
+        }
+        blockDepth++;
+        urlMatch = 0;
         i++;
         continue;
       }
-      if (c === 41 && parenthesisDepth) {
-        parenthesisDepth--;
+      if (
+        c === 60 &&
+        styleString.charCodeAt(i + 1) === 33 &&
+        styleString.charCodeAt(i + 2) === 45 &&
+        styleString.charCodeAt(i + 3) === 45
+      ) {
+        urlMatch = 0;
+        i += 4;
+        continue;
+      }
+      if (isIdentifierCode(c)) {
+        urlMatch = getUrlMatch(urlMatch, c);
         i++;
         continue;
       }
-      if (c === 59 && parenthesisDepth === 0) break;
+      if (c === 64 || c === 35) {
+        urlMatch = 4;
+        i++;
+        continue;
+      }
+      if (c === 91 || c === 123) {
+        if (blockDepth < MAX_PACKED_BLOCK_DEPTH) {
+          blockStack = blockStack * 4 + (c === 91 ? 2 : 3);
+        } else {
+          (blockOverflow ||= []).push(c === 91 ? 2 : 3);
+        }
+        blockDepth++;
+        urlMatch = 0;
+        i++;
+        continue;
+      }
+      if ((c === 41 || c === 93 || c === 125) && blockDepth) {
+        const blockType = c === 41 ? 1 : c === 93 ? 2 : 3;
+        if (blockDepth > MAX_PACKED_BLOCK_DEPTH) {
+          const overflowIndex = blockDepth - MAX_PACKED_BLOCK_DEPTH - 1;
+          if (blockOverflow?.[overflowIndex] === blockType) {
+            blockOverflow.pop();
+            blockDepth--;
+          }
+        } else if (blockStack % 4 === blockType) {
+          blockStack = (blockStack - blockType) / 4;
+          blockDepth--;
+        }
+        urlMatch = 0;
+        i++;
+        continue;
+      }
+      if (c === 59 && blockDepth === 0) break;
+      urlMatch = 0;
       i++;
     }
     let valEnd = i;
     while (valEnd > valStart) {
       const c = styleString.charCodeAt(valEnd - 1);
-      if (c !== 32 && c !== 9 && c !== 10 && c !== 13) break;
+      if (!isCSSWhitespace(c)) break;
       valEnd--;
     }
     if (i < len) {
