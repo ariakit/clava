@@ -30,6 +30,7 @@ export function getClassPropertyName(mode: Mode) {
  * Converts a hyphenated CSS property name to camelCase.
  * @example
  * hyphenToCamel("background-color") // "backgroundColor"
+ * hyphenToCamel("-ms-transition") // "msTransition" (lowercase "ms" prefix)
  * hyphenToCamel("--custom-var") // "--custom-var" (CSS variables are preserved)
  */
 export function hyphenToCamel(str: string) {
@@ -57,11 +58,7 @@ export function hyphenToCamel(str: string) {
 
     const code = str.charCodeAt(nextIndex);
     if (isAsciiLetter(code)) {
-      const isMicrosoftPrefix =
-        hyphenIndex === 0 &&
-        code === 109 &&
-        str.charCodeAt(2) === 115 &&
-        str.charCodeAt(3) === 45;
+      const isMicrosoftPrefix = hyphenIndex === 0 && str.startsWith("ms-", 1);
       result += isMicrosoftPrefix
         ? str[nextIndex]
         : str[nextIndex].toUpperCase();
@@ -81,6 +78,7 @@ export function hyphenToCamel(str: string) {
  * Converts a camelCase CSS property name to hyphenated form.
  * @example
  * camelToHyphen("backgroundColor") // "background-color"
+ * camelToHyphen("msTransition") // "-ms-transition" (lowercase "ms" prefix)
  * camelToHyphen("--customVar") // "--customVar" (CSS variables are preserved)
  */
 export function camelToHyphen(str: string) {
@@ -94,7 +92,8 @@ export function camelToHyphen(str: string) {
   for (let i = 0; i < str.length; i++) {
     const code = str.charCodeAt(i);
     if (code < 65 || code > 90) continue;
-    if (i === 2 && str.charCodeAt(0) === 109 && str.charCodeAt(1) === 115) {
+    const isMicrosoftPrefix = i === 2 && str.startsWith("ms");
+    if (isMicrosoftPrefix) {
       result += "-";
     }
     result += str.slice(lastIndex, i);
