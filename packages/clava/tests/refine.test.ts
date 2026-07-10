@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import type { AnyComponent } from "../src/types.ts";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -8,6 +9,18 @@ import {
   getModeComponent,
   getStyleClass,
 } from "./_utils.ts";
+
+function extendComponent(
+  cv: ReturnType<typeof createCVFromConfig>,
+  component: AnyComponent,
+  depth: number,
+) {
+  let extended = component;
+  for (let i = 0; i < depth; i++) {
+    extended = cv({ extend: [extended] });
+  }
+  return extended;
+}
 
 for (const config of Object.values(CONFIGS)) {
   const mode = getConfigMode(config);
@@ -720,6 +733,63 @@ for (const config of Object.values(CONFIGS)) {
       );
       const props = component();
       expect(getStyleClass(props)).toEqual({ class: cls("red") });
+    });
+
+    test("stable extension depth does not consume refine iterations", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: { state: { ready: "ready" } },
+        refine: ({ variants, setVariants }) => {
+          if (!variants.state) {
+            setVariants({ state: "ready" });
+          }
+        },
+      });
+      const extension = extendComponent(cv, base, 50);
+      const component = cv({ extend: [extension] });
+
+      expect(component.getVariants()).toEqual({ state: "ready" });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("deep extension retains refine output", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        refine: ({ addClass, addStyle }) => {
+          addClass("refined");
+          addStyle({ color: "red" });
+        },
+      });
+      const extension = extendComponent(cv, base, 50);
+      const component = getModeComponent(mode, cv({ extend: [extension] }));
+
+      expect(getStyleClass(component())).toEqual({
+        color: "red",
+        class: cls("refined"),
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("deep oscillating refine extensions still stop at the limit", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      let refineRuns = 0;
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+        refine: ({ variants, setVariants }) => {
+          refineRuns += 1;
+          setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
+        },
+      });
+      const extension = extendComponent(cv, base, 50);
+      const component = getModeComponent(mode, cv({ extend: [extension] }));
+
+      component();
+      expect(refineRuns).toBe(50);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Maximum refine iterations exceeded"),
+      );
     });
 
     test("refine warns when variants keep changing", () => {

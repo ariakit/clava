@@ -1,7 +1,6 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
 import {
   REFINE_UNSTABLE_TRACKING_WINDOW,
-  type RefineRunState,
   type VariantChange,
   accumulateUnstableVariantChanges,
   captureCreationFrame,
@@ -50,9 +49,16 @@ type ComputeFn = (
   skipValues: Record<string, Set<string>> | null,
   classesOut: ClsxClassValue[],
   styleOut: StyleValue,
-  runState?: RefineRunState,
+) => Record<string, unknown>;
+
+type ComputeOnceFn = (
+  resolved: Record<string, unknown>,
+  userVariantProps: Record<string, unknown>,
+  skipKeys: Set<string> | null,
+  skipValues: Record<string, Set<string>> | null,
+  classesOut: ClsxClassValue[],
+  styleOut: StyleValue,
   protectedVariants?: Record<string, unknown> | null,
-  pendingProtectedVariants?: Record<string, unknown> | null,
   protectedVariantKeys?: Set<string> | null,
   defaultResolved?: Record<string, unknown>,
   renderOnly?: boolean,
@@ -62,9 +68,13 @@ type ResolveRefineFn = (
   resolved: Record<string, unknown>,
   userVariantProps: Record<string, unknown>,
   filterOwnVariants?: boolean,
-  runState?: RefineRunState,
+) => Record<string, unknown>;
+
+type ResolveRefineOnceFn = (
+  resolved: Record<string, unknown>,
+  userVariantProps: Record<string, unknown>,
+  filterOwnVariants?: boolean,
   protectedVariants?: Record<string, unknown> | null,
-  pendingProtectedVariants?: Record<string, unknown> | null,
   protectedVariantKeys?: Set<string> | null,
   defaultResolved?: Record<string, unknown>,
 ) => Record<string, unknown>;
@@ -78,10 +88,10 @@ type ComputedDefaultVariantFn = (
 interface ComponentMeta {
   baseClass: string;
   staticDefaults: Record<string, unknown>;
-  // Returns variant classes + style for this component, used by extending
-  // components. Top-level rendering also routes through this.
-  compute: ComputeFn;
-  resolveRefine: ResolveRefineFn | null;
+  // Performs a single compute pass for extending components, returning the
+  // resolved variants while pushing classes and styles into the output values.
+  compute: ComputeOnceFn;
+  resolveRefine: ResolveRefineOnceFn | null;
   // Reference identity is used to detect mixed-factory `extend`. When a
   // component is extended by a parent from a different `create()` call, the
   // parent applies this transform to the extend's contribution before joining,
@@ -127,46 +137,13 @@ function areVariantsEqual(
 function getExtUserVariantProps(
   userVariantProps: Record<string, unknown>,
   protectedVariants: Record<string, unknown> | null,
-  changedVariants: Record<string, unknown> | null,
 ): Record<string, unknown> {
   const extUserVariantProps: Record<string, unknown> = {};
   Object.assign(extUserVariantProps, userVariantProps);
   if (protectedVariants) {
     Object.assign(extUserVariantProps, protectedVariants);
   }
-  if (changedVariants) {
-    Object.assign(extUserVariantProps, changedVariants);
-  }
   return extUserVariantProps;
-}
-
-function mergeVariants(
-  target: Record<string, unknown>,
-  source: Record<string, unknown>,
-  skipKeys?: Set<string> | null,
-): boolean {
-  let changed = false;
-  if (!skipKeys || skipKeys.size === 0) {
-    for (const key in source) {
-      if (!Object.hasOwn(source, key)) continue;
-      const value = source[key];
-      if (!Object.is(target[key], value)) {
-        changed = true;
-      }
-      target[key] = value;
-    }
-    return changed;
-  }
-  for (const key in source) {
-    if (!Object.hasOwn(source, key)) continue;
-    if (skipKeys.has(key)) continue;
-    const value = source[key];
-    if (!Object.is(target[key], value)) {
-      changed = true;
-    }
-    target[key] = value;
-  }
-  return changed;
 }
 
 function mergeProtectedIntoBase(
@@ -835,7 +812,6 @@ export function create({
       }
     }
     const extMetasWithRefineCount = extMetasWithRefine.length;
-    const shouldCollectChangedVariants = extMetasWithRefineCount > 0;
 
     // Call-site frame captured at the `cv()` call site so refine-limit warnings
     // can point developers at the component definition. Skipped entirely for
@@ -1042,12 +1018,9 @@ export function create({
       userVariantProps: Record<string, unknown>,
       filterOwnVariants: boolean,
       protectedVariantKeys: Set<string> | null | undefined,
-    ): {
-      workingResolved: Record<string, unknown>;
-      changedVariants: Record<string, unknown> | null;
-    } => {
+    ): Record<string, unknown> => {
       if (computedDefaultCount === 0) {
-        return { workingResolved: resolved, changedVariants: null };
+        return resolved;
       }
 
       let ownVariants = filterOwnVariants ? null : resolved;
@@ -1067,7 +1040,6 @@ export function create({
       };
 
       let updatedVariants: Record<string, unknown> | null = null;
-      let changedVariants: Record<string, unknown> | null = null;
       const ensureUpdated = (): Record<string, unknown> => {
         if (updatedVariants) {
           return updatedVariants;
@@ -1100,25 +1072,14 @@ export function create({
 
         if (value === undefined) {
           if (!Object.hasOwn(variantSnapshot, key)) continue;
-          if (shouldCollectChangedVariants) {
-            changedVariants ??= {};
-            changedVariants[key] = value;
-          }
           Reflect.deleteProperty(ensureUpdated(), key);
           continue;
         }
         if (Object.is(variantSnapshot[key], value)) continue;
-        if (shouldCollectChangedVariants) {
-          changedVariants ??= {};
-          changedVariants[key] = value;
-        }
         ensureUpdated()[key] = value;
       }
 
-      return {
-        workingResolved: updatedVariants ?? resolved,
-        changedVariants,
-      };
+      return updatedVariants ?? resolved;
     };
 
     const runRefineContext = (
@@ -1128,18 +1089,15 @@ export function create({
       collectOutput: boolean,
       applyVariantUpdates: boolean,
       protectedVariants: Record<string, unknown> | null | undefined,
-      pendingProtectedVariants: Record<string, unknown> | null | undefined,
       protectedVariantKeys: Set<string> | null | undefined,
     ): {
       workingResolved: Record<string, unknown>;
-      changedVariants: Record<string, unknown> | null;
       classes: ClassValue[] | null;
       style: StyleValue | null;
     } => {
       let workingResolved = resolved;
       let cClasses: ClassValue[] | null = null;
       let cStyle: StyleValue | null = null;
-      let changedVariants: Record<string, unknown> | null = null;
 
       if (refine) {
         let ownVariants = resolved;
@@ -1171,18 +1129,8 @@ export function create({
           updatedVariants = u;
           return u;
         };
-        const setChangedVariant = (
-          key: string,
-          value: unknown,
-          protect = false,
-        ) => {
-          if (shouldCollectChangedVariants) {
-            if (!changedVariants) {
-              changedVariants = {};
-            }
-            changedVariants[key] = value;
-          }
-          if (protect && protectedVariants) {
+        const protectVariant = (key: string, value: unknown) => {
+          if (protectedVariants) {
             protectedVariants[key] = value;
             protectedVariantKeys?.add(key);
           }
@@ -1202,7 +1150,7 @@ export function create({
               for (const key in newVariants) {
                 if (!Object.hasOwn(newVariants, key)) continue;
                 const value = (newVariants as Record<string, unknown>)[key];
-                setChangedVariant(key, value, true);
+                protectVariant(key, value);
                 if (Object.is(getCurrentVariantValue(key), value)) continue;
                 ensureUpdated()[key] = value;
               }
@@ -1221,7 +1169,7 @@ export function create({
                   continue;
                 }
               }
-              setChangedVariant(key, value, true);
+              protectVariant(key, value);
               if (Object.is(getCurrentVariantValue(key), value)) continue;
               ensureUpdated()[key] = value;
             }
@@ -1268,7 +1216,6 @@ export function create({
 
       return {
         workingResolved,
-        changedVariants,
         classes: cClasses,
         style: cStyle,
       };
@@ -1278,16 +1225,14 @@ export function create({
     // `computeResult`) and recursively when this component is used as an
     // `extend` target by another component. Pushes variant classes (excluding
     // base class) into `classesOut` and merges styles into `styleOut`.
-    const computeOnce: ComputeFn = (
+    const computeOnce: ComputeOnceFn = (
       resolved,
       userVariantProps,
       skipKeys,
       skipValues,
       classesOut,
       styleOut,
-      runState,
       protectedVariants,
-      pendingProtectedVariants,
       protectedVariantKeys,
       defaultResolved = resolved,
       renderOnly = false,
@@ -1295,7 +1240,6 @@ export function create({
       let workingResolved = resolved;
       let cClasses: ClassValue[] | null = null;
       let cStyle: StyleValue | null = null;
-      let changedVariants: Record<string, unknown> | null = null;
 
       // Run extends' contributions first (their full classes + styles) so our
       // own base style and variants apply on top, matching the original
@@ -1344,7 +1288,6 @@ export function create({
             ? getExtUserVariantProps(
                 userVariantProps,
                 protectedVariants ?? null,
-                changedVariants,
               )
             : userVariantProps;
         for (let i = 0; i < extCount; i++) {
@@ -1360,9 +1303,7 @@ export function create({
               extSkipVals,
               extClasses,
               styleOut,
-              runState,
               protectedVariants,
-              pendingProtectedVariants,
               protectedVariantKeys,
               defaultResolved,
               renderOnly,
@@ -1381,9 +1322,7 @@ export function create({
               extSkipVals,
               classesOut,
               styleOut,
-              runState,
               protectedVariants,
-              pendingProtectedVariants,
               protectedVariantKeys,
               defaultResolved,
               renderOnly,
@@ -1404,15 +1343,13 @@ export function create({
       // Run own computed defaults after extended components so defaults resolve
       // from base to child. They still run before this component's `refine`.
       if (!renderOnly && computedDefaultCount > 0) {
-        const computedResult = runComputedDefaults(
+        workingResolved = runComputedDefaults(
           workingResolved,
           defaultResolved,
           userVariantProps,
           true,
           protectedVariantKeys,
         );
-        workingResolved = computedResult.workingResolved;
-        changedVariants = computedResult.changedVariants;
       }
 
       // Run own `refine` (if any). May modify resolved variants and emit
@@ -1425,16 +1362,11 @@ export function create({
           true,
           !renderOnly,
           protectedVariants,
-          pendingProtectedVariants,
           protectedVariantKeys,
         );
         workingResolved = refineResult.workingResolved;
         cClasses = refineResult.classes;
         cStyle = refineResult.style;
-        if (refineResult.changedVariants) {
-          changedVariants ??= {};
-          Object.assign(changedVariants, refineResult.changedVariants);
-        }
       }
 
       // Apply own base style (after extends' styles, matching original order).
@@ -1544,32 +1476,11 @@ export function create({
             skipValues,
             classesOut,
             styleOut,
-            runState,
-            protectedVariants,
-            pendingProtectedVariants,
-            protectedVariantKeys,
-            incomingDefaultResolved = resolved,
-            renderOnly = false,
           ) => {
-            if (renderOnly) {
-              return computeOnce(
-                resolved,
-                userVariantProps,
-                skipKeys,
-                skipValues,
-                classesOut,
-                styleOut,
-                runState,
-                protectedVariants,
-                pendingProtectedVariants,
-                protectedVariantKeys,
-                incomingDefaultResolved,
-                true,
-              );
-            }
-            runState ??= { remaining: MAX_REFINE_RUNS };
-            protectedVariants ??= {};
-            protectedVariantKeys ??= new Set<string>();
+            let remaining = MAX_REFINE_RUNS;
+            const protectedVariants: Record<string, unknown> = {};
+            const protectedVariantKeys = new Set<string>();
+            const incomingDefaultResolved = resolved;
             let workingResolved = resolved;
             // Latest variant changes from non-converging iterations inside the
             // tracking window. Lazy-init keeps convergent loops allocation-free.
@@ -1578,19 +1489,10 @@ export function create({
             let lastStyle: StyleValue = {};
             let isFirstRun = true;
 
-            while (runState.remaining > 0) {
-              runState.remaining -= 1;
-              let useDirectOutput = isFirstRun;
-              if (useDirectOutput) {
-                for (const key in styleOut) {
-                  if (Object.hasOwn(styleOut, key)) {
-                    useDirectOutput = false;
-                    break;
-                  }
-                }
-              }
+            while (remaining > 0) {
+              remaining -= 1;
+              const useDirectOutput = isFirstRun;
               const classCount = classesOut.length;
-              const nextPendingProtectedVariants: Record<string, unknown> = {};
               const nextClasses: ClsxClassValue[] = useDirectOutput
                 ? classesOut
                 : [];
@@ -1606,32 +1508,14 @@ export function create({
                 skipValues,
                 nextClasses,
                 nextStyle,
-                runState,
                 protectedVariants,
-                nextPendingProtectedVariants,
                 protectedVariantKeys,
                 defaultResolved,
               );
 
-              let protectedChanged: boolean;
-              if (pendingProtectedVariants) {
-                protectedChanged = mergeVariants(
-                  pendingProtectedVariants,
-                  nextPendingProtectedVariants,
-                  protectedVariantKeys,
-                );
-              } else {
-                protectedChanged = mergeVariants(
-                  protectedVariants,
-                  nextPendingProtectedVariants,
-                  protectedVariantKeys,
-                );
-              }
-
               if (
-                !protectedChanged &&
-                (nextResolved === workingResolved ||
-                  areVariantsEqual(workingResolved, nextResolved))
+                nextResolved === workingResolved ||
+                areVariantsEqual(workingResolved, nextResolved)
               ) {
                 if (nextResolved !== workingResolved) {
                   if (useDirectOutput) {
@@ -1649,9 +1533,7 @@ export function create({
                     skipValues,
                     classesOut,
                     styleOut,
-                    runState,
                     protectedVariants,
-                    null,
                     protectedVariantKeys,
                     defaultResolved,
                     true,
@@ -1667,7 +1549,7 @@ export function create({
 
               if (
                 process.env.NODE_ENV !== "production" &&
-                runState.remaining < REFINE_UNSTABLE_TRACKING_WINDOW
+                remaining < REFINE_UNSTABLE_TRACKING_WINDOW
               ) {
                 if (!unstableChanges) {
                   unstableChanges = new Map<string, VariantChange>();
@@ -1677,17 +1559,6 @@ export function create({
                   workingResolved,
                   nextResolved,
                 );
-              }
-
-              if (useDirectOutput && runState.remaining === 0) {
-                // Keep the direct output from the last allowed run. Rolling
-                // back here would drop it before the fallback copy below.
-                warnRefineLimit({
-                  runState,
-                  creationFrame,
-                  unstableChanges,
-                });
-                return nextResolved;
               }
 
               if (useDirectOutput) {
@@ -1707,7 +1578,6 @@ export function create({
             }
 
             warnRefineLimit({
-              runState,
               creationFrame,
               unstableChanges,
             });
@@ -1719,24 +1589,20 @@ export function create({
             return workingResolved;
           };
 
-    const resolveRefineOnce: ResolveRefineFn = (
+    const resolveRefineOnce: ResolveRefineOnceFn = (
       resolved,
       userVariantProps,
       filterOwnVariants = true,
-      runState,
       protectedVariants,
-      pendingProtectedVariants,
       protectedVariantKeys,
       defaultResolved = resolved,
     ) => {
       let workingResolved = resolved;
-      let changedVariants: Record<string, unknown> | null = null;
 
       if (extMetasWithRefineCount > 0) {
         const extUserVariantProps = getExtUserVariantProps(
           userVariantProps,
           protectedVariants ?? null,
-          changedVariants,
         );
         for (let i = 0; i < extMetasWithRefineCount; i++) {
           const meta = extMetasWithRefine[i];
@@ -1746,9 +1612,7 @@ export function create({
             workingResolved,
             extUserVariantProps,
             true,
-            runState,
             protectedVariants,
-            pendingProtectedVariants,
             protectedVariantKeys,
             defaultResolved,
           );
@@ -1763,15 +1627,13 @@ export function create({
       }
 
       if (computedDefaultCount > 0) {
-        const computedResult = runComputedDefaults(
+        workingResolved = runComputedDefaults(
           workingResolved,
           defaultResolved,
           userVariantProps,
           filterOwnVariants,
           protectedVariantKeys,
         );
-        workingResolved = computedResult.workingResolved;
-        changedVariants = computedResult.changedVariants;
       }
       if (refine) {
         const refineResult = runRefineContext(
@@ -1781,14 +1643,9 @@ export function create({
           false,
           true,
           protectedVariants,
-          pendingProtectedVariants,
           protectedVariantKeys,
         );
         workingResolved = refineResult.workingResolved;
-        if (refineResult.changedVariants) {
-          changedVariants ??= {};
-          Object.assign(changedVariants, refineResult.changedVariants);
-        }
       }
 
       return workingResolved;
@@ -1796,29 +1653,19 @@ export function create({
 
     const resolveRefine: ResolveRefineFn | null =
       refine || computedDefaultCount > 0 || extMetasWithRefineCount > 0
-        ? (
-            resolved,
-            userVariantProps,
-            filterOwnVariants = true,
-            runState,
-            protectedVariants,
-            pendingProtectedVariants,
-            protectedVariantKeys,
-            incomingDefaultResolved = resolved,
-          ) => {
-            runState ??= { remaining: MAX_REFINE_RUNS };
-            protectedVariants ??= {};
-            protectedVariantKeys ??= new Set<string>();
+        ? (resolved, userVariantProps, filterOwnVariants = true) => {
+            let remaining = MAX_REFINE_RUNS;
+            const protectedVariants: Record<string, unknown> = {};
+            const protectedVariantKeys = new Set<string>();
+            const incomingDefaultResolved = resolved;
             let workingResolved = resolved;
             // Latest variant changes from non-converging iterations inside the
             // tracking window. See the compute loop above for the shared
             // rationale.
             let unstableChanges: Map<string, VariantChange> | null = null;
-            let reachedLimit = true;
 
-            while (runState.remaining > 0) {
-              runState.remaining -= 1;
-              const nextPendingProtectedVariants: Record<string, unknown> = {};
+            while (remaining > 0) {
+              remaining -= 1;
               const defaultResolved = mergeProtectedIntoBase(
                 incomingDefaultResolved,
                 protectedVariants,
@@ -1827,40 +1674,21 @@ export function create({
                 workingResolved,
                 userVariantProps,
                 filterOwnVariants,
-                runState,
                 protectedVariants,
-                nextPendingProtectedVariants,
                 protectedVariantKeys,
                 defaultResolved,
               );
-              let protectedChanged: boolean;
-              if (pendingProtectedVariants) {
-                protectedChanged = mergeVariants(
-                  pendingProtectedVariants,
-                  nextPendingProtectedVariants,
-                  protectedVariantKeys,
-                );
-              } else {
-                protectedChanged = mergeVariants(
-                  protectedVariants,
-                  nextPendingProtectedVariants,
-                  protectedVariantKeys,
-                );
-              }
 
               if (
-                !protectedChanged &&
-                (nextResolved === workingResolved ||
-                  areVariantsEqual(workingResolved, nextResolved))
+                nextResolved === workingResolved ||
+                areVariantsEqual(workingResolved, nextResolved)
               ) {
-                workingResolved = nextResolved;
-                reachedLimit = false;
-                break;
+                return nextResolved;
               }
 
               if (
                 process.env.NODE_ENV !== "production" &&
-                runState.remaining < REFINE_UNSTABLE_TRACKING_WINDOW
+                remaining < REFINE_UNSTABLE_TRACKING_WINDOW
               ) {
                 if (!unstableChanges) {
                   unstableChanges = new Map<string, VariantChange>();
@@ -1874,13 +1702,10 @@ export function create({
               workingResolved = nextResolved;
             }
 
-            if (reachedLimit) {
-              warnRefineLimit({
-                runState,
-                creationFrame,
-                unstableChanges,
-              });
-            }
+            warnRefineLimit({
+              creationFrame,
+              unstableChanges,
+            });
 
             return workingResolved;
           }
@@ -2014,8 +1839,8 @@ export function create({
     const meta: ComponentMeta = {
       baseClass: computedBaseClass,
       staticDefaults,
-      compute,
-      resolveRefine,
+      compute: computeOnce,
+      resolveRefine: resolveRefine ? resolveRefineOnce : null,
       transformClass,
       functionVariantKeys,
       computedDefaultKeys,
