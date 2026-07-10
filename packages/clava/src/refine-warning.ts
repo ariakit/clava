@@ -1,8 +1,3 @@
-export interface RefineRunState {
-  remaining: number;
-  warned?: boolean;
-}
-
 export interface CreationFrame {
   stack?: string;
 }
@@ -128,21 +123,17 @@ function formatVariantChanges(changes: Map<string, VariantChange>): string {
 }
 
 interface WarnRefineLimitParams {
-  runState: RefineRunState;
   creationFrame: CreationFrame | undefined;
   unstableChanges: Map<string, VariantChange> | null;
 }
 
 export function warnRefineLimit({
-  runState,
   creationFrame,
   unstableChanges,
 }: WarnRefineLimitParams): void {
   // Bundlers are expected to replace this branch with a production literal,
   // allowing warning-only code below to be removed from consumer bundles.
   if (process.env.NODE_ENV === "production") return;
-  if (runState.warned) return;
-  runState.warned = true;
   let message =
     "Clava: Maximum refine iterations exceeded. This can happen when a " +
     "computed default variant or refine callback changes one of the " +
