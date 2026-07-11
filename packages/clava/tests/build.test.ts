@@ -4,6 +4,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import {
+  createBundleSizeBuildConfig,
+  stripBundleRegionComments,
+} from "scripts/src/bundle-size.ts";
 import { withPackageBuildLock } from "test-utils/build-lock";
 import { build } from "vite";
 import { expect, test } from "vitest";
@@ -19,6 +23,26 @@ interface PackResult {
 function buildPackage() {
   buildPromise ??= exec("pnpm", ["--dir", root, "build"]);
   return buildPromise;
+}
+
+async function bundleProductionEntry(
+  getSource: (packageUrl: string) => string,
+) {
+  await buildPackage();
+
+  const tempDir = await mkdtemp(join(tmpdir(), "clava-vite-"));
+  try {
+    const entry = join(tempDir, "entry.js");
+    const bundle = join(tempDir, "dist/bundle.js");
+    const packageUrl = pathToFileURL(join(root, "dist/index.js")).href;
+
+    await writeFile(entry, getSource(packageUrl));
+    await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
+
+    return stripBundleRegionComments(await readFile(bundle, "utf8"));
+  } finally {
+    await rm(tempDir, { force: true, recursive: true });
+  }
 }
 
 test("build preserves the production warning guard for consumers", async () => {
@@ -90,18 +114,9 @@ test("source condition loads the package source", async () => {
 
 test("vite removes warning logic from the production bundle", async () => {
   await withPackageBuildLock(async () => {
-    await buildPackage();
-
-    const tempDir = await mkdtemp(join(tmpdir(), "clava-vite-"));
-    try {
-      const entry = join(tempDir, "entry.js");
-      const bundle = join(tempDir, "dist/bundle.js");
-      const clavaUrl = pathToFileURL(join(root, "dist/index.js")).href;
-
-      await writeFile(
-        entry,
-        `
-        import { cv } from ${JSON.stringify(clavaUrl)};
+    const code = await bundleProductionEntry(
+      (packageUrl) => `
+        import { cv } from ${JSON.stringify(packageUrl)};
 
         export const button = cv({
           variants: {
@@ -116,38 +131,28 @@ test("vite removes warning logic from the production bundle", async () => {
 
         button();
       `,
-      );
+    );
 
-      await build({
-        configFile: false,
-        logLevel: "silent",
-        root: tempDir,
-        mode: "production",
-        define: {
-          "process.env.NODE_ENV": JSON.stringify("production"),
-        },
-        build: {
-          emptyOutDir: true,
-          lib: {
-            entry,
-            fileName: () => "bundle.js",
-            formats: ["es"],
-          },
-          minify: true,
-          outDir: "dist",
-        },
-      });
+    expect(code).not.toContain("console.warn");
+    expect(code).not.toContain("Clava: Maximum refine iterations exceeded");
+    expect(code).not.toContain("Variant(s) that did not stabilize");
+    expect(code).not.toContain("Latest variant changes before warning");
+    expect(code).not.toContain("Component created at");
+    expect(code).not.toContain("captureStackTrace");
+    expect(code).not.toMatch(/\.warned\b|["']warned["']/);
+  });
+}, 60_000);
 
-      const code = await readFile(bundle, "utf8");
-      expect(code).not.toContain("console.warn");
-      expect(code).not.toContain("Clava: Maximum refine iterations exceeded");
-      expect(code).not.toContain("Variant(s) that did not stabilize");
-      expect(code).not.toContain("Latest variant changes before warning");
-      expect(code).not.toContain("Component created at");
-      expect(code).not.toContain("captureStackTrace");
-      expect(code).not.toMatch(/\.warned\b|["']warned["']/);
-    } finally {
-      await rm(tempDir, { force: true, recursive: true });
-    }
+test("vite tree shakes independent exports", async () => {
+  await withPackageBuildLock(async () => {
+    const cxCode = await bundleProductionEntry((packageUrl) => {
+      return `export { cx } from ${JSON.stringify(packageUrl)};`;
+    });
+    const splitPropsCode = await bundleProductionEntry((packageUrl) => {
+      return `export { splitProps } from ${JSON.stringify(packageUrl)};`;
+    });
+
+    expect(Buffer.byteLength(cxCode)).toBeLessThan(600);
+    expect(Buffer.byteLength(splitPropsCode)).toBeLessThan(1500);
   });
 }, 60_000);

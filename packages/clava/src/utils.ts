@@ -1,15 +1,6 @@
-import type * as CSS from "csstype";
-import type {
-  HTMLCSSProperties,
-  JSXCSSProperties,
-  StyleValue,
-} from "./types.ts";
+import type { HTMLCSSProperties, StyleValue } from "./types.ts";
 
-export const MODES = ["jsx", "html", "htmlObj"] as const;
-export type Mode = (typeof MODES)[number];
-
-// eslint-disable-next-line @typescript-eslint/unbound-method
-const hasOwn = Object.prototype.hasOwnProperty;
+export const hasOwn = Object.hasOwn;
 
 // Keep this explicit so normalization does not depend on browser globals.
 // Vendor-prefixed variants are derived below instead of duplicating the list.
@@ -71,24 +62,8 @@ const unitlessNumberProperties = new Set([
   "zoom",
 ]);
 
-function isAsciiLetter(code: number) {
-  if (code >= 65 && code <= 90) return true;
-  return code >= 97 && code <= 122;
-}
-
 function isCustomProperty(property: string) {
-  if (property.length < 2) return false;
   return property.charCodeAt(0) === 45 && property.charCodeAt(1) === 45;
-}
-
-/**
- * Returns the appropriate class property name based on the mode.
- * @example
- * getClassPropertyName("jsx") // "className"
- * getClassPropertyName("html") // "class"
- */
-export function getClassPropertyName(mode: Mode) {
-  return mode === "jsx" ? "className" : "class";
 }
 
 /**
@@ -122,7 +97,9 @@ export function hyphenToCamel(str: string) {
     }
 
     const code = str.charCodeAt(nextIndex);
-    if (isAsciiLetter(code)) {
+    const isAsciiLetter =
+      (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+    if (isAsciiLetter) {
       const isMicrosoftPrefix = hyphenIndex === 0 && str.startsWith("ms-", 1);
       result += isMicrosoftPrefix
         ? str[nextIndex]
@@ -214,10 +191,11 @@ function normalizeStyleValue(property: string, value: string | number) {
  * htmlStyleToStyleValue("background-color: red; font-size: 16px;");
  * // { backgroundColor: "red", fontSize: "16px" }
  */
-export function htmlStyleToStyleValue(styleString: string) {
-  if (!styleString) return {};
-
-  const result: StyleValue = {};
+export function htmlStyleToStyleValue(
+  styleString: string,
+  result: StyleValue = {},
+) {
+  if (!styleString) return result;
   const len = styleString.length;
   let i = 0;
   while (i < len) {
@@ -299,40 +277,17 @@ export function htmlStyleToStyleValue(styleString: string) {
  * // { backgroundColor: "red", fontSize: "16px" }
  */
 export function htmlObjStyleToStyleValue(
-  style: CSS.PropertiesHyphen<string | number>,
+  style: object,
+  result: StyleValue = {},
 ): StyleValue {
-  const result: StyleValue = {};
   for (const key in style) {
-    if (!hasOwn.call(style, key)) continue;
+    if (!hasOwn(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     const property = hyphenToCamel(key);
     // CSS property names and values are dynamic - cast required for index access
     (result as Record<string, string | number>)[property] = normalizeStyleValue(
       property,
-      value as string | number,
-    );
-  }
-  return result;
-}
-
-/**
- * Converts a camelCase style object to a StyleValue object.
- * @example
- * jsxStyleToStyleValue({ backgroundColor: "red", fontSize: 16 });
- * // { backgroundColor: "red", fontSize: "16px" }
- */
-export function jsxStyleToStyleValue(
-  style: CSS.Properties<string | number>,
-): StyleValue {
-  const result: StyleValue = {};
-  for (const key in style) {
-    if (!hasOwn.call(style, key)) continue;
-    const value = (style as Record<string, unknown>)[key];
-    if (value == null) continue;
-    // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string | number>)[key] = normalizeStyleValue(
-      key,
       value as string | number,
     );
   }
@@ -348,7 +303,7 @@ export function jsxStyleToStyleValue(
 export function styleValueToHTMLStyle(style: StyleValue): string {
   let result = "";
   for (const key in style) {
-    if (!hasOwn.call(style, key)) continue;
+    if (!hasOwn(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     if (result) {
@@ -371,38 +326,10 @@ export function styleValueToHTMLStyle(style: StyleValue): string {
 export function styleValueToHTMLObjStyle(style: StyleValue) {
   const result: HTMLCSSProperties = {};
   for (const key in style) {
-    if (!hasOwn.call(style, key)) continue;
+    if (!hasOwn(style, key)) continue;
     const value = (style as Record<string, unknown>)[key];
     if (value == null) continue;
     (result as Record<string, unknown>)[camelToHyphen(key)] = value;
   }
   return result;
-}
-
-/**
- * Converts a StyleValue object to a camelCase style object.
- * @example
- * styleValueToJSXStyle({ backgroundColor: "red", fontSize: "16px" });
- * // { backgroundColor: "red", fontSize: "16px" }
- */
-export function styleValueToJSXStyle(style: StyleValue) {
-  return style as JSXCSSProperties;
-}
-
-/**
- * Type guard to check if a style object has hyphenated keys.
- * @example
- * isHTMLObjStyle({ "background-color": "red" }); // true
- * isHTMLObjStyle({ backgroundColor: "red" }); // false
- */
-export function isHTMLObjStyle(
-  style: CSS.Properties<any> | CSS.PropertiesHyphen<any>,
-): style is CSS.PropertiesHyphen {
-  for (const key in style) {
-    if (!hasOwn.call(style, key)) continue;
-    // Quick exclusion of CSS custom properties (--foo)
-    if (isCustomProperty(key)) continue;
-    if (key.indexOf("-") !== -1) return true;
-  }
-  return false;
 }

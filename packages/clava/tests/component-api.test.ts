@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
-import { type Variant, cv as cvBase } from "../src/index.ts";
+import { type Variant, create, cv as cvBase, cx } from "../src/index.ts";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -10,6 +10,22 @@ import {
   getModeComponent,
   getStyle,
 } from "./_utils.ts";
+
+test("cx joins classes and applies factory transforms once", () => {
+  expect(cx("button", ["active", false], { disabled: true })).toBe(
+    "button active disabled",
+  );
+
+  const transformed: string[] = [];
+  const { cx: factoryCx } = create({
+    transformClass(className) {
+      transformed.push(className);
+      return `[${className}]`;
+    },
+  });
+  expect(factoryCx("button", ["active", false])).toBe("[button active]");
+  expect(transformed).toEqual(["button active"]);
+});
 
 for (const config of Object.values(CONFIGS)) {
   const mode = getConfigMode(config);
