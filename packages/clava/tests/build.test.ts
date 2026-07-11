@@ -4,6 +4,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import {
+  createBundleSizeBuildConfig,
+  stripBundleRegionComments,
+} from "scripts/src/bundle-size.ts";
 import { withPackageBuildLock } from "test-utils/build-lock";
 import { build } from "vite";
 import { expect, test } from "vitest";
@@ -33,35 +37,9 @@ async function bundleProductionEntry(
     const packageUrl = pathToFileURL(join(root, "dist/index.js")).href;
 
     await writeFile(entry, getSource(packageUrl));
-    await build({
-      configFile: false,
-      logLevel: "silent",
-      root: tempDir,
-      mode: "production",
-      define: {
-        "process.env.NODE_ENV": JSON.stringify("production"),
-      },
-      build: {
-        emptyOutDir: true,
-        lib: {
-          entry,
-          fileName: () => "bundle.js",
-          formats: ["es"],
-        },
-        minify: true,
-        outDir: "dist",
-        rolldownOptions: {
-          output: {
-            minify: true,
-          },
-        },
-      },
-    });
+    await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
 
-    return (await readFile(bundle, "utf8")).replace(
-      /^\/\/#(?:end)?region.*\r?\n/gm,
-      "",
-    );
+    return stripBundleRegionComments(await readFile(bundle, "utf8"));
   } finally {
     await rm(tempDir, { force: true, recursive: true });
   }

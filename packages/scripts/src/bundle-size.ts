@@ -58,6 +58,12 @@ export function createBundleSizeBuildConfig({
   };
 }
 
+export function stripBundleRegionComments(code: string) {
+  // Rolldown's region comments include resolved module paths, which would
+  // make identical bundles measure differently across worktree directories.
+  return code.replace(/^\/\/#(?:end)?region.*\r?\n/gm, "");
+}
+
 function readOptions(
   args = process.argv.slice(2),
   cwd = process.cwd(),
@@ -103,12 +109,7 @@ export async function measureBundleSize({
 
     await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
 
-    // Rolldown's region comments include resolved module paths, which would
-    // make identical bundles measure differently across worktree directories.
-    const code = (await readFile(bundle, "utf-8")).replace(
-      /^\/\/#(?:end)?region.*\r?\n/gm,
-      "",
-    );
+    const code = stripBundleRegionComments(await readFile(bundle, "utf-8"));
     const result = {
       minifiedBytes: Buffer.byteLength(code),
       gzipBytes: gzipSync(code).byteLength,

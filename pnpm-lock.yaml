@@ -110,6 +110,9 @@ importers:
       rolldown-plugin-dts:
         specifier: 0.27.1
         version: 0.27.1(rolldown@1.1.4)(typescript@6.0.3)
+      scripts:
+        specifier: workspace:*
+        version: link:../scripts
       solid-js:
         specifier: 1.9.14
         version: 1.9.14
