@@ -1,5 +1,16 @@
 # clava
 
+## 0.6.1
+
+- Reduced the production bundle size and improved tree-shaking for standalone imports.
+- Fixed [`getVariants`](https://clava.style/docs/reference/getVariants) to ignore input keys that are not declared variants.
+- Limited the published package to runtime builds, source-condition files, and package documentation.
+- Fixed Microsoft-prefixed CSS properties to round-trip between camelCase and hyphenated style formats.
+- Fixed [`cv`](https://clava.style/docs/reference/cv) to preserve inherited variant types when extending `.jsx`, `.html`, or `.htmlObj` mode components.
+- Fixed deep component extension chains to preserve stable refinement output without exhausting the convergence limit.
+- Fixed [`splitProps`](https://clava.style/docs/reference/split-props) to ignore inherited property values.
+- Fixed numeric style normalization to preserve unitless CSS and custom property values.
+
 ## 0.6.0
 
 ### Computed default variant parameters
