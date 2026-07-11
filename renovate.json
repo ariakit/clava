@@ -23,6 +23,7 @@
         "solid-js",
         "/^vite/",
         "/^commander/",
+        "@typescript/typescript6",
         "/^typescript/"
       ],
       "automerge": true,
