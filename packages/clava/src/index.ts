@@ -578,8 +578,8 @@ export function create({
           hasDisabledVariantValues = true;
         }
         if (
-          isRecordObject(variant) &&
-          hasOwn(variant, "false") &&
+          prebuiltVariant.values &&
+          hasOwn(prebuiltVariant.values, "false") &&
           staticDefaults[name] === undefined
         ) {
           staticDefaults[name] = false;
@@ -907,7 +907,6 @@ export function create({
 
     const runRefineContext = (
       resolved: Record<string, unknown>,
-      userVariantProps: Record<string, unknown>,
       filterOwnVariants: boolean,
       collectOutput: boolean,
       applyVariantUpdates: boolean,
@@ -1177,7 +1176,6 @@ export function create({
       if (refine) {
         const refineResult = runRefineContext(
           workingResolved,
-          userVariantProps,
           true,
           true,
           !renderOnly,
@@ -1456,7 +1454,6 @@ export function create({
       if (refine) {
         const refineResult = runRefineContext(
           workingResolved,
-          userVariantProps,
           filterOwnVariants,
           false,
           true,
@@ -1559,7 +1556,7 @@ export function create({
         }
         userVariantProps = variantProps;
       } else {
-        // Fast path: walk variantKeys directly against propsRecord. Use
+        // Fast path: walk variantKeys directly against propsRecord.
         // Own-property checks ensure a polluted Object.prototype can't add
         // values the user didn't pass.
         for (let i = 0; i < variantKeysLength; i++) {
@@ -1727,4 +1724,11 @@ export function create({
 
 export const cv = /* @__PURE__ */ (() => create().cv)();
 
-export const cx = (...classes: ClsxClassValue[]) => clsx(classes);
+/**
+ * Joins class values without applying a class transform.
+ *
+ * This behaves like the `cx` function returned by `create()` with no options.
+ */
+export function cx(...classes: ClsxClassValue[]) {
+  return clsx(classes);
+}

@@ -1,12 +1,4 @@
-import type * as CSS from "csstype";
-import type {
-  HTMLCSSProperties,
-  JSXCSSProperties,
-  StyleValue,
-} from "./types.ts";
-
-export const MODES = ["jsx", "html", "htmlObj"] as const;
-export type Mode = (typeof MODES)[number];
+import type { HTMLCSSProperties, StyleValue } from "./types.ts";
 
 export const hasOwn = Object.hasOwn;
 
@@ -72,16 +64,6 @@ const unitlessNumberProperties = new Set([
 
 function isCustomProperty(property: string) {
   return property.charCodeAt(0) === 45 && property.charCodeAt(1) === 45;
-}
-
-/**
- * Returns the appropriate class property name based on the mode.
- * @example
- * getClassPropertyName("jsx") // "className"
- * getClassPropertyName("html") // "class"
- */
-export function getClassPropertyName(mode: Mode) {
-  return mode === "jsx" ? "className" : "class";
 }
 
 /**
@@ -313,29 +295,6 @@ export function htmlObjStyleToStyleValue(
 }
 
 /**
- * Converts a camelCase style object to a StyleValue object.
- * @example
- * jsxStyleToStyleValue({ backgroundColor: "red", fontSize: 16 });
- * // { backgroundColor: "red", fontSize: "16px" }
- */
-export function jsxStyleToStyleValue(
-  style: CSS.Properties<string | number>,
-): StyleValue {
-  const result: StyleValue = {};
-  for (const key in style) {
-    if (!hasOwn(style, key)) continue;
-    const value = (style as Record<string, unknown>)[key];
-    if (value == null) continue;
-    // CSS property names and values are dynamic - cast required for index access
-    (result as Record<string, string | number>)[key] = normalizeStyleValue(
-      key,
-      value as string | number,
-    );
-  }
-  return result;
-}
-
-/**
  * Converts a StyleValue object to a CSS style string.
  * @example
  * styleValueToHTMLStyle({ backgroundColor: "red", fontSize: "16px" });
@@ -373,32 +332,4 @@ export function styleValueToHTMLObjStyle(style: StyleValue) {
     (result as Record<string, unknown>)[camelToHyphen(key)] = value;
   }
   return result;
-}
-
-/**
- * Converts a StyleValue object to a camelCase style object.
- * @example
- * styleValueToJSXStyle({ backgroundColor: "red", fontSize: "16px" });
- * // { backgroundColor: "red", fontSize: "16px" }
- */
-export function styleValueToJSXStyle(style: StyleValue) {
-  return style as JSXCSSProperties;
-}
-
-/**
- * Type guard to check if a style object has hyphenated keys.
- * @example
- * isHTMLObjStyle({ "background-color": "red" }); // true
- * isHTMLObjStyle({ backgroundColor: "red" }); // false
- */
-export function isHTMLObjStyle(
-  style: CSS.Properties<any> | CSS.PropertiesHyphen<any>,
-): style is CSS.PropertiesHyphen {
-  for (const key in style) {
-    if (!hasOwn(style, key)) continue;
-    // Quick exclusion of CSS custom properties (--foo)
-    if (isCustomProperty(key)) continue;
-    if (key.indexOf("-") !== -1) return true;
-  }
-  return false;
 }

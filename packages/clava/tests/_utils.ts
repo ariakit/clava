@@ -14,8 +14,6 @@ import type {
 import {
   htmlObjStyleToStyleValue,
   htmlStyleToStyleValue,
-  isHTMLObjStyle,
-  jsxStyleToStyleValue,
 } from "../src/utils.ts";
 
 const MODES = ["jsx", "html", "htmlObj"] as const;
@@ -162,10 +160,7 @@ export function getStyle(props: Pick<ComponentResult, "style">) {
     return htmlStyleToStyleValue(props.style);
   }
   if (typeof props.style === "object") {
-    if (isHTMLObjStyle(props.style)) {
-      return htmlObjStyleToStyleValue(props.style);
-    }
-    return jsxStyleToStyleValue(props.style);
+    return htmlObjStyleToStyleValue(props.style);
   }
   return {};
 }
