@@ -58,7 +58,7 @@
     "scripts": "workspace:*",
     "solid-js": "1.9.14",
     "test-utils": "workspace:*",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vite": "8.1.3",
     "vitest": "4.1.10"
   }
