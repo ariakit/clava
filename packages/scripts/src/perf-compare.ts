@@ -6,6 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import type { BundleSizeMeasurement, BundleSizeResult } from "./bundle-size.ts";
 import { isDirectEntry } from "./is-direct-entry.ts";
 
 const RESULTS_DIR = path.join(process.cwd(), ".perf-results");
@@ -87,11 +88,6 @@ export interface PerfCompareRunResult {
   markdown: string;
 }
 
-interface BundleSizeReport {
-  minifiedBytes: number;
-  gzipBytes: number;
-}
-
 interface BundleSizeRow {
   label: string;
   baseline: number;
@@ -151,23 +147,39 @@ function getNumber(value: unknown): number {
   return value;
 }
 
-function loadBundleSizeReport(name: string): BundleSizeReport | undefined {
+function getBundleSizeMeasurement(
+  value: unknown,
+): BundleSizeMeasurement | undefined {
+  if (!value) return undefined;
+  if (typeof value !== "object") return undefined;
+  const { minifiedBytes, gzipBytes } = value as Partial<BundleSizeMeasurement>;
+  const minified = getNumber(minifiedBytes);
+  const gzip = getNumber(gzipBytes);
+  if (minified <= 0) return undefined;
+  if (gzip <= 0) return undefined;
+  return {
+    minifiedBytes: minified,
+    gzipBytes: gzip,
+  };
+}
+
+function loadBundleSizeReport(name: string): BundleSizeResult | undefined {
   const filePath = path.join(RESULTS_DIR, name);
   const report = readOptionalJsonFile(filePath);
   if (!report) return undefined;
   if (typeof report !== "object") return undefined;
-  const { minifiedBytes, gzipBytes } = report as Partial<BundleSizeReport>;
-  const minified = getNumber(minifiedBytes);
-  const gzip = getNumber(gzipBytes);
-  if (minified <= 0 || gzip <= 0) {
+  const { cvSplitProps, fullApi } = report as Partial<BundleSizeResult>;
+  const cvSplitPropsMeasurement = getBundleSizeMeasurement(cvSplitProps);
+  const fullApiMeasurement = getBundleSizeMeasurement(fullApi);
+  if (!cvSplitPropsMeasurement || !fullApiMeasurement) {
     console.warn(
       `Warning: invalid bundle size report at ${filePath}. Skipping bundle-size comparison.`,
     );
     return undefined;
   }
   return {
-    minifiedBytes: minified,
-    gzipBytes: gzip,
+    cvSplitProps: cvSplitPropsMeasurement,
+    fullApi: fullApiMeasurement,
   };
 }
 
@@ -180,14 +192,24 @@ function compareBundleSize(): BundleSizeComparison | undefined {
   return {
     rows: [
       createBundleSizeRow(
-        "Minified",
-        baseline.minifiedBytes,
-        current.minifiedBytes,
+        "{ cv, splitProps } (minified)",
+        baseline.cvSplitProps.minifiedBytes,
+        current.cvSplitProps.minifiedBytes,
       ),
       createBundleSizeRow(
-        "Minified + gzip",
-        baseline.gzipBytes,
-        current.gzipBytes,
+        "{ cv, splitProps } (minified + gzip)",
+        baseline.cvSplitProps.gzipBytes,
+        current.cvSplitProps.gzipBytes,
+      ),
+      createBundleSizeRow(
+        "Full API (minified)",
+        baseline.fullApi.minifiedBytes,
+        current.fullApi.minifiedBytes,
+      ),
+      createBundleSizeRow(
+        "Full API (minified + gzip)",
+        baseline.fullApi.gzipBytes,
+        current.fullApi.gzipBytes,
       ),
     ],
   };
@@ -628,6 +650,10 @@ function formatMarkdown(summary: ComparisonSummary) {
 
   if (bundleSize) {
     lines.push("## Bundle Size");
+    lines.push("");
+    lines.push(
+      'Representative tree-shaken bundle: `import { cv, splitProps } from "clava"`',
+    );
     lines.push("");
     lines.push(...formatBundleSizeRows(bundleSize));
     lines.push("");

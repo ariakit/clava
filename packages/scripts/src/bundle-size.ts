@@ -11,9 +11,14 @@ export interface BundleSizeOptions {
   output: string;
 }
 
-export interface BundleSizeResult {
+export interface BundleSizeMeasurement {
   minifiedBytes: number;
   gzipBytes: number;
+}
+
+export interface BundleSizeResult {
+  cvSplitProps: BundleSizeMeasurement;
+  fullApi: BundleSizeMeasurement;
 }
 
 export interface BundleSizeRunResult {
@@ -103,16 +108,30 @@ export async function measureBundleSize({
     const bundle = path.join(tempDir, "dist/bundle.js");
     const packageUrl = pathToFileURL(packageEntry).href;
 
-    // Re-export the full public API so the metric tracks the published
-    // surface plus its bundled runtime dependencies, not one tree-shaken use.
-    await writeFile(entry, `export * from ${JSON.stringify(packageUrl)};\n`);
+    const measureEntry = async (
+      source: string,
+    ): Promise<BundleSizeMeasurement> => {
+      await writeFile(entry, `${source}\n`);
+      await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
 
-    await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
+      const code = stripBundleRegionComments(await readFile(bundle, "utf-8"));
+      return {
+        minifiedBytes: Buffer.byteLength(code),
+        gzipBytes: gzipSync(code).byteLength,
+      };
+    };
 
-    const code = stripBundleRegionComments(await readFile(bundle, "utf-8"));
+    // Re-exporting keeps these APIs live while allowing the rest of the public
+    // surface to be tree-shaken from the representative consumer bundle.
+    const cvSplitProps = await measureEntry(
+      `export { cv, splitProps } from ${JSON.stringify(packageUrl)};`,
+    );
+    const fullApi = await measureEntry(
+      `export * from ${JSON.stringify(packageUrl)};`,
+    );
     const result = {
-      minifiedBytes: Buffer.byteLength(code),
-      gzipBytes: gzipSync(code).byteLength,
+      cvSplitProps,
+      fullApi,
     };
 
     await mkdir(path.dirname(output), { recursive: true });
@@ -123,8 +142,15 @@ export async function measureBundleSize({
   }
 }
 
-function formatResult(result: BundleSizeResult) {
-  return `Bundle size: ${(result.minifiedBytes / 1000).toFixed(2)} kB minified, ${(result.gzipBytes / 1000).toFixed(2)} kB gzip`;
+function formatMeasurement(result: BundleSizeMeasurement) {
+  return `${(result.minifiedBytes / 1000).toFixed(2)} kB minified, ${(result.gzipBytes / 1000).toFixed(2)} kB gzip`;
+}
+
+function formatResult({ cvSplitProps, fullApi }: BundleSizeResult) {
+  return [
+    `Bundle size for import { cv, splitProps } from "clava": ${formatMeasurement(cvSplitProps)}`,
+    `Full API bundle size: ${formatMeasurement(fullApi)}`,
+  ].join("\n");
 }
 
 export async function runBundleSize(

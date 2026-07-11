@@ -167,17 +167,30 @@ afterEach(() => {
 describe("perf compare", () => {
   test("renders bundle size comparison", () => {
     const markdown = runCompare({
-      bundleSizeBaseline: { minifiedBytes: 1000, gzipBytes: 500 },
-      bundleSizeCurrent: { minifiedBytes: 1100, gzipBytes: 450 },
+      bundleSizeBaseline: {
+        cvSplitProps: { minifiedBytes: 1000, gzipBytes: 500 },
+        fullApi: { minifiedBytes: 2000, gzipBytes: 800 },
+      },
+      bundleSizeCurrent: {
+        cvSplitProps: { minifiedBytes: 1100, gzipBytes: 450 },
+        fullApi: { minifiedBytes: 2100, gzipBytes: 750 },
+      },
     });
 
     expect(markdown).toContain("## Bundle Size");
+    expect(markdown).toContain('`import { cv, splitProps } from "clava"`');
     expect(markdown).toContain("| Metric | Baseline | Current | Change |");
     expect(markdown).toContain(
-      "| Minified | 1.00 kB | 1.10 kB | +0.10 kB (+10.0%) :warning: |",
+      "| { cv, splitProps } (minified) | 1.00 kB | 1.10 kB | +0.10 kB (+10.0%) :warning: |",
     );
     expect(markdown).toContain(
-      "| Minified + gzip | 0.50 kB | 0.45 kB | -0.05 kB (-10.0%) :rocket: |",
+      "| { cv, splitProps } (minified + gzip) | 0.50 kB | 0.45 kB | -0.05 kB (-10.0%) :rocket: |",
+    );
+    expect(markdown).toContain(
+      "| Full API (minified) | 2.00 kB | 2.10 kB | +0.10 kB (+5.0%) :warning: |",
+    );
+    expect(markdown).toContain(
+      "| Full API (minified + gzip) | 0.80 kB | 0.75 kB | -0.05 kB (-6.3%) :rocket: |",
     );
   });
 
@@ -185,24 +198,44 @@ describe("perf compare", () => {
     const { summary } = runCompareRoundsResult({
       baseline: [],
       current: [],
-      bundleSizeBaseline: { minifiedBytes: 1000, gzipBytes: 500 },
-      bundleSizeCurrent: { minifiedBytes: 1100, gzipBytes: 450 },
+      bundleSizeBaseline: {
+        cvSplitProps: { minifiedBytes: 1000, gzipBytes: 500 },
+        fullApi: { minifiedBytes: 2000, gzipBytes: 800 },
+      },
+      bundleSizeCurrent: {
+        cvSplitProps: { minifiedBytes: 1100, gzipBytes: 450 },
+        fullApi: { minifiedBytes: 2100, gzipBytes: 750 },
+      },
     });
 
     expect(summary.bundleSize?.rows).toEqual([
       {
-        label: "Minified",
+        label: "{ cv, splitProps } (minified)",
         baseline: 1000,
         current: 1100,
         delta: 100,
         percent: 10,
       },
       {
-        label: "Minified + gzip",
+        label: "{ cv, splitProps } (minified + gzip)",
         baseline: 500,
         current: 450,
         delta: -50,
         percent: -10,
+      },
+      {
+        label: "Full API (minified)",
+        baseline: 2000,
+        current: 2100,
+        delta: 100,
+        percent: 5,
+      },
+      {
+        label: "Full API (minified + gzip)",
+        baseline: 800,
+        current: 750,
+        delta: -50,
+        percent: -6.25,
       },
     ]);
   });
@@ -240,8 +273,14 @@ describe("perf compare", () => {
 
   test("omits bundle size comparison when size results are partial", () => {
     const markdown = runCompare({
-      bundleSizeBaseline: { minifiedBytes: 1000, gzipBytes: 500 },
-      bundleSizeCurrent: { minifiedBytes: 1100 },
+      bundleSizeBaseline: {
+        cvSplitProps: { minifiedBytes: 1000, gzipBytes: 500 },
+        fullApi: { minifiedBytes: 2000, gzipBytes: 800 },
+      },
+      bundleSizeCurrent: {
+        cvSplitProps: { minifiedBytes: 1100 },
+        fullApi: { minifiedBytes: 2100, gzipBytes: 750 },
+      },
     });
 
     expect(markdown).not.toContain("## Bundle Size");
@@ -253,8 +292,8 @@ describe("perf compare", () => {
     const outputDir = path.join(dir, resultsDir);
     mkdirSync(outputDir, { recursive: true });
     writeJson(dir, "bundle-size-baseline.json", {
-      minifiedBytes: 1000,
-      gzipBytes: 500,
+      cvSplitProps: { minifiedBytes: 1000, gzipBytes: 500 },
+      fullApi: { minifiedBytes: 2000, gzipBytes: 800 },
     });
     writeFileSync(path.join(outputDir, "bundle-size-current.json"), "{");
 

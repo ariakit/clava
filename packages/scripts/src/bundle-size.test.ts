@@ -14,16 +14,21 @@ import { promisify } from "node:util";
 import { withPackageBuildLock } from "test-utils/build-lock";
 import { build } from "vite";
 import { expect, test } from "vitest";
-import { createBundleSizeBuildConfig } from "./bundle-size.ts";
+import {
+  type BundleSizeResult,
+  createBundleSizeBuildConfig,
+} from "./bundle-size.ts";
 
 const exec = promisify(execFile);
 const root = path.join(import.meta.dirname, "../../..");
 const scriptPath = path.join(import.meta.dirname, "index.ts");
 let buildPromise: Promise<unknown> | undefined;
 
-interface BundleSizeReport {
-  minifiedBytes: number;
-  gzipBytes: number;
+function formatMeasurement({
+  minifiedBytes,
+  gzipBytes,
+}: BundleSizeResult["cvSplitProps"]) {
+  return `${(minifiedBytes / 1000).toFixed(2)} kB minified, ${(gzipBytes / 1000).toFixed(2)} kB gzip`;
 }
 
 function buildPackage() {
@@ -50,7 +55,7 @@ test("measures production bundle size", async () => {
     try {
       const output = path.join(tempDir, "bundle-size.json");
 
-      await exec(process.execPath, [
+      const { stdout } = await exec(process.execPath, [
         scriptPath,
         "bundle-size",
         "--source-root",
@@ -61,11 +66,24 @@ test("measures production bundle size", async () => {
 
       const report = JSON.parse(
         await readFile(output, "utf-8"),
-      ) as BundleSizeReport;
+      ) as BundleSizeResult;
 
-      expect(report.minifiedBytes).toBeGreaterThan(0);
-      expect(report.gzipBytes).toBeGreaterThan(0);
-      expect(report.gzipBytes).toBeLessThanOrEqual(report.minifiedBytes);
+      expect(stdout.trim()).toBe(
+        [
+          `Bundle size for import { cv, splitProps } from "clava": ${formatMeasurement(report.cvSplitProps)}`,
+          `Full API bundle size: ${formatMeasurement(report.fullApi)}`,
+        ].join("\n"),
+      );
+      for (const measurement of Object.values(report)) {
+        expect(measurement.minifiedBytes).toBeGreaterThan(0);
+        expect(measurement.gzipBytes).toBeGreaterThan(0);
+        expect(measurement.gzipBytes).toBeLessThanOrEqual(
+          measurement.minifiedBytes,
+        );
+      }
+      expect(report.cvSplitProps.minifiedBytes).toBeLessThan(
+        report.fullApi.minifiedBytes,
+      );
     } finally {
       await rm(tempDir, { force: true, recursive: true });
     }
