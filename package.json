@@ -50,5 +50,12 @@
       "oxlint --type-aware --type-check"
     ]
   },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.18.0",
+      "onFail": "download"
+    }
+  },
   "packageManager": "pnpm@11.10.0"
 }
