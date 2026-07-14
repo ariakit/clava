@@ -549,7 +549,7 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 
 ## Comparison
 
-This table compares Clava with the packages used by the repository's alternative benchmark: `class-variance-authority@0.7.1`, `cva@1.0.0-beta.4`, `tailwind-variants/lite@3.2.2`, `tailwind-variants@3.2.2`, and `tailwind-merge@3.6.0` through Clava's `transformClass`.
+This table compares Clava with the packages used by the repository's alternative benchmark: `class-variance-authority@0.7.1`, `cva@1.0.0-beta.6`, `tailwind-variants/lite@3.2.2`, `tailwind-variants@3.2.2`, and `tailwind-merge@3.6.0` through Clava's `transformClass`.
 
 | Feature                                              | Clava          | CVA v0             | CVA v1 beta        | TV Lite            | TV                 |
 | ---------------------------------------------------- | -------------- | ------------------ | ------------------ | ------------------ | ------------------ |
@@ -565,16 +565,16 @@ This table compares Clava with the packages used by the repository's alternative
 | Dedicated slots API                                  | No             | No                 | No                 | Yes                | Yes                |
 | Built-in Tailwind conflict merging                   | No             | No                 | No                 | No                 | Yes                |
 
-The `pnpm perf-alternatives` benchmark resolves a composed Tailwind-style button with inherited variants, defaults, and cross-variant conditions. On Node v24.14.1, Vitest reported these results, where higher ops/sec is better:
+The `pnpm perf-alternatives` benchmark resolves a composed Tailwind-style button with inherited variants, defaults, and cross-variant conditions. On Node v24.18.0, Vitest reported these results, where higher ops/sec is better:
 
 | Package                              |   Ops/sec | Relative to Clava |
 | ------------------------------------ | --------: | ----------------: |
-| `clava@0.6.0`                        | 1,093,632 |             1.00x |
-| `clava@0.6.0 + tailwind-merge@3.6.0` |   535,392 |      2.04x slower |
-| `class-variance-authority@0.7.1`     |   445,527 |      2.45x slower |
-| `tailwind-variants/lite@3.2.2`       |   377,985 |      2.89x slower |
-| `tailwind-variants@3.2.2`            |   286,653 |      3.82x slower |
-| `cva@1.0.0-beta.4`                   |   218,829 |      5.00x slower |
+| `clava@0.6.1`                        | 1,064,359 |             1.00x |
+| `clava@0.6.1 + tailwind-merge@3.6.0` |   505,454 |      2.11x slower |
+| `class-variance-authority@0.7.1`     |   435,382 |      2.44x slower |
+| `tailwind-variants/lite@3.2.2`       |   371,763 |      2.86x slower |
+| `cva@1.0.0-beta.6`                   |   328,566 |      3.24x slower |
+| `tailwind-variants@3.2.2`            |   274,351 |      3.88x slower |
 
 Benchmark results vary by runtime and hardware, so treat them as a reproducible snapshot of this repository's composed-variant case rather than a universal ranking.
 
