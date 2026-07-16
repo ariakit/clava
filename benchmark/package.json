@@ -6,7 +6,7 @@
   "dependencies": {
     "class-variance-authority": "0.7.1",
     "clava": "workspace:*",
-    "cva": "1.0.0-beta.6",
+    "cva": "1.0.0-beta.7",
     "tailwind-merge": "3.6.0",
     "tailwind-variants": "3.2.2",
     "tailwindcss": "4.3.2"
