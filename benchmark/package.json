@@ -8,7 +8,7 @@
     "clava": "workspace:*",
     "cva": "1.0.0-beta.8",
     "tailwind-merge": "3.6.0",
-    "tailwind-variants": "3.2.2",
+    "tailwind-variants": "3.3.0",
     "tailwindcss": "4.3.3"
   },
   "devDependencies": {
