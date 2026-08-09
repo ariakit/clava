@@ -8,7 +8,7 @@
   "type": "module",
   "dependencies": {
     "commander": "15.0.0",
-    "vite": "8.2.0"
+    "vite": "8.2.1"
   },
   "devDependencies": {
     "test-utils": "workspace:*",
