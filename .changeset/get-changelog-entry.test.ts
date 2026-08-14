@@ -3,7 +3,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import applyReleasePlan from "@changesets/apply-release-plan";
+import { applyReleasePlan } from "@changesets/apply-release-plan";
 import { expect, test } from "vitest";
 
 test("changesets getChangelogEntry hook", async () => {
@@ -46,7 +46,7 @@ test("changesets getChangelogEntry hook", async () => {
     } as const;
 
     const packages = {
-      root: { dir: process.cwd() },
+      rootDir: process.cwd(),
       packages: [
         {
           dir: packageDir,
@@ -62,7 +62,7 @@ test("changesets getChangelogEntry hook", async () => {
         onlyUpdatePeerDependentsWhenOutOfRange: true,
       },
       bumpVersionsWithWorkspaceProtocolOnly: false,
-      prettier: false,
+      format: false,
       ignore: [],
       privatePackages: { version: false, tag: false },
     } as const;
