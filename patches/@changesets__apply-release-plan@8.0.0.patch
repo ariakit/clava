@@ -1,38 +1,8 @@
 diff --git a/dist/index.mjs b/dist/index.mjs
-index 595405f16c11621c1d96db816b47bce10816bef3..fef6380f9999dfeba7d3057dfc7fcb22923f91c9 100644
+index 595405f16c11621c1d96db816b47bce10816bef3..f59bff8977c21847a658b7ba6b8af87fd070bfc7 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -88,7 +88,7 @@ function capitalize(str) {
- }
- //#endregion
- //#region src/get-changelog-entry.ts
--async function getChangelogEntry(cwd, release, releases, changesets, changelogFuncs, changelogOpts, { updateInternalDependencies, onlyUpdatePeerDependentsWhenOutOfRange }) {
-+async function getChangelogEntry(cwd, release, releases, changesets, changelogFuncs, changelogOpts, { updateInternalDependencies, onlyUpdatePeerDependentsWhenOutOfRange }, customGetChangelogEntry) {
- 	if (release.type === "none") return null;
- 	const changelogLines = {
- 		major: [],
-@@ -120,6 +120,7 @@ async function getChangelogEntry(cwd, release, releases, changesets, changelogFu
- 	});
- 	const relevantChangesets = changesets.filter((cs) => relevantChangesetIds.has(cs.id));
- 	changelogLines.patch.push(Promise.resolve(changelogFuncs.getDependencyReleaseLine(relevantChangesets, dependentReleases, changelogOpts)));
-+	if (customGetChangelogEntry) return customGetChangelogEntry(release, changelogLines);
- 	const resolvedChangelogLines = {
- 		major: await Promise.all(changelogLines.major),
- 		minor: await Promise.all(changelogLines.minor),
-@@ -327,6 +328,7 @@ async function getNewChangelogEntry(releasesWithPackage, changesets, config, cwd
- 	}
- 	if (typeof possibleChangelogFunc.getReleaseLine === "function" && typeof possibleChangelogFunc.getDependencyReleaseLine === "function") getChangelogFuncs = possibleChangelogFunc;
- 	else throw new Error("Could not resolve changelog generation functions");
-+	const customGetChangelogEntry = typeof possibleChangelogFunc.getChangelogEntry === "function" ? possibleChangelogFunc.getChangelogEntry : void 0;
- 	const commits = await getCommitsThatAddChangesets(changesets.map((cs) => cs.id), cwd);
- 	const moddedChangesets = changesets.map((cs, i) => ({
- 		...cs,
-@@ -336,7 +338,7 @@ async function getNewChangelogEntry(releasesWithPackage, changesets, config, cwd
- 		const changelog = await getChangelogEntry(cwd, release, releasesWithPackage, moddedChangesets, getChangelogFuncs, changelogOpts, {
- 			updateInternalDependencies: config.updateInternalDependencies,
- 			onlyUpdatePeerDependentsWhenOutOfRange: config.___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH.onlyUpdatePeerDependentsWhenOutOfRange
--		});
-+		}, customGetChangelogEntry);
- 		return {
- 			...release,
- 			changelog
+@@ -123,0 +124,3 @@ async function getChangelogEntry(cwd, release, releases, changesets, changelogFu
++	if (typeof changelogFuncs.getChangelogEntry === "function") {
++		return changelogFuncs.getChangelogEntry(release, changelogLines);
++	}
