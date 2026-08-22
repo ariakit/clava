@@ -375,12 +375,12 @@ describe("variants type inference", () => {
   test("function variant return type accepts ClassValue and StyleClassValue", () => {
     cv({
       variants: {
-        a: (_: number) => "class-a",
-        b: (_: number) => null,
-        c: (_: number) => undefined,
-        d: (_: number) => ["x", "y"],
-        e: (_: number) => ({ class: "c", style: { color: "red" } }),
-        f: (_: number) => ({ style: { color: "red" } }),
+        a: (_value: number) => "class-a",
+        b: (_value: number) => null,
+        c: (_value: number) => undefined,
+        d: (_value: number) => ["x", "y"],
+        e: (_value: number) => ({ class: "c", style: { color: "red" } }),
+        f: (_value: number) => ({ style: { color: "red" } }),
       },
     });
   });
