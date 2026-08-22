@@ -1129,7 +1129,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: {
-            border: (_: boolean) => {},
+            border: (_value: boolean) => {},
           },
           defaultVariants: { border: false },
         }),
@@ -1158,7 +1158,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base2],
           variants: {
-            border: (_: boolean) => {},
+            border: (_value: boolean) => {},
           },
           defaultVariants: { border: false },
         }),
@@ -1186,7 +1186,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: {
-            border: (_: boolean) => {},
+            border: (_value: boolean) => {},
           },
         }),
       );
@@ -1213,7 +1213,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base],
           variants: {
-            border: (_: boolean) => {},
+            border: (_value: boolean) => {},
           },
         }),
       );
@@ -1241,7 +1241,7 @@ for (const config of Object.values(CONFIGS)) {
         cv({
           extend: [base2],
           variants: {
-            border: (_: boolean) => {},
+            border: (_value: boolean) => {},
           },
         }),
       );
