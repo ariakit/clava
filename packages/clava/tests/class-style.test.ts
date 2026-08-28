@@ -36,6 +36,20 @@ test("parses Microsoft-prefixed properties through public inputs", () => {
   });
 });
 
+// Guards the `StyleProperty` union shape. If its only indexed member were a
+// property-less index signature, TypeScript would skip the weak type check
+// and accept any widened style object.
+// https://github.com/ariakit/clava/issues/483#issuecomment-5447514407
+test("rejects invalid style values from widened objects", () => {
+  const widenedStyle = { color: 1 };
+  cv().jsx({
+    // @ts-expect-error `color` does not accept a number
+    style:
+      // no error
+      widenedStyle,
+  });
+});
+
 for (const config of [CONFIGS.default, CONFIGS.uppercase]) {
   const mode = getConfigMode(config);
   const cv = createCVFromConfig(config);

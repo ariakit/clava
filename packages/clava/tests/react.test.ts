@@ -26,6 +26,23 @@ test("splitProps", () => {
   expect(rest).toEqual({ id: "my-div" });
 });
 
+test("split props feed back into the component", () => {
+  const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
+
+  interface Props
+    extends ComponentProps<"div">, VariantProps<typeof component> {}
+  const props: Props = { style: { color: "red" }, size: "md" };
+
+  // React types `style` as `CSSProperties`, which declares no custom-property
+  // index signature, so the style input type must keep accepting it.
+  // https://github.com/ariakit/clava/issues/483#issuecomment-5447514407
+  const [variantProps] = splitProps(props, component);
+  expect(component.jsx(variantProps)).toEqual({
+    className: "md",
+    style: { color: "red" },
+  });
+});
+
 test("component props", () => {
   const component = cv({
     style: { fontSize: "16px" },
