@@ -24,19 +24,28 @@ export type ClassValue =
   | void
   | ClassValue[];
 
-export interface JSXCSSProperties extends CSS.Properties<string | number> {
+interface CustomProperties {
   [key: `--${string}`]: string | number;
 }
 
-export interface HTMLCSSProperties extends CSS.PropertiesHyphen<
-  string | number
-> {
-  [key: `--${string}`]: string | number;
-}
+export interface JSXCSSProperties
+  extends CSS.Properties<string | number>, CustomProperties {}
+
+export interface HTMLCSSProperties
+  extends CSS.PropertiesHyphen<string | number>, CustomProperties {}
 
 export type CSSProperties = CSS.Properties;
 
-export type StyleProperty = JSXCSSProperties | HTMLCSSProperties | string;
+// Indexed members keep custom properties known to fresh style literals, one
+// per input mode. Index-free members keep framework style types assignable:
+// an all-indexed union rejects React's `CSSProperties`, surfacing as TS2590.
+// https://github.com/ariakit/clava/issues/483#issuecomment-5447514407
+export type StyleProperty =
+  | JSXCSSProperties
+  | HTMLCSSProperties
+  | CSS.Properties<string | number>
+  | CSS.PropertiesHyphen<string | number>
+  | string;
 
 /**
  * The prop object returned by a component's `.jsx()` mode.
@@ -375,9 +384,7 @@ export type DefaultVariants<V> = {
  * };
  * ```
  */
-export interface StyleValue extends CSS.Properties {
-  [key: `--${string}`]: string | number;
-}
+export interface StyleValue extends CSS.Properties, CustomProperties {}
 
 /**
  * A value that contributes both class and style output from a base config,
