@@ -549,7 +549,7 @@ The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleCl
 
 ## Comparison
 
-This table compares Clava with the packages used by the repository's alternative benchmark: `class-variance-authority@0.7.1`, `cva@1.0.0-beta.8`, `tailwind-variants/lite@3.3.1`, `tailwind-variants@3.3.1`, plus `tailwind-merge@3.6.0` and `cn@0.2.4` through Clava's `transformClass`.
+This table compares Clava with the packages used by the repository's alternative benchmark: `class-variance-authority@0.7.1`, `cva@1.0.0-beta.8`, `tailwind-variants/lite@3.3.1`, `tailwind-variants@3.3.1`, plus `tailwind-merge@3.6.0` and `cn@0.2.3` through Clava's `transformClass`.
 
 | Feature                                              | Clava          | CVA v0             | CVA v1 beta        | TV Lite            | TV                 |
 | ---------------------------------------------------- | -------------- | ------------------ | ------------------ | ------------------ | ------------------ |
@@ -569,15 +569,15 @@ The `pnpm perf-alternatives` benchmark resolves a composed Tailwind-style button
 
 | Package                              |   Ops/sec | Relative to Clava |
 | ------------------------------------ | --------: | ----------------: |
-| `clava@0.6.2`                        | 1,160,404 |             1.00x |
-| `tailwind-variants@3.3.1`            |   583,083 |      1.99x slower |
-| `tailwind-variants/lite@3.3.1`       |   573,224 |      2.02x slower |
-| `clava@0.6.2 + cn@0.2.4`             |   566,028 |      2.05x slower |
-| `clava@0.6.2 + tailwind-merge@3.6.0` |   565,507 |      2.05x slower |
-| `class-variance-authority@0.7.1`     |   459,182 |      2.53x slower |
-| `cva@1.0.0-beta.8`                   |   341,712 |      3.40x slower |
+| `clava@0.6.2`                        | 1,157,102 |             1.00x |
+| `tailwind-variants@3.3.1`            |   574,719 |      2.01x slower |
+| `clava@0.6.2 + cn@0.2.3`             |   572,575 |      2.02x slower |
+| `tailwind-variants/lite@3.3.1`       |   571,944 |      2.02x slower |
+| `clava@0.6.2 + tailwind-merge@3.6.0` |   570,873 |      2.03x slower |
+| `class-variance-authority@0.7.1`     |   464,457 |      2.49x slower |
+| `cva@1.0.0-beta.8`                   |   340,690 |      3.40x slower |
 
-Benchmark results vary by runtime and hardware, so treat them as a reproducible snapshot of this repository's composed-variant case rather than a universal ranking. The four rows from 1.99x to 2.05x fall within a few percent of each other, which is inside run-to-run noise, so their relative order is not meaningful.
+Benchmark results vary by runtime and hardware, so treat them as a reproducible snapshot of this repository's composed-variant case rather than a universal ranking. The four rows from 2.01x to 2.03x fall within a few percent of each other, which is inside run-to-run noise, so their relative order is not meaningful.
 
 The benchmark also resolves one fixed prop set on every iteration, so every package with an internal cache serves repeated calls from cache after warmup. `tailwind-merge` and `cn` cache merged class strings, and both `tailwind-variants` entry points cache the resolved result by variant props. Clava, `cva`, and `class-variance-authority` have no such cache, so those rows recompute on every iteration.
 
