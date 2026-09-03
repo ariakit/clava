@@ -9,6 +9,7 @@ import {
   getExpectedPropsKeys,
   getModeComponent,
   getStyle,
+  getStyleClass,
 } from "./_utils.ts";
 
 test("cx joins classes and applies factory transforms once", () => {
@@ -166,6 +167,75 @@ for (const config of Object.values(CONFIGS)) {
       expect(component.getVariants(props)).toEqual({ size: "lg" });
       expect(unknownReads).toBe(0);
       expect(inheritedSetterCalls).toBe(0);
+    });
+
+    test("resolving copies variant props once when an extend has a computed default", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          intent: { primary: "primary", neutral: "neutral" },
+        },
+        defaultVariants: {
+          intent: (defaultValue, variants) =>
+            variants.size === "lg" ? "neutral" : defaultValue,
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [base] }));
+      // A computed default re-runs the refine chain, so an uncopied props
+      // record would read the accessor once per pass. A caller can pass a
+      // record whose reads are observable, such as a Solid props proxy handed
+      // straight to the component, so the count is not an internal detail.
+      let intentReads = 0;
+      const props = {};
+      Object.defineProperty(props, "size", {
+        enumerable: true,
+        value: "lg",
+      });
+      Object.defineProperty(props, "intent", {
+        enumerable: true,
+        get: () => {
+          intentReads += 1;
+          return undefined;
+        },
+      });
+      expect(getStyleClass(component(props))).toEqual({
+        class: cls("lg neutral"),
+      });
+      expect(intentReads).toBe(1);
+    });
+
+    test("getVariants copies variant props once when an extend has a computed default", () => {
+      const base = cv({
+        variants: {
+          size: { sm: "sm", lg: "lg" },
+          intent: { primary: "primary", neutral: "neutral" },
+        },
+        defaultVariants: {
+          intent: (defaultValue, variants) =>
+            variants.size === "lg" ? "neutral" : defaultValue,
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [base] }));
+      // `getVariants` copies the caller's record on its own branch, separate
+      // from the one the component call uses, so it needs its own coverage.
+      let intentReads = 0;
+      const props = {};
+      Object.defineProperty(props, "size", {
+        enumerable: true,
+        value: "lg",
+      });
+      Object.defineProperty(props, "intent", {
+        enumerable: true,
+        get: () => {
+          intentReads += 1;
+          return undefined;
+        },
+      });
+      expect(component.getVariants(props)).toEqual({
+        size: "lg",
+        intent: "neutral",
+      });
+      expect(intentReads).toBe(1);
     });
 
     test("getVariants returns default variants", () => {
