@@ -1,5 +1,6 @@
 import { cva as cva0 } from "class-variance-authority";
 import { create, cv } from "clava";
+import { cn } from "cn";
 import { compose, cva as cva1 } from "cva";
 import { twMerge } from "tailwind-merge";
 import { tv } from "tailwind-variants";
@@ -26,6 +27,7 @@ const packageVersions = {
   "class-variance-authority":
     benchmarkPackageJson.dependencies["class-variance-authority"],
   clava: clavaPackageJson.version,
+  cn: benchmarkPackageJson.dependencies.cn,
   cva: benchmarkPackageJson.dependencies.cva,
   "tailwind-merge": benchmarkPackageJson.dependencies["tailwind-merge"],
   "tailwind-variants": benchmarkPackageJson.dependencies["tailwind-variants"],
@@ -207,6 +209,9 @@ const clavaProductWithTwMerge = createClavaProduct(cvTwMerge);
 const clavaTwMergeLabel = `${packageLabel("clava")} + ${packageLabel(
   "tailwind-merge",
 )}`;
+const { cv: cvCn } = create({ transformClass: cn });
+const clavaProductWithCn = createClavaProduct(cvCn);
+const clavaCnLabel = `${packageLabel("clava")} + ${packageLabel("cn")}`;
 
 const cvaSurface = cva1({
   base: surfaceBase,
@@ -326,6 +331,14 @@ describe("alternatives: resolve composed tailwind variants", () => {
     clavaTwMergeLabel,
     () => {
       consume(clavaProductWithTwMerge(resolveProps).class);
+    },
+    options,
+  );
+
+  bench(
+    clavaCnLabel,
+    () => {
+      consume(clavaProductWithCn(resolveProps).class);
     },
     options,
   );
