@@ -29,6 +29,7 @@ import type {
   Variants,
 } from "./types.ts";
 import {
+  getOwn,
   hasOwn,
   htmlObjStyleToStyleValue,
   htmlStyleToStyleValue,
@@ -120,15 +121,22 @@ function areVariantsEqual(
   a: Record<string, unknown>,
   b: Record<string, unknown>,
 ): boolean {
+  // The first loop proves every own key of `a` is an own key of `b` with the
+  // same value, so counting both sides is enough to prove the key sets match.
+  // Counting keeps the total number of lookups the same as before the own-key
+  // check was added to the first loop.
+  let ownKeyDifference = 0;
   for (const key in a) {
     if (!hasOwn(a, key)) continue;
+    if (!hasOwn(b, key)) return false;
     if (!Object.is(a[key], b[key])) return false;
+    ownKeyDifference++;
   }
   for (const key in b) {
     if (!hasOwn(b, key)) continue;
-    if (!hasOwn(a, key)) return false;
+    ownKeyDifference--;
   }
-  return true;
+  return ownKeyDifference === 0;
 }
 
 // Variants that a `refine` callback assigned through `setVariants`. Two stages
@@ -269,6 +277,10 @@ interface CreateParams {
   transformClass?: (className: string) => string;
 }
 
+function identityClass(className: string) {
+  return className;
+}
+
 function isRecordObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object") return false;
   if (value == null) return false;
@@ -303,13 +315,19 @@ function extractClassAndStylePrebuilt(value: unknown): PrebuiltValue {
   if (!isRecordObject(value)) {
     return { class: value as ClassValue, style: null };
   }
-  if (!("style" in value || "class" in value)) {
+  // A value that owns neither key contributes nothing, and a value that owns
+  // one of them must not pick up the other from a polluted `Object.prototype`.
+  // Checked inline rather than through `getOwn`: this runs for every variant
+  // value at creation time, where the call is worth about 3% of `cv()`.
+  const styleClassValue = value as StyleClassValue;
+  const classValue = hasOwn(value, "class") ? styleClassValue.class : undefined;
+  const styleValue = hasOwn(value, "style") ? styleClassValue.style : undefined;
+  if (classValue === undefined && styleValue === undefined) {
     return { class: null, style: null };
   }
-  const styleClassValue = value as StyleClassValue;
-  const style = normalizeStyle(styleClassValue.style);
+  const style = normalizeStyle(styleValue);
   return {
-    class: styleClassValue.class ?? null,
+    class: classValue ?? null,
     style: Object.keys(style).length > 0 ? style : null,
   };
 }
@@ -449,8 +467,10 @@ export const splitProps: SplitPropsFunction = ((
  * fallback when the variant is a single class value (treated as `{ true: ... }`).
  */
 interface PrebuiltVariant {
-  // For object variants: map of value -> prebuilt class/style
-  values: Record<string, PrebuiltValue> | null;
+  // For object variants: map of value -> prebuilt class/style. A Map keeps the
+  // lookup keyed by the caller's variant value out of reach of a polluted
+  // `Object.prototype`.
+  values: Map<string, PrebuiltValue> | null;
   // For shorthand variants: the value to use when selectedValue is true
   shorthand: PrebuiltValue | null;
   // Set of value keys that are disabled (value === null in the original variant
@@ -466,7 +486,7 @@ function buildPrebuiltVariant(variantDef: unknown): PrebuiltVariant {
       disabledValues: null,
     };
   }
-  const values: Record<string, PrebuiltValue> = {};
+  const values = new Map<string, PrebuiltValue>();
   let disabledValues: Set<string> | null = null;
   for (const key in variantDef) {
     if (!hasOwn(variantDef, key)) continue;
@@ -478,7 +498,7 @@ function buildPrebuiltVariant(variantDef: unknown): PrebuiltVariant {
       disabledValues.add(key);
       continue;
     }
-    values[key] = extractClassAndStylePrebuilt(value);
+    values.set(key, extractClassAndStylePrebuilt(value));
   }
   return {
     values,
@@ -490,9 +510,12 @@ function buildPrebuiltVariant(variantDef: unknown): PrebuiltVariant {
 /**
  * Creates the cv and cx functions.
  */
-export function create({
-  transformClass = (className) => className,
-}: CreateParams = {}) {
+export function create(params: CreateParams = {}) {
+  // Destructuring would read an inherited `transformClass`, which a polluted
+  // `Object.prototype` could use to rewrite every class string this factory
+  // produces, including those of the package-level `cv`.
+  const transformClass = getOwn(params, "transformClass") ?? identityClass;
+
   const cx = (...classes: ClsxClassValue[]) => transformClass(clsx(classes));
 
   const cv = <V extends Variants = {}, const E extends AnyComponent[] = []>(
@@ -501,12 +524,16 @@ export function create({
     type MergedVariants = MergeVariants<V, E>;
 
     // ----- Pre-computed at creation time -----
-    const extend = config.extend;
+    // Every setting is optional, so each one is read only when the caller owns
+    // the key. A plain read would let a polluted `Object.prototype` supply a
+    // class, a style, or a refine callback to every component.
+    const extend = getOwn(config, "extend");
     const hasExtend = !!extend && extend.length > 0;
-    const variants = config.variants;
-    const refine = config.refine;
-    const baseStyle = config.style;
+    const variants = getOwn(config, "variants");
+    const refine = getOwn(config, "refine");
+    const baseStyle = getOwn(config, "style");
     const hasBaseStyle = !!baseStyle;
+    const baseClass = getOwn(config, "class");
 
     const variantKeySet = new Set<string>();
     const staticDefaults: Record<string, unknown> = {};
@@ -550,8 +577,7 @@ export function create({
     // shared with their prebuilt variants instead of scanning and allocating
     // them twice.
     const disabledVariantKeys = new Set<string>();
-    const disabledVariantValues: Record<string, Set<string>> = {};
-    let hasDisabledVariantValues = false;
+    let disabledValuesBuilder: Record<string, Set<string>> | null = null;
     const variantEntryNames: string[] = [];
     const variantEntryDefs: PrebuiltVariant[] = [];
     const functionVariantNames: string[] = [];
@@ -575,13 +601,12 @@ export function create({
         variantEntryNames.push(name);
         variantEntryDefs.push(prebuiltVariant);
         if (prebuiltVariant.disabledValues) {
-          disabledVariantValues[name] = prebuiltVariant.disabledValues;
-          hasDisabledVariantValues = true;
+          disabledValuesBuilder ??= {};
+          disabledValuesBuilder[name] = prebuiltVariant.disabledValues;
         }
         if (
-          prebuiltVariant.values &&
-          hasOwn(prebuiltVariant.values, "false") &&
-          staticDefaults[name] === undefined
+          prebuiltVariant.values?.has("false") &&
+          !hasOwn(staticDefaults, name)
         ) {
           staticDefaults[name] = false;
         }
@@ -592,13 +617,18 @@ export function create({
     const variantEntryCount = variantEntryNames.length;
     const functionVariantCount = functionVariantNames.length;
     const hasDisabledVariantKeys = disabledVariantKeys.size > 0;
-    const hasAnyDisabled = hasDisabledVariantKeys || hasDisabledVariantValues;
+    // The table is allocated only when a variant declares a disabled value,
+    // so its presence is the flag. Capturing it in a `const` lets the closures
+    // below narrow it instead of repeating an optional chain.
+    const disabledVariantValues = disabledValuesBuilder;
+    const hasAnyDisabled =
+      hasDisabledVariantKeys || disabledVariantValues !== null;
 
     const inputPropsKeys = ["class", "className", "style", ...variantKeys];
 
     const computedDefaultNames: string[] = [];
     const computedDefaultFns: ComputedDefaultVariantFn[] = [];
-    const defaultVariants = config.defaultVariants as
+    const defaultVariants = getOwn(config, "defaultVariants") as
       | Record<string, unknown>
       | undefined;
 
@@ -635,10 +665,13 @@ export function create({
           delete staticDefaults[key];
           continue;
         }
-        if (hasDisabledVariantValues) {
+        if (disabledVariantValues) {
           const value = staticDefaults[key];
           const valueKey = getVariantValueKey(value);
-          if (valueKey != null && disabledVariantValues[key]?.has(valueKey)) {
+          if (
+            valueKey != null &&
+            getOwn(disabledVariantValues, key)?.has(valueKey)
+          ) {
             delete staticDefaults[key];
           }
         }
@@ -754,8 +787,7 @@ export function create({
     }
     // Skip values are passed directly to extends. We can reuse the same object
     // when no caller-provided values need merging.
-    const staticExtSkipValues: Record<string, Set<string>> | null =
-      hasDisabledVariantValues ? disabledVariantValues : null;
+    const staticExtSkipValues = disabledVariantValues;
 
     // Callers use this only when disabled keys or values exist.
     function filterDisabledInto(
@@ -766,9 +798,12 @@ export function create({
         if (!hasOwn(input, key)) continue;
         if (disabledVariantKeys.has(key)) continue;
         const value = input[key];
-        if (hasDisabledVariantValues) {
+        if (disabledVariantValues) {
           const valueKey = getVariantValueKey(value);
-          if (valueKey != null && disabledVariantValues[key]?.has(valueKey)) {
+          if (
+            valueKey != null &&
+            getOwn(disabledVariantValues, key)?.has(valueKey)
+          ) {
             continue;
           }
         }
@@ -780,9 +815,12 @@ export function create({
       if (disabledVariantKeys.has(key)) {
         return true;
       }
-      if (hasDisabledVariantValues) {
+      if (disabledVariantValues) {
         const valueKey = getVariantValueKey(value);
-        if (valueKey != null && disabledVariantValues[key]?.has(valueKey)) {
+        if (
+          valueKey != null &&
+          getOwn(disabledVariantValues, key)?.has(valueKey)
+        ) {
           return true;
         }
       }
@@ -818,7 +856,7 @@ export function create({
           filtered[key] = value;
           continue;
         }
-        const fallbackValue = fallback[key];
+        const fallbackValue = getOwn(fallback, key);
         if (
           fallbackValue !== undefined &&
           !isOwnDisabledValue(key, fallbackValue)
@@ -900,14 +938,19 @@ export function create({
 
         const variantSnapshot = getOwnVariants();
         const defaultValue = inheritedComputedDefaultKeys.has(key)
-          ? variantSnapshot[key]
-          : defaultResolved[key];
+          ? getOwn(variantSnapshot, key)
+          : getOwn(defaultResolved, key);
         const value = computedDefaultFns[i](defaultValue, variantSnapshot);
         if (hasAnyDisabled) {
           if (disabledVariantKeys.has(key)) continue;
-          const valueKey = getVariantValueKey(value);
-          if (valueKey != null && disabledVariantValues[key]?.has(valueKey)) {
-            continue;
+          if (disabledVariantValues) {
+            const valueKey = getVariantValueKey(value);
+            if (
+              valueKey != null &&
+              getOwn(disabledVariantValues, key)?.has(valueKey)
+            ) {
+              continue;
+            }
           }
         }
 
@@ -916,7 +959,7 @@ export function create({
           delete ensureUpdated()[key];
           continue;
         }
-        if (Object.is(variantSnapshot[key], value)) continue;
+        if (Object.is(getOwn(variantSnapshot, key), value)) continue;
         ensureUpdated()[key] = value;
       }
 
@@ -978,11 +1021,11 @@ export function create({
               // run a caller-defined accessor.
               if (disabledVariantKeys.has(key)) continue;
               const value = (newVariants as Record<string, unknown>)[key];
-              if (hasDisabledVariantValues) {
+              if (disabledVariantValues) {
                 const valueKey = getVariantValueKey(value);
                 if (
                   valueKey != null &&
-                  disabledVariantValues[key]?.has(valueKey)
+                  getOwn(disabledVariantValues, key)?.has(valueKey)
                 ) {
                   continue;
                 }
@@ -991,7 +1034,9 @@ export function create({
                 const protectedVariants = (protection.variants ??= {});
                 protectedVariants[key] = value;
               }
-              if (Object.is((updatedVariants ?? ownVariants)[key], value)) {
+              if (
+                Object.is(getOwn(updatedVariants ?? ownVariants, key), value)
+              ) {
                 continue;
               }
               updatedVariants ??= Object.assign({}, ownVariants);
@@ -1086,18 +1131,21 @@ export function create({
         } else {
           extSkipVals = {};
           for (const k in skipValues) {
+            if (!hasOwn(skipValues, k)) continue;
             extSkipVals[k] = skipValues[k];
           }
           for (const k in staticExtSkipValues) {
-            const existing = extSkipVals[k];
+            if (!hasOwn(staticExtSkipValues, k)) continue;
+            const values = staticExtSkipValues[k];
+            const existing = getOwn(extSkipVals, k);
             if (existing) {
               const merged = new Set<string>(existing);
-              for (const v of staticExtSkipValues[k]) {
+              for (const v of values) {
                 merged.add(v);
               }
               extSkipVals[k] = merged;
             } else {
-              extSkipVals[k] = staticExtSkipValues[k];
+              extSkipVals[k] = values;
             }
           }
         }
@@ -1187,8 +1235,12 @@ export function create({
       for (let i = 0; i < variantEntryCount; i++) {
         const variantName = variantEntryNames[i];
         if (ownSkipKeys && ownSkipKeys.has(variantName)) continue;
+        // Read first: an inherited value that could change the output is
+        // never `undefined`, so the own-property check only runs for the
+        // variants that carry a value.
         const selectedValue = workingResolved[variantName];
         if (selectedValue === undefined) continue;
+        if (!hasOwn(workingResolved, variantName)) continue;
         const selectedKey = getVariantValueKey(selectedValue);
         const variant = variantEntryDefs[i];
         if (
@@ -1201,7 +1253,7 @@ export function create({
         if (
           ownSkipValues &&
           selectedKey != null &&
-          ownSkipValues[variantName]?.has(selectedKey)
+          getOwn(ownSkipValues, variantName)?.has(selectedKey)
         ) {
           continue;
         }
@@ -1209,7 +1261,7 @@ export function create({
         let value: PrebuiltValue | null | undefined;
         if (variant.values) {
           if (selectedKey == null) continue;
-          value = variant.values[selectedKey];
+          value = variant.values.get(selectedKey);
         } else if (selectedValue === true) {
           value = variant.shorthand;
         }
@@ -1230,11 +1282,12 @@ export function create({
         if (ownSkipKeys && ownSkipKeys.has(variantName)) continue;
         const selectedValue = workingResolved[variantName];
         if (selectedValue === undefined) continue;
+        if (!hasOwn(workingResolved, variantName)) continue;
         const selectedKey = getVariantValueKey(selectedValue);
         if (
           ownSkipValues &&
           selectedKey != null &&
-          ownSkipValues[variantName]?.has(selectedKey)
+          getOwn(ownSkipValues, variantName)?.has(selectedKey)
         ) {
           continue;
         }
@@ -1548,17 +1601,20 @@ export function create({
       const style: StyleValue = {};
       compute(resolved, userVariantProps, null, null, allClasses, style);
 
-      // Apply user-provided class / className.
-      if ("class" in propsRecord) {
+      // Apply user-provided class / className. Own-property checks keep these
+      // consistent with the variant props read above: only what the caller
+      // passed is applied, never a key inherited from Object.prototype.
+      if (hasOwn(propsRecord, "class")) {
         allClasses.push(propsRecord.class as ClsxClassValue);
       }
-      if ("className" in propsRecord) {
+      if (hasOwn(propsRecord, "className")) {
         allClasses.push(propsRecord.className as ClsxClassValue);
       }
 
-      // Apply user-provided style.
+      // Apply user-provided style, read before the own-property check for the
+      // same reason as the variant loops above.
       const psv = propsRecord.style;
-      if (psv != null) {
+      if (psv != null && hasOwn(propsRecord, "style")) {
         if (typeof psv === "string") {
           if (psv.length > 0) {
             htmlStyleToStyleValue(psv, style);
@@ -1606,8 +1662,8 @@ export function create({
     // would compound (double for own-render, triple+ for extend chains) and
     // misbehave for non-idempotent transforms.
     const computedBaseClass = hasExtend
-      ? clsx(extBaseClassesArr, config.class as ClsxClassValue)
-      : clsx(config.class as ClsxClassValue);
+      ? clsx(extBaseClassesArr, baseClass as ClsxClassValue)
+      : clsx(baseClass as ClsxClassValue);
 
     // Shared closures across the default and modal components.
     const classFn = (props: ComponentProps<MergedVariants> = {}) => {
