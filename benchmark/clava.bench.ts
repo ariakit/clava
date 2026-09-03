@@ -138,6 +138,59 @@ const toolbarButton = cv({
   },
 });
 
+// `refinedButton` and `inertRefinedButton` above measure the refine chain on a
+// component that extends nothing. These add the extends dimension, where the
+// chain also threads protected variants through each layer and filters
+// `ctx.variants` per layer. `toolbarButton` cannot stand in for them, because
+// it bundles a refine callback, a function variant value, and a computed
+// default into one component.
+const plainExtend = cv({ extend: [button], class: "plain-extend" });
+
+const inertRefineExtend = cv({
+  extend: [button],
+  class: "inert-refine-extend",
+  refine: () => {},
+});
+
+const setVariantsRefineExtend = cv({
+  extend: [button],
+  class: "set-variants-refine-extend",
+  refine: ({ variants, setVariants }) => {
+    if (variants.size === "lg") {
+      setVariants({ intent: "neutral" });
+    }
+  },
+});
+
+const computedDefaultExtend = cv({
+  extend: [button],
+  class: "computed-default-extend",
+  defaultVariants: {
+    intent: (defaultValue, variants) =>
+      variants.size === "lg" ? "neutral" : defaultValue,
+  },
+});
+
+// The refine sits on the extended component instead of the outer one. That
+// reaches code the cases above do not: the outer component owns no refine yet
+// still runs the refine loop and allocates the protection holder, and the
+// extend filters `ctx.variants` from a record that carries the outer
+// component's own `active` key. The added key and the extra chain level cost
+// something by themselves, so compare this row against itself over time rather
+// than against `plainExtend`.
+const inheritedRefineExtend = cv({
+  extend: [inertRefineExtend],
+  class: "inherited-refine-extend",
+  variants: {
+    active: { true: "inherited-refine-active", false: "inherited-refine-idle" },
+  },
+  defaultVariants: { active: false },
+});
+
+// Leaves `intent` unset so the computed default and `setVariants` both change a
+// variant and enter the re-run path.
+const refineProps = { size: "lg", disabled: true } as const;
+
 const splitPropsInput = {
   id: "save",
   type: "button",
@@ -235,6 +288,46 @@ describe("cv", () => {
           style: { marginInlineStart: 4 },
         }),
       );
+    },
+    options,
+  );
+
+  bench(
+    "resolve extended props without refine",
+    () => {
+      consume(plainExtend(refineProps));
+    },
+    options,
+  );
+
+  bench(
+    "resolve extended props with inert refine",
+    () => {
+      consume(inertRefineExtend(refineProps));
+    },
+    options,
+  );
+
+  bench(
+    "resolve extended props with refine setVariants",
+    () => {
+      consume(setVariantsRefineExtend(refineProps));
+    },
+    options,
+  );
+
+  bench(
+    "resolve extended props with computed default",
+    () => {
+      consume(computedDefaultExtend(refineProps));
+    },
+    options,
+  );
+
+  bench(
+    "resolve extended props with inherited refine",
+    () => {
+      consume(inheritedRefineExtend(refineProps));
     },
     options,
   );

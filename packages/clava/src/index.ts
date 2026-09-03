@@ -57,8 +57,7 @@ type ComputeOnceFn = (
   skipValues: Record<string, Set<string>> | null,
   classesOut: ClsxClassValue[],
   styleOut: StyleValue,
-  protectedVariants?: Record<string, unknown> | null,
-  protectedVariantKeys?: Set<string> | null,
+  protection?: RefineProtection | null,
   defaultResolved?: Record<string, unknown>,
   renderOnly?: boolean,
 ) => Record<string, unknown>;
@@ -73,8 +72,7 @@ type ResolveRefineOnceFn = (
   resolved: Record<string, unknown>,
   userVariantProps: Record<string, unknown>,
   filterOwnVariants?: boolean,
-  protectedVariants?: Record<string, unknown> | null,
-  protectedVariantKeys?: Set<string> | null,
+  protection?: RefineProtection | null,
   defaultResolved?: Record<string, unknown>,
 ) => Record<string, unknown>;
 
@@ -133,19 +131,22 @@ function areVariantsEqual(
   return true;
 }
 
-function getExtUserVariantProps(
-  userVariantProps: Record<string, unknown>,
-  protectedVariants: Record<string, unknown> | null,
-): Record<string, unknown> {
-  return Object.assign({}, userVariantProps, protectedVariants);
+// Variants that a `refine` callback assigned through `setVariants`. Two stages
+// read them: computed defaults skip a key that was assigned this way, and
+// `mergeProtectedIntoBase` folds them into the base each pass resolves from.
+// The record is created on the first `setVariants` call, because most callbacks
+// only read variants. The holder is shared so that a callback anywhere in the
+// chain can report its assignment back to the resolution that owns the pass.
+interface RefineProtection {
+  variants: Record<string, unknown> | null;
 }
 
 function mergeProtectedIntoBase(
   baseResolved: Record<string, unknown>,
-  protectedVariants: Record<string, unknown>,
-  protectedVariantKeys: Set<string>,
+  protection: RefineProtection | null,
 ): Record<string, unknown> {
-  if (protectedVariantKeys.size === 0) return baseResolved;
+  const protectedVariants = protection?.variants;
+  if (!protectedVariants) return baseResolved;
   return Object.assign({}, baseResolved, protectedVariants);
 }
 
@@ -664,6 +665,22 @@ export function create({
     }
     const extMetasWithRefineCount = extMetasWithRefine.length;
 
+    // Only a `refine` callback protects variants, through `setVariants`. This
+    // over-approximates: `extMetasWithRefineCount` also counts extends that
+    // only have computed defaults. Tightening it would mean tracking `refine`
+    // separately in `ComponentMeta` to save one allocation. The record inside
+    // the holder is created only when a callback assigns something.
+    const canProtectVariants = !!refine || extMetasWithRefineCount > 0;
+
+    // `userVariantProps` tells computed defaults which variants the user set
+    // explicitly, and `runComputedDefaults` is its only reader anywhere in the
+    // chain: a `refine` callback never receives it. `computedDefaultKeys` is
+    // transitive, so an empty inherited set proves no extend runs computed
+    // defaults either, and nothing reads the record. The record is then the
+    // caller's own props object, which no stage may write to.
+    const needsUserVariantProps =
+      computedDefaultCount > 0 || inheritedComputedDefaultKeys.size > 0;
+
     // Call-site frame captured at the `cv()` call site so refine-limit warnings
     // can point developers at the component definition. Skipped entirely for
     // components that can never enter the refine loop, and stripped in
@@ -845,8 +862,9 @@ export function create({
       defaultResolved: Record<string, unknown>,
       userVariantProps: Record<string, unknown>,
       filterOwnVariants: boolean,
-      protectedVariantKeys: Set<string> | null | undefined,
+      protection: RefineProtection | null | undefined,
     ): Record<string, unknown> => {
+      const protectedVariants = protection?.variants;
       let ownVariants = filterOwnVariants ? null : resolved;
       const getOwnVariants = (): Record<string, unknown> => {
         if (ownVariants) {
@@ -878,7 +896,7 @@ export function create({
         if (hasOwn(userVariantProps, key)) {
           if (userVariantProps[key] !== undefined) continue;
         }
-        if (protectedVariantKeys?.has(key)) continue;
+        if (protectedVariants && hasOwn(protectedVariants, key)) continue;
 
         const variantSnapshot = getOwnVariants();
         const defaultValue = inheritedComputedDefaultKeys.has(key)
@@ -910,8 +928,7 @@ export function create({
       filterOwnVariants: boolean,
       collectOutput: boolean,
       applyVariantUpdates: boolean,
-      protectedVariants: Record<string, unknown> | null | undefined,
-      protectedVariantKeys: Set<string> | null | undefined,
+      protection: RefineProtection | null | undefined,
     ): {
       workingResolved: Record<string, unknown>;
       classes: ClassValue[] | null;
@@ -937,25 +954,14 @@ export function create({
           }
           ownVariants = filteredVariants;
         }
-        // Lazy-init updatedVariants — many refine callbacks only inspect
-        // `variants`, so the copy is unnecessary in the common case.
+        // `updatedVariants`, `localCClasses` and `localCStyle` are created on
+        // first use, so a callback that only inspects `variants` allocates
+        // none of them. The `setVariants` bookkeeping is inlined for the same
+        // reason: helper closures would be allocated on every call, including
+        // the calls that never assign anything.
         let updatedVariants: Record<string, unknown> | null = null;
-        const localCClasses: ClassValue[] | null = collectOutput ? [] : null;
+        let localCClasses: ClassValue[] | null = null;
         let localCStyle: StyleValue | null = null;
-        const ensureUpdated = (): Record<string, unknown> => {
-          if (updatedVariants) {
-            return updatedVariants;
-          }
-          const u = Object.assign({}, ownVariants);
-          updatedVariants = u;
-          return u;
-        };
-        const protectVariant = (key: string, value: unknown) => {
-          if (protectedVariants) {
-            protectedVariants[key] = value;
-            protectedVariantKeys?.add(key);
-          }
-        };
         const ctx = {
           variants: ownVariants as VariantValues<Record<string, unknown>>,
           setVariants: (
@@ -964,20 +970,12 @@ export function create({
             if (!applyVariantUpdates) {
               return;
             }
-            if (!hasAnyDisabled) {
-              for (const key in newVariants) {
-                if (!hasOwn(newVariants, key)) continue;
-                const value = (newVariants as Record<string, unknown>)[key];
-                protectVariant(key, value);
-                if (Object.is((updatedVariants ?? ownVariants)[key], value)) {
-                  continue;
-                }
-                ensureUpdated()[key] = value;
-              }
-              return;
-            }
             for (const key in newVariants) {
               if (!hasOwn(newVariants, key)) continue;
+              // `disabledVariantKeys` is empty unless this component disables a
+              // variant, so the lookup replaces a `hasAnyDisabled` branch. The
+              // key is checked before the value is read, because reading it can
+              // run a caller-defined accessor.
               if (disabledVariantKeys.has(key)) continue;
               const value = (newVariants as Record<string, unknown>)[key];
               if (hasDisabledVariantValues) {
@@ -989,21 +987,25 @@ export function create({
                   continue;
                 }
               }
-              protectVariant(key, value);
+              if (protection) {
+                const protectedVariants = (protection.variants ??= {});
+                protectedVariants[key] = value;
+              }
               if (Object.is((updatedVariants ?? ownVariants)[key], value)) {
                 continue;
               }
-              ensureUpdated()[key] = value;
+              updatedVariants ??= Object.assign({}, ownVariants);
+              updatedVariants[key] = value;
             }
           },
           addClass: (className: ClassValue) => {
-            localCClasses?.push(className);
+            if (!collectOutput) return;
+            localCClasses ??= [];
+            localCClasses.push(className);
           },
           addStyle: (newStyle: StyleValue) => {
             if (!collectOutput) return;
-            if (!localCStyle) {
-              localCStyle = {};
-            }
+            localCStyle ??= {};
             Object.assign(localCStyle, newStyle);
           },
         };
@@ -1011,12 +1013,11 @@ export function create({
         if (collectOutput && result != null) {
           const r = extractClassAndStylePrebuilt(result);
           if (r.class != null) {
-            localCClasses?.push(r.class);
+            localCClasses ??= [];
+            localCClasses.push(r.class);
           }
           if (r.style) {
-            if (!localCStyle) {
-              localCStyle = {};
-            }
+            localCStyle ??= {};
             Object.assign(localCStyle, r.style);
           }
         }
@@ -1051,8 +1052,7 @@ export function create({
       skipValues,
       classesOut,
       styleOut,
-      protectedVariants,
-      protectedVariantKeys,
+      protection,
       defaultResolved = resolved,
       renderOnly = false,
     ) => {
@@ -1102,13 +1102,6 @@ export function create({
           }
         }
 
-        const extUserVariantProps =
-          extMetasWithRefineCount > 0
-            ? getExtUserVariantProps(
-                userVariantProps,
-                protectedVariants ?? null,
-              )
-            : userVariantProps;
         for (let i = 0; i < extCount; i++) {
           if (hasIsolatedExt && extIsolated[i]) {
             // Isolated extend (different factory): gather its variant classes
@@ -1117,13 +1110,12 @@ export function create({
             const extClasses: ClsxClassValue[] = [];
             workingResolved = extMetas[i].compute(
               workingResolved,
-              extUserVariantProps,
+              userVariantProps,
               extSkipKeys,
               extSkipVals,
               extClasses,
               styleOut,
-              protectedVariants,
-              protectedVariantKeys,
+              protection,
               defaultResolved,
               renderOnly,
             );
@@ -1136,13 +1128,12 @@ export function create({
           } else {
             workingResolved = extMetas[i].compute(
               workingResolved,
-              extUserVariantProps,
+              userVariantProps,
               extSkipKeys,
               extSkipVals,
               classesOut,
               styleOut,
-              protectedVariants,
-              protectedVariantKeys,
+              protection,
               defaultResolved,
               renderOnly,
             );
@@ -1151,11 +1142,6 @@ export function create({
             workingResolved,
             defaultResolved,
           );
-          // Only sync protected variants when a child refine resolver can
-          // observe them. Otherwise extUserVariantProps may alias caller props.
-          if (protectedVariants && extMetasWithRefineCount > 0) {
-            Object.assign(extUserVariantProps, protectedVariants);
-          }
         }
       }
 
@@ -1167,7 +1153,7 @@ export function create({
           defaultResolved,
           userVariantProps,
           true,
-          protectedVariantKeys,
+          protection,
         );
       }
 
@@ -1179,8 +1165,7 @@ export function create({
           true,
           true,
           !renderOnly,
-          protectedVariants,
-          protectedVariantKeys,
+          protection,
         );
         workingResolved = refineResult.workingResolved;
         cClasses = refineResult.classes;
@@ -1291,8 +1276,9 @@ export function create({
             styleOut,
           ) => {
             let remaining = MAX_REFINE_RUNS;
-            const protectedVariants: Record<string, unknown> = {};
-            const protectedVariantKeys = new Set<string>();
+            const protection: RefineProtection | null = canProtectVariants
+              ? { variants: null }
+              : null;
             const incomingDefaultResolved = resolved;
             let workingResolved = resolved;
             // Latest variant changes from non-converging iterations inside the
@@ -1312,8 +1298,7 @@ export function create({
               const nextStyle: StyleValue = useDirectOutput ? styleOut : {};
               const defaultResolved = mergeProtectedIntoBase(
                 incomingDefaultResolved,
-                protectedVariants,
-                protectedVariantKeys,
+                protection,
               );
               const nextResolved = computeOnce(
                 workingResolved,
@@ -1322,8 +1307,7 @@ export function create({
                 skipValues,
                 nextClasses,
                 nextStyle,
-                protectedVariants,
-                protectedVariantKeys,
+                protection,
                 defaultResolved,
               );
 
@@ -1347,8 +1331,7 @@ export function create({
                     skipValues,
                     classesOut,
                     styleOut,
-                    protectedVariants,
-                    protectedVariantKeys,
+                    protection,
                     defaultResolved,
                     true,
                   );
@@ -1409,37 +1392,26 @@ export function create({
       resolved,
       userVariantProps,
       filterOwnVariants = true,
-      protectedVariants,
-      protectedVariantKeys,
+      protection,
       defaultResolved = resolved,
     ) => {
       let workingResolved = resolved;
 
-      if (extMetasWithRefineCount > 0) {
-        const extUserVariantProps = getExtUserVariantProps(
+      for (let i = 0; i < extMetasWithRefineCount; i++) {
+        const meta = extMetasWithRefine[i];
+        const resolveRefine = meta.resolveRefine;
+        if (!resolveRefine) continue;
+        workingResolved = resolveRefine(
+          workingResolved,
           userVariantProps,
-          protectedVariants ?? null,
+          true,
+          protection,
+          defaultResolved,
         );
-        for (let i = 0; i < extMetasWithRefineCount; i++) {
-          const meta = extMetasWithRefine[i];
-          const resolveRefine = meta.resolveRefine;
-          if (!resolveRefine) continue;
-          workingResolved = resolveRefine(
-            workingResolved,
-            extUserVariantProps,
-            true,
-            protectedVariants,
-            protectedVariantKeys,
-            defaultResolved,
-          );
-          workingResolved = filterOwnDisabledVariants(
-            workingResolved,
-            defaultResolved,
-          );
-          if (protectedVariants) {
-            Object.assign(extUserVariantProps, protectedVariants);
-          }
-        }
+        workingResolved = filterOwnDisabledVariants(
+          workingResolved,
+          defaultResolved,
+        );
       }
 
       if (computedDefaultCount > 0) {
@@ -1448,7 +1420,7 @@ export function create({
           defaultResolved,
           userVariantProps,
           filterOwnVariants,
-          protectedVariantKeys,
+          protection,
         );
       }
       if (refine) {
@@ -1457,8 +1429,7 @@ export function create({
           filterOwnVariants,
           false,
           true,
-          protectedVariants,
-          protectedVariantKeys,
+          protection,
         );
         workingResolved = refineResult.workingResolved;
       }
@@ -1470,8 +1441,9 @@ export function create({
       refine || computedDefaultCount > 0 || extMetasWithRefineCount > 0
         ? (resolved, userVariantProps, filterOwnVariants = true) => {
             let remaining = MAX_REFINE_RUNS;
-            const protectedVariants: Record<string, unknown> = {};
-            const protectedVariantKeys = new Set<string>();
+            const protection: RefineProtection | null = canProtectVariants
+              ? { variants: null }
+              : null;
             const incomingDefaultResolved = resolved;
             let workingResolved = resolved;
             // Latest variant changes from non-converging iterations inside the
@@ -1483,15 +1455,13 @@ export function create({
               remaining -= 1;
               const defaultResolved = mergeProtectedIntoBase(
                 incomingDefaultResolved,
-                protectedVariants,
-                protectedVariantKeys,
+                protection,
               );
               const nextResolved = resolveRefineOnce(
                 workingResolved,
                 userVariantProps,
                 filterOwnVariants,
-                protectedVariants,
-                protectedVariantKeys,
+                protection,
                 defaultResolved,
               );
 
@@ -1540,19 +1510,15 @@ export function create({
       Object.assign(resolved, staticDefaults);
 
       let userVariantProps: Record<string, unknown>;
-      if (refine || computedDefaultCount > 0 || extMetasWithRefineCount > 0) {
+      if (needsUserVariantProps) {
         const variantProps: Record<string, unknown> = {};
         for (let i = 0; i < variantKeysLength; i++) {
           const key = variantKeys[i];
-          if (hasOwn(propsRecord, key)) {
-            variantProps[key] = propsRecord[key];
-          }
-        }
-        for (const k in variantProps) {
-          if (!hasOwn(variantProps, k)) continue;
-          const v = variantProps[k];
-          if (v === undefined) continue;
-          resolved[k] = v;
+          if (!hasOwn(propsRecord, key)) continue;
+          const value = propsRecord[key];
+          variantProps[key] = value;
+          if (value === undefined) continue;
+          resolved[key] = value;
         }
         userVariantProps = variantProps;
       } else {
@@ -1611,8 +1577,12 @@ export function create({
     const getVariants = (variants?: VariantValues<MergedVariants>) => {
       const variantsRecord = variants ?? EMPTY_DEFAULTS;
       let variantProps = variantsRecord;
-      // Extended refinement copies user props, so filter before unknown
-      // accessors or prototype keys can be observed by Object.assign.
+      // Copy to the declared variant keys, so the computed defaults that read
+      // this record cannot see an undeclared key as an explicitly passed
+      // variant, and cannot re-run a caller accessor once per refine pass. The
+      // gate is narrower than that purpose: it misses a chain whose only
+      // computed default is this component's own.
+      // See https://github.com/ariakit/clava/issues/494
       if (variants && extMetasWithRefineCount > 0) {
         variantProps = {};
         for (let i = 0; i < variantKeysLength; i++) {
