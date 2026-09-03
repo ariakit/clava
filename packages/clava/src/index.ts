@@ -1036,10 +1036,10 @@ export function create(params: CreateParams = {}) {
                 const protectedVariants = (protection.variants ??= {});
                 protectedVariants[key] = value;
               }
-              // The assigned record holds only changed keys, so the lookup
-              // has to tell a key it owns, whose value can be `undefined`,
-              // from one it does not own, which falls back to `ownVariants`.
-              // Neither `??` nor `getOwn` on the merged record expresses both.
+              // The record holds only assigned keys, so both halves matter: a
+              // key it owns can hold a clear that `??` on the value would
+              // discard, and a key it does not own must fall back to
+              // `ownVariants`, or a clear compares against `undefined`.
               const current =
                 assignedVariants && hasOwn(assignedVariants, key)
                   ? assignedVariants[key]

@@ -547,6 +547,29 @@ for (const config of Object.values(CONFIGS)) {
       expect(warn).not.toHaveBeenCalled();
     });
 
+    test("refine setVariants clears a variant it has not already assigned", () => {
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: {
+            size: { sm: "sm", lg: "lg" },
+            tone: { a: "a", b: "b" },
+          },
+          defaultVariants: { size: "sm", tone: "a" },
+          refine: ({ setVariants }) => {
+            setVariants({ size: undefined });
+            setVariants({ size: "sm" });
+            setVariants({ tone: undefined });
+          },
+        }),
+      );
+
+      // The clear-and-restore pair keeps `size` in the record on every pass,
+      // so the third call reads `tone` from `ownVariants`. Drop the first call
+      // and the record is empty, where a record-only lookup also passes.
+      expect(getStyleClass(component())).toEqual({ class: cls("sm") });
+    });
+
     test("refine setVariants does not mutate props with plain extends", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
