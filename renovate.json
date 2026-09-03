@@ -31,6 +31,21 @@
       "platformAutomerge": true
     },
     {
+      "description": "Benchmark-only comparison packages. They never ship in a published package, so bumps can land automatically and the benchmark can be re-run separately.",
+      "matchFileNames": ["benchmark/package.json"],
+      "matchPackageNames": [
+        "class-variance-authority",
+        "cn",
+        "cva",
+        "tailwind-merge",
+        "tailwind-variants",
+        "tailwindcss"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
       "matchPackageNames": ["lint-staged"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
