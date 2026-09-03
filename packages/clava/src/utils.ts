@@ -2,6 +2,20 @@ import type { HTMLCSSProperties, StyleValue } from "./types.ts";
 
 export const hasOwn = Object.hasOwn;
 
+/**
+ * Reads a key that may be absent from a plain record. Variant, prop, and config
+ * records are plain objects, so a key inherited from a polluted
+ * `Object.prototype` would otherwise read back like a value the caller passed
+ * or Clava itself resolved.
+ */
+export function getOwn<T extends object, K extends keyof T & string>(
+  record: T,
+  key: K,
+): T[K] | undefined {
+  if (!hasOwn(record, key)) return undefined;
+  return record[key];
+}
+
 // Keep this explicit so normalization does not depend on browser globals.
 // Vendor-prefixed variants are derived below instead of duplicating the list.
 const unitlessNumberProperties = new Set([
