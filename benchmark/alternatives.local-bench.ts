@@ -140,28 +140,34 @@ const productDefaultVariants = {
   icon: "none",
 } as const;
 
-const sizePlaceholders = {
-  size: {
-    sm: "",
-    md: "",
-    lg: "",
-  },
-} as const;
-
-const intentPlaceholders = {
-  intent: {
-    primary: "",
-    neutral: "",
-    danger: "",
-  },
-} as const;
-
-function createClavaProduct(createCv: typeof cv) {
+// Each library is built twice so both groups compare equivalent work: Clava
+// spells cross-variant conditions as `refine`, every other library as
+// `compoundVariants`. Clava alone repeats its construction chain, because an
+// empty `compoundVariants` array costs its libraries almost nothing while a
+// present `refine` runs the chain whatever the callback does, as the inert
+// refine case in `clava.bench.ts` measures.
+function createClavaProduct(createCv: typeof cv, crossVariant: boolean) {
   const clavaSurface = createCv({
     class: surfaceBase,
     variants: surfaceVariants,
     defaultVariants: surfaceDefaultVariants,
   });
+
+  if (!crossVariant) {
+    const clavaInteraction = createCv({
+      extend: [clavaSurface],
+      class: interactionBase,
+      variants: interactionVariants,
+      defaultVariants: interactionDefaultVariants,
+    });
+
+    return createCv({
+      extend: [clavaInteraction],
+      class: productBase,
+      variants: productVariants,
+      defaultVariants: productDefaultVariants,
+    });
+  }
 
   const clavaInteraction = createCv({
     extend: [clavaSurface],
@@ -203,108 +209,82 @@ function createClavaProduct(createCv: typeof cv) {
   });
 }
 
-const clavaProduct = createClavaProduct(cv);
-const { cv: cvTwMerge } = create({ transformClass: twMerge });
-const clavaProductWithTwMerge = createClavaProduct(cvTwMerge);
-const clavaTwMergeLabel = `${packageLabel("clava")} + ${packageLabel(
-  "tailwind-merge",
-)}`;
-const { cv: cvCn } = create({ transformClass: cn });
-const clavaProductWithCn = createClavaProduct(cvCn);
-const clavaCnLabel = `${packageLabel("clava")} + ${packageLabel("cn")}`;
+function createCvaProduct(crossVariant: boolean) {
+  const cvaSurface = cva1({
+    base: surfaceBase,
+    variants: surfaceVariants,
+    defaultVariants: surfaceDefaultVariants,
+  });
 
-const cvaSurface = cva1({
-  base: surfaceBase,
-  variants: surfaceVariants,
-  defaultVariants: surfaceDefaultVariants,
-});
+  const cvaInteraction = cva1({
+    base: interactionBase,
+    variants: interactionVariants,
+    compoundVariants: crossVariant ? [...interactionCompoundVariants] : [],
+    defaultVariants: interactionDefaultVariants,
+  });
 
-const cvaInteraction = cva1({
-  base: interactionBase,
-  variants: {
-    ...intentPlaceholders,
-    ...interactionVariants,
-  },
-  compoundVariants: [...interactionCompoundVariants],
-  defaultVariants: interactionDefaultVariants,
-});
+  const cvaProductOnly = cva1({
+    base: productBase,
+    variants: productVariants,
+    compoundVariants: crossVariant ? [...productCompoundVariants] : [],
+    defaultVariants: productDefaultVariants,
+  });
 
-const cvaProductOnly = cva1({
-  base: productBase,
-  variants: {
-    ...sizePlaceholders,
-    ...intentPlaceholders,
-    ...productVariants,
-  },
-  compoundVariants: [...productCompoundVariants],
-  defaultVariants: productDefaultVariants,
-});
+  return compose(cvaSurface, cvaInteraction, cvaProductOnly);
+}
 
-const cvaProduct = compose(cvaSurface, cvaInteraction, cvaProductOnly);
-
-const cva0Product = cva0(
-  [surfaceBase, interactionBase, productBase].join(" "),
-  {
+function createCva0Product(crossVariant: boolean) {
+  return cva0([surfaceBase, interactionBase, productBase].join(" "), {
     variants: {
       ...surfaceVariants,
       ...interactionVariants,
       ...productVariants,
     },
-    compoundVariants: [
-      ...interactionCompoundVariants,
-      ...productCompoundVariants,
-    ],
+    compoundVariants: crossVariant
+      ? [...interactionCompoundVariants, ...productCompoundVariants]
+      : [],
     defaultVariants: {
       ...surfaceDefaultVariants,
       ...interactionDefaultVariants,
       ...productDefaultVariants,
     },
-  },
-);
+  });
+}
 
-const tailwindVariantsSurface = tvLite({
-  base: surfaceBase,
-  variants: surfaceVariants,
-  defaultVariants: surfaceDefaultVariants,
-});
+function createTailwindVariantsProduct(
+  createTv: typeof tv | typeof tvLite,
+  crossVariant: boolean,
+) {
+  const surface = createTv({
+    base: surfaceBase,
+    variants: surfaceVariants,
+    defaultVariants: surfaceDefaultVariants,
+  });
 
-const tailwindVariantsInteraction = tvLite({
-  extend: tailwindVariantsSurface,
-  base: interactionBase,
-  variants: interactionVariants,
-  compoundVariants: [...interactionCompoundVariants],
-  defaultVariants: interactionDefaultVariants,
-});
+  const interaction = createTv({
+    extend: surface,
+    base: interactionBase,
+    variants: interactionVariants,
+    compoundVariants: crossVariant ? [...interactionCompoundVariants] : [],
+    defaultVariants: interactionDefaultVariants,
+  });
 
-const tailwindVariantsProduct = tvLite({
-  extend: tailwindVariantsInteraction,
-  base: productBase,
-  variants: productVariants,
-  compoundVariants: [...productCompoundVariants],
-  defaultVariants: productDefaultVariants,
-});
+  return createTv({
+    extend: interaction,
+    base: productBase,
+    variants: productVariants,
+    compoundVariants: crossVariant ? [...productCompoundVariants] : [],
+    defaultVariants: productDefaultVariants,
+  });
+}
 
-const tailwindVariantsFullSurface = tv({
-  base: surfaceBase,
-  variants: surfaceVariants,
-  defaultVariants: surfaceDefaultVariants,
-});
+const { cv: cvTwMerge } = create({ transformClass: twMerge });
+const { cv: cvCn } = create({ transformClass: cn });
 
-const tailwindVariantsFullInteraction = tv({
-  extend: tailwindVariantsFullSurface,
-  base: interactionBase,
-  variants: interactionVariants,
-  compoundVariants: [...interactionCompoundVariants],
-  defaultVariants: interactionDefaultVariants,
-});
-
-const tailwindVariantsFullProduct = tv({
-  extend: tailwindVariantsFullInteraction,
-  base: productBase,
-  variants: productVariants,
-  compoundVariants: [...productCompoundVariants],
-  defaultVariants: productDefaultVariants,
-});
+const clavaTwMergeLabel = `${packageLabel("clava")} + ${packageLabel(
+  "tailwind-merge",
+)}`;
+const clavaCnLabel = `${packageLabel("clava")} + ${packageLabel("cn")}`;
 
 const resolveProps = {
   size: "lg",
@@ -318,62 +298,78 @@ const resolveProps = {
   class: "data-[state=open]:animate-in",
 } as const;
 
-describe("alternatives: resolve composed tailwind variants", () => {
-  bench(
-    packageLabel("clava"),
-    () => {
-      consume(clavaProduct(resolveProps).class);
-    },
-    options,
-  );
+function describeGroup(title: string, crossVariant: boolean) {
+  const clavaProduct = createClavaProduct(cv, crossVariant);
+  const clavaProductWithTwMerge = createClavaProduct(cvTwMerge, crossVariant);
+  const clavaProductWithCn = createClavaProduct(cvCn, crossVariant);
+  const cvaProduct = createCvaProduct(crossVariant);
+  const cva0Product = createCva0Product(crossVariant);
+  const tvLiteProduct = createTailwindVariantsProduct(tvLite, crossVariant);
+  const tvProduct = createTailwindVariantsProduct(tv, crossVariant);
 
-  bench(
-    clavaTwMergeLabel,
-    () => {
-      consume(clavaProductWithTwMerge(resolveProps).class);
-    },
-    options,
-  );
+  describe(title, () => {
+    bench(
+      packageLabel("clava"),
+      () => {
+        consume(clavaProduct(resolveProps).class);
+      },
+      options,
+    );
 
-  bench(
-    clavaCnLabel,
-    () => {
-      consume(clavaProductWithCn(resolveProps).class);
-    },
-    options,
-  );
+    bench(
+      clavaTwMergeLabel,
+      () => {
+        consume(clavaProductWithTwMerge(resolveProps).class);
+      },
+      options,
+    );
 
-  bench(
-    packageLabel("cva"),
-    () => {
-      consume(cvaProduct(resolveProps));
-    },
-    options,
-  );
+    bench(
+      clavaCnLabel,
+      () => {
+        consume(clavaProductWithCn(resolveProps).class);
+      },
+      options,
+    );
 
-  bench(
-    packageLabel("class-variance-authority"),
-    () => {
-      consume(cva0Product(resolveProps));
-    },
-    options,
-  );
+    bench(
+      packageLabel("cva"),
+      () => {
+        consume(cvaProduct(resolveProps));
+      },
+      options,
+    );
 
-  bench(
-    packageLabel("tailwind-variants", "tailwind-variants/lite"),
-    () => {
-      consume(tailwindVariantsProduct(resolveProps));
-    },
-    options,
-  );
+    bench(
+      packageLabel("class-variance-authority"),
+      () => {
+        consume(cva0Product(resolveProps));
+      },
+      options,
+    );
 
-  bench(
-    packageLabel("tailwind-variants"),
-    () => {
-      consume(tailwindVariantsFullProduct(resolveProps));
-    },
-    options,
-  );
-});
+    bench(
+      packageLabel("tailwind-variants", "tailwind-variants/lite"),
+      () => {
+        consume(tvLiteProduct(resolveProps));
+      },
+      options,
+    );
+
+    bench(
+      packageLabel("tailwind-variants"),
+      () => {
+        consume(tvProduct(resolveProps));
+      },
+      options,
+    );
+  });
+}
+
+describeGroup("alternatives: resolve composed tailwind variants", false);
+describeGroup(
+  "alternatives: resolve composed tailwind variants with cross-variant conditions",
+  true,
+);
 
 export { sink };
