@@ -87,6 +87,25 @@ const fieldConfig = {
 } as const;
 
 const button = cv(buttonConfig);
+// Same config as `button` plus cross-variant conditions, so the delta against
+// "resolve component props" is the cost of a refine chain that does work.
+const refinedButton = cv({
+  ...buttonConfig,
+  refine: ({ variants, addClass, addStyle }) => {
+    if (variants.disabled && variants.intent === "danger") {
+      addClass("button-danger-disabled");
+    }
+    if (variants.size === "lg" && variants.intent === "danger") {
+      addStyle({ letterSpacing: "0.01em" });
+    }
+  },
+});
+// Same config again with a refine that contributes nothing, which separates
+// the fixed cost of running the chain from the work the callback does.
+const inertRefinedButton = cv({
+  ...buttonConfig,
+  refine: () => {},
+});
 const field = cv(fieldConfig);
 const toolbarButton = cv({
   extend: [button],
@@ -147,6 +166,38 @@ describe("cv", () => {
     () => {
       consume(
         button({
+          size: "lg",
+          intent: "danger",
+          disabled: true,
+          className: "custom",
+          style: { marginTop: 4 },
+        }),
+      );
+    },
+    options,
+  );
+
+  bench(
+    "resolve refined component props",
+    () => {
+      consume(
+        refinedButton({
+          size: "lg",
+          intent: "danger",
+          disabled: true,
+          className: "custom",
+          style: { marginTop: 4 },
+        }),
+      );
+    },
+    options,
+  );
+
+  bench(
+    "resolve component props with inert refine",
+    () => {
+      consume(
+        inertRefinedButton({
           size: "lg",
           intent: "danger",
           disabled: true,
