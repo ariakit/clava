@@ -954,12 +954,14 @@ export function create({
           }
           ownVariants = filteredVariants;
         }
-        // `updatedVariants`, `localCClasses` and `localCStyle` are created on
+        // `assignedVariants`, `localCClasses` and `localCStyle` are created on
         // first use, so a callback that only inspects `variants` allocates
         // none of them. The `setVariants` bookkeeping is inlined for the same
         // reason: helper closures would be allocated on every call, including
         // the calls that never assign anything.
-        let updatedVariants: Record<string, unknown> | null = null;
+        // `assignedVariants` holds only the changed keys, because copying all
+        // of `ownVariants` into it would repeat values `workingResolved` has.
+        let assignedVariants: Record<string, unknown> | null = null;
         let localCClasses: ClassValue[] | null = null;
         let localCStyle: StyleValue | null = null;
         const ctx = {
@@ -991,11 +993,15 @@ export function create({
                 const protectedVariants = (protection.variants ??= {});
                 protectedVariants[key] = value;
               }
-              if (Object.is((updatedVariants ?? ownVariants)[key], value)) {
+              const current =
+                assignedVariants && hasOwn(assignedVariants, key)
+                  ? assignedVariants[key]
+                  : ownVariants[key];
+              if (Object.is(current, value)) {
                 continue;
               }
-              updatedVariants ??= Object.assign({}, ownVariants);
-              updatedVariants[key] = value;
+              assignedVariants ??= {};
+              assignedVariants[key] = value;
             }
           },
           addClass: (className: ClassValue) => {
@@ -1023,14 +1029,15 @@ export function create({
         }
         cClasses = localCClasses;
         cStyle = localCStyle;
-        if (updatedVariants) {
-          const nextResolved = Object.assign({}, workingResolved);
-          if (hasAnyDisabled) {
-            filterDisabledInto(updatedVariants, nextResolved);
-          } else {
-            Object.assign(nextResolved, updatedVariants);
-          }
-          workingResolved = nextResolved;
+        if (assignedVariants) {
+          // No disabled filtering here: `setVariants` drops a disabled key or
+          // value before it records one, so every assigned key already passed
+          // the same two checks.
+          workingResolved = Object.assign(
+            {},
+            workingResolved,
+            assignedVariants,
+          );
         }
       }
 
@@ -1344,9 +1351,13 @@ export function create({
                 return nextResolved;
               }
 
+              // `remaining` is checked first: `process.env.NODE_ENV` is an
+              // environment lookup in Node, not a property load, and only the
+              // last `REFINE_UNSTABLE_TRACKING_WINDOW` passes need it. Bundlers
+              // still inline it and drop the block.
               if (
-                process.env.NODE_ENV !== "production" &&
-                remaining < REFINE_UNSTABLE_TRACKING_WINDOW
+                remaining < REFINE_UNSTABLE_TRACKING_WINDOW &&
+                process.env.NODE_ENV !== "production"
               ) {
                 if (!unstableChanges) {
                   unstableChanges = new Map<string, VariantChange>();
@@ -1472,9 +1483,11 @@ export function create({
                 return nextResolved;
               }
 
+              // `remaining` is checked first for the reason given in the
+              // compute loop above.
               if (
-                process.env.NODE_ENV !== "production" &&
-                remaining < REFINE_UNSTABLE_TRACKING_WINDOW
+                remaining < REFINE_UNSTABLE_TRACKING_WINDOW &&
+                process.env.NODE_ENV !== "production"
               ) {
                 if (!unstableChanges) {
                   unstableChanges = new Map<string, VariantChange>();

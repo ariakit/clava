@@ -525,6 +525,28 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
+    test("refine setVariants restores a value it cleared in the same pass", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const component = getModeComponent(
+        mode,
+        cv({
+          variants: { size: { sm: "sm", lg: "lg" } },
+          defaultVariants: { size: "sm" },
+          refine: ({ setVariants }) => {
+            setVariants({ size: undefined });
+            setVariants({ size: "sm" });
+          },
+        }),
+      );
+
+      // The second call has to compare against the cleared `undefined` that the
+      // first call recorded. Reading the recorded value with `??` instead would
+      // fall back to the resolved `"sm"`, drop the restore, and leave the chain
+      // flipping between `undefined` and `"sm"` until it hits the run limit.
+      expect(getStyleClass(component())).toEqual({ class: cls("sm") });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
     test("refine setVariants does not mutate props with plain extends", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
