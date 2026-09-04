@@ -571,29 +571,29 @@ The first group composes three layers with no cross-variant conditions. `class-v
 
 | Package                              |   Ops/sec | Relative to Clava |
 | ------------------------------------ | --------: | ----------------: |
-| `clava@0.6.2`                        | 2,437,844 |             1.00x |
-| `class-variance-authority@0.7.1`     | 1,802,851 |      1.35x slower |
-| `tailwind-variants@3.3.1`            | 1,267,118 |      1.92x slower |
-| `tailwind-variants/lite@3.3.1`       | 1,212,550 |      2.01x slower |
-| `clava@0.6.2 + cn@0.2.3`             |   778,948 |      3.13x slower |
-| `clava@0.6.2 + tailwind-merge@3.6.0` |   774,957 |      3.15x slower |
-| `cva@1.0.0-beta.8`                   |   398,310 |      6.12x slower |
+| `clava@0.6.2`                        | 2,384,411 |             1.00x |
+| `class-variance-authority@0.7.1`     | 1,872,892 |      1.27x slower |
+| `tailwind-variants@3.3.1`            | 1,312,965 |      1.82x slower |
+| `tailwind-variants/lite@3.3.1`       | 1,308,798 |      1.82x slower |
+| `clava@0.6.2 + tailwind-merge@3.6.0` |   843,376 |      2.83x slower |
+| `clava@0.6.2 + cn@0.2.3`             |   832,987 |      2.86x slower |
+| `cva@1.0.0-beta.8`                   |   408,730 |      5.83x slower |
 
 The second group adds the same cross-variant conditions at the interaction and product layers. Clava expresses them with `refine`, and every other library with `compoundVariants`.
 
 | Package                              |   Ops/sec | Relative to Clava |
 | ------------------------------------ | --------: | ----------------: |
-| `clava@0.6.2`                        | 1,120,145 |             1.00x |
-| `tailwind-variants@3.3.1`            |   550,288 |      2.04x slower |
-| `tailwind-variants/lite@3.3.1`       |   545,387 |      2.05x slower |
-| `clava@0.6.2 + tailwind-merge@3.6.0` |   545,091 |      2.05x slower |
-| `clava@0.6.2 + cn@0.2.3`             |   544,813 |      2.06x slower |
-| `class-variance-authority@0.7.1`     |   497,304 |      2.25x slower |
-| `cva@1.0.0-beta.8`                   |   364,078 |      3.08x slower |
+| `clava@0.6.2`                        | 1,335,204 |             1.00x |
+| `clava@0.6.2 + cn@0.2.3`             |   619,502 |      2.16x slower |
+| `clava@0.6.2 + tailwind-merge@3.6.0` |   607,107 |      2.20x slower |
+| `tailwind-variants/lite@3.3.1`       |   568,960 |      2.35x slower |
+| `tailwind-variants@3.3.1`            |   563,659 |      2.37x slower |
+| `class-variance-authority@0.7.1`     |   500,557 |      2.67x slower |
+| `cva@1.0.0-beta.8`                   |   313,641 |      4.26x slower |
 
-Dividing one table by the other shows what each library charges for cross-variant conditions. `cva` charges the least, Clava and both `tailwind-variants` entry points sit together in the middle, and `class-variance-authority` charges the most. The Clava rows that add a class merger charge less than Clava alone, since the merge cost dilutes the difference. The exact ratios move by several percent between runs, so read the ordering rather than the digits, and reach for the group that matches your components rather than reading either table as the whole picture.
+Dividing one table by the other shows what each library charges for cross-variant conditions. `cva` charges the least at 1.30x, Clava sits at 1.79x, both `tailwind-variants` entry points are near 2.31x, and `class-variance-authority` charges the most at 3.74x. The Clava rows that add a class merger charge less than Clava alone, near 1.36x, since the merge cost dilutes the difference. The exact ratios move by several percent between runs, so read the ordering rather than the digits, and reach for the group that matches your components rather than reading either table as the whole picture.
 
-Benchmark results vary by runtime and hardware, so treat them as a reproducible snapshot of this repository's composed-variant case rather than a universal ranking. Rows within a few percent of each other sit inside run-to-run noise, so their relative order is not meaningful. That covers the four rows from 2.04x to 2.06x in the second group and the `cn` and `tailwind-merge` pair in the first.
+Benchmark results vary by runtime and hardware, so treat them as a reproducible snapshot of this repository's composed-variant case rather than a universal ranking. Rows within a few percent of each other sit inside run-to-run noise, so their relative order is not meaningful. That covers two pairs, `cn` against `tailwind-merge` and the two `tailwind-variants` entry points. Each pair lands within a few percent in both groups, and both pairs swap order between runs.
 
 Both groups resolve one fixed prop set on every iteration, so every package with an internal cache serves repeated calls from cache after warmup. `tailwind-merge` and `cn` cache merged class strings, and both `tailwind-variants` entry points cache the resolved result by variant props. Clava, `cva`, and `class-variance-authority` have no such cache, so those rows recompute on every iteration.
 
