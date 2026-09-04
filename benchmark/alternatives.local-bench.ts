@@ -1,8 +1,6 @@
 import { cva as cva0 } from "class-variance-authority";
-import { create, cv } from "clava";
-import { cn } from "cn";
+import { cv } from "clava";
 import { compose, cva as cva1 } from "cva";
-import { twMerge } from "tailwind-merge";
 import { tv } from "tailwind-variants";
 import { tv as tvLite } from "tailwind-variants/lite";
 import { bench, describe } from "vitest";
@@ -27,9 +25,7 @@ const packageVersions = {
   "class-variance-authority":
     benchmarkPackageJson.dependencies["class-variance-authority"],
   clava: clavaPackageJson.version,
-  cn: benchmarkPackageJson.dependencies.cn,
   cva: benchmarkPackageJson.dependencies.cva,
-  "tailwind-merge": benchmarkPackageJson.dependencies["tailwind-merge"],
   "tailwind-variants": benchmarkPackageJson.dependencies["tailwind-variants"],
 } as const;
 
@@ -146,22 +142,22 @@ const productDefaultVariants = {
 // empty `compoundVariants` array costs its libraries almost nothing while a
 // present `refine` runs the chain whatever the callback does, as the inert
 // refine case in `clava.bench.ts` measures.
-function createClavaProduct(createCv: typeof cv, crossVariant: boolean) {
-  const clavaSurface = createCv({
+function createClavaProduct(crossVariant: boolean) {
+  const clavaSurface = cv({
     class: surfaceBase,
     variants: surfaceVariants,
     defaultVariants: surfaceDefaultVariants,
   });
 
   if (!crossVariant) {
-    const clavaInteraction = createCv({
+    const clavaInteraction = cv({
       extend: [clavaSurface],
       class: interactionBase,
       variants: interactionVariants,
       defaultVariants: interactionDefaultVariants,
     });
 
-    return createCv({
+    return cv({
       extend: [clavaInteraction],
       class: productBase,
       variants: productVariants,
@@ -169,7 +165,7 @@ function createClavaProduct(createCv: typeof cv, crossVariant: boolean) {
     });
   }
 
-  const clavaInteraction = createCv({
+  const clavaInteraction = cv({
     extend: [clavaSurface],
     class: interactionBase,
     variants: interactionVariants,
@@ -187,7 +183,7 @@ function createClavaProduct(createCv: typeof cv, crossVariant: boolean) {
     },
   });
 
-  return createCv({
+  return cv({
     extend: [clavaInteraction],
     class: productBase,
     variants: productVariants,
@@ -278,14 +274,6 @@ function createTailwindVariantsProduct(
   });
 }
 
-const { cv: cvTwMerge } = create({ transformClass: twMerge });
-const { cv: cvCn } = create({ transformClass: cn });
-
-const clavaTwMergeLabel = `${packageLabel("clava")} + ${packageLabel(
-  "tailwind-merge",
-)}`;
-const clavaCnLabel = `${packageLabel("clava")} + ${packageLabel("cn")}`;
-
 const resolveProps = {
   size: "lg",
   intent: "primary",
@@ -299,9 +287,7 @@ const resolveProps = {
 } as const;
 
 function describeGroup(title: string, crossVariant: boolean) {
-  const clavaProduct = createClavaProduct(cv, crossVariant);
-  const clavaProductWithTwMerge = createClavaProduct(cvTwMerge, crossVariant);
-  const clavaProductWithCn = createClavaProduct(cvCn, crossVariant);
+  const clavaProduct = createClavaProduct(crossVariant);
   const cvaProduct = createCvaProduct(crossVariant);
   const cva0Product = createCva0Product(crossVariant);
   const tvLiteProduct = createTailwindVariantsProduct(tvLite, crossVariant);
@@ -312,22 +298,6 @@ function describeGroup(title: string, crossVariant: boolean) {
       packageLabel("clava"),
       () => {
         consume(clavaProduct(resolveProps).class);
-      },
-      options,
-    );
-
-    bench(
-      clavaTwMergeLabel,
-      () => {
-        consume(clavaProductWithTwMerge(resolveProps).class);
-      },
-      options,
-    );
-
-    bench(
-      clavaCnLabel,
-      () => {
-        consume(clavaProductWithCn(resolveProps).class);
       },
       options,
     );
