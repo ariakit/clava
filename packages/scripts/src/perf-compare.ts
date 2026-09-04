@@ -605,12 +605,13 @@ function formatRemovedBenchmarks(entries: AggregatedBenchmark[]) {
   return lines;
 }
 
-// Names the artifact the figures describe. Without it a reported percentage
-// reads as applying to every consumer, when the benchmarks measure a
-// production bundle rather than `dist` as Node loads it.
+// Names the artifact the figures describe. The benchmarks import `dist`,
+// which keeps `process.env.NODE_ENV` intact, so code behind a development
+// guard is measured in a configuration a bundled application does not run.
+// Without this note a reported percentage reads as applying to everyone.
 // See https://github.com/ariakit/clava/issues/500.
 const MEASURED_ARTIFACT =
-  "Measured against a production bundle of the package, with `process.env.NODE_ENV` inlined, so the figures describe what an application ships rather than `dist` under Node.";
+  "Performance figures were measured against `dist` under Node, where `process.env.NODE_ENV` is still live, so a figure for code behind a development-only guard does not describe an application that inlines it. Bundle size is measured with it inlined.";
 
 function formatRoundsSummary(pairedRoundsCount: number) {
   if (pairedRoundsCount <= 2) {

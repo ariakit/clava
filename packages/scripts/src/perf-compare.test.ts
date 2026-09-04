@@ -376,7 +376,7 @@ describe("perf compare", () => {
     // comparison, which is the case that has no rounds summary to hide behind.
     // See https://github.com/ariakit/clava/issues/500.
     expect(markdown).toContain(
-      "Measured against a production bundle of the package",
+      "Performance figures were measured against `dist` under Node",
     );
   });
 
@@ -401,6 +401,11 @@ describe("perf compare", () => {
 
     expect(markdown).toContain(
       "Some benchmarks were removed; no comparable benchmarks remain.",
+    );
+    // The note has to survive a comparison that flags nothing, because the
+    // breakdown still prints a percentage for every row.
+    expect(markdown).toContain(
+      "Performance figures were measured against `dist` under Node",
     );
   });
 

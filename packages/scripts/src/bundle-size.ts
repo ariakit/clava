@@ -91,44 +91,23 @@ function readOptions(
   };
 }
 
-export interface BuildPackageBundleOptions {
-  sourceRoot: string;
-  outDir: string;
-}
-
-/**
- * Builds the package the way an application bundles it and returns the path to
- * the result. The bundle metric and the benchmarks both go through here, so
- * they describe the same artifact.
- */
-export async function buildPackageBundle({
-  sourceRoot,
-  outDir,
-}: BuildPackageBundleOptions): Promise<string> {
-  const packageEntry = path.join(sourceRoot, "packages/clava/dist/index.js");
-  const entry = path.join(outDir, "entry.js");
-
-  await mkdir(outDir, { recursive: true });
-  // Re-export the full public API so the bundle covers the published surface
-  // plus its bundled runtime dependencies, not one tree-shaken use.
-  await writeFile(
-    entry,
-    `export * from ${JSON.stringify(pathToFileURL(packageEntry).href)};\n`,
-  );
-
-  await build(createBundleSizeBuildConfig({ entry, root: outDir }));
-
-  return path.join(outDir, "dist/bundle.js");
-}
-
 export async function measureBundleSize({
   sourceRoot,
   output,
 }: BundleSizeOptions): Promise<BundleSizeResult> {
+  const packageEntry = path.join(sourceRoot, "packages/clava/dist/index.js");
   const tempDir = await mkdtemp(path.join(tmpdir(), "clava-bundle-size-"));
 
   try {
-    const bundle = await buildPackageBundle({ sourceRoot, outDir: tempDir });
+    const entry = path.join(tempDir, "entry.js");
+    const bundle = path.join(tempDir, "dist/bundle.js");
+    const packageUrl = pathToFileURL(packageEntry).href;
+
+    // Re-export the full public API so the metric tracks the published
+    // surface plus its bundled runtime dependencies, not one tree-shaken use.
+    await writeFile(entry, `export * from ${JSON.stringify(packageUrl)};\n`);
+
+    await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
 
     const code = stripBundleRegionComments(await readFile(bundle, "utf-8"));
     const result = {
