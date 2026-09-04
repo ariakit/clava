@@ -605,6 +605,13 @@ function formatRemovedBenchmarks(entries: AggregatedBenchmark[]) {
   return lines;
 }
 
+// Names the artifact the figures describe. Without it a reported percentage
+// reads as applying to every consumer, when the benchmarks measure a
+// production bundle rather than `dist` as Node loads it.
+// See https://github.com/ariakit/clava/issues/500.
+const MEASURED_ARTIFACT =
+  "Measured against a production bundle of the package, with `process.env.NODE_ENV` inlined, so the figures describe what an application ships rather than `dist` under Node.";
+
 function formatRoundsSummary(pairedRoundsCount: number) {
   if (pairedRoundsCount <= 2) {
     return `Aggregated across ${pairedRoundsCount} interleaved rounds (preliminary).`;
@@ -677,6 +684,8 @@ function formatMarkdown(summary: ComparisonSummary) {
   lines.push(
     `:warning: = regression above ${THRESHOLD_PERCENT}% - :rocket: = improvement above ${THRESHOLD_PERCENT}%`,
   );
+  lines.push("");
+  lines.push(MEASURED_ARTIFACT);
   if (pairedRoundsCount > 1) {
     lines.push("");
     lines.push(formatRoundsSummary(pairedRoundsCount));

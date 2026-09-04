@@ -371,6 +371,13 @@ describe("perf compare", () => {
 
     expect(markdown).toContain("| Benchmark | Baseline | Current | Change |");
     expect(markdown).toContain("-20% :warning:");
+    // The output has to name the artifact it measured, so a percentage cannot
+    // be read as applying to a consumer who bundles. Asserted on a single-round
+    // comparison, which is the case that has no rounds summary to hide behind.
+    // See https://github.com/ariakit/clava/issues/500.
+    expect(markdown).toContain(
+      "Measured against a production bundle of the package",
+    );
   });
 
   test("reports renamed benchmarks distinctly from missing baseline", () => {
