@@ -35,9 +35,7 @@
       "matchFileNames": ["benchmark/package.json"],
       "matchPackageNames": [
         "class-variance-authority",
-        "cn",
         "cva",
-        "tailwind-merge",
         "tailwind-variants",
         "tailwindcss"
       ],
