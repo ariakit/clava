@@ -51,6 +51,11 @@
     ]
   },
   "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.3.0",
+      "onFail": "ignore"
+    },
     "runtime": {
       "name": "node",
       "version": "24.18.0",
