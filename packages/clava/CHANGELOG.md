@@ -1,5 +1,27 @@
 # clava
 
+## 0.6.3
+
+### Improved runtime performance of the `refine` chain
+
+Per-render benchmarks improve roughly 15% to 20% for a component that extends nothing and whose [`refine`](https://clava.style/docs/reference/refine) callback does not change variants. A component that does more work per render gains a smaller share of that improvement. The minified bundle is 2.2% smaller. There are no public API or behavior changes.
+
+Resolving a component whose chain contains [`refine`](https://clava.style/docs/reference/refine) or a computed `defaultVariants` entry allocated the bookkeeping for a variant change on every call, even when no callback changed one. Each piece of that bookkeeping is now created only when something reads it: the record of assigned variants when a callback assigns one, and the copy of your props when a computed default reads them.
+
+### Improved runtime performance of re-running the `refine` chain
+
+Per-render benchmarks improve roughly 15% to 20% for a component whose [`refine`](https://clava.style/docs/reference/refine) callback or computed `defaultVariants` entry changes a variant, and the [`getVariants()`](https://clava.style/docs/reference/getVariants) benchmark for such a component is roughly twice as fast, measured on the unbundled `dist` under Node. The minified bundle is 0.3% smaller. There are no public API changes and no change to supported behavior.
+
+When a callback changes a variant, Clava re-runs the chain until the variants stop changing, and each extra pass cost far more than the work it repeated. Two things caused that. A development-only check read `process.env.NODE_ENV` on every pass that changed a variant, which in Node is an environment lookup rather than a property load. Separately, the record tracking a callback's assignments was seeded with a full copy of the resolved variants. The check now runs only as a chain approaches its iteration limit, and the record holds only the keys that changed.
+
+A bundler that replaces `process.env.NODE_ENV` already removes that check from both versions, so a bundled application gains only from the record change, which applies where a [`refine`](https://clava.style/docs/reference/refine) callback calls `setVariants`.
+
+### Ignored inherited property values in variants, props, and configuration
+
+[`cv`](https://clava.style/docs/reference/cv) and [`create`](https://clava.style/docs/reference/create) no longer take a class, a style, a variant value, or a configuration setting from a key inherited from `Object.prototype`.
+
+A variant named after an `Object.prototype` member, such as `constructor` or `toString`, now resolves like any other variant.
+
 ## 0.6.2
 
 - Fixed `TS2590` and `TS2345` type errors when a framework style value, such as React's `CSSProperties` or Solid's `JSX.CSSProperties`, is passed to a [`cv`](https://clava.style/docs/reference/cv) component.
