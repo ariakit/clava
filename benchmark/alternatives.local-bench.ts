@@ -3,7 +3,7 @@ import { cv } from "clava";
 import { compose, cva as cva1 } from "cva";
 import { tv } from "tailwind-variants";
 import { tv as tvLite } from "tailwind-variants/lite";
-import { bench, describe } from "vitest";
+import { describe, test } from "vitest";
 import clavaPackageJson from "../packages/clava/package.json" with { type: "json" };
 import benchmarkPackageJson from "./package.json" with { type: "json" };
 
@@ -294,45 +294,41 @@ function describeGroup(title: string, crossVariant: boolean) {
   const tvProduct = createTailwindVariantsProduct(tv, crossVariant);
 
   describe(title, () => {
-    bench(
-      packageLabel("clava"),
-      () => {
+    test(packageLabel("clava"), async ({ bench }) => {
+      await bench(packageLabel("clava"), () => {
         consume(clavaProduct(resolveProps).class);
-      },
-      options,
-    );
+      }).run(options);
+    });
 
-    bench(
-      packageLabel("cva"),
-      () => {
+    test(packageLabel("cva"), async ({ bench }) => {
+      await bench(packageLabel("cva"), () => {
         consume(cvaProduct(resolveProps));
-      },
-      options,
-    );
+      }).run(options);
+    });
 
-    bench(
-      packageLabel("class-variance-authority"),
-      () => {
+    test(packageLabel("class-variance-authority"), async ({ bench }) => {
+      await bench(packageLabel("class-variance-authority"), () => {
         consume(cva0Product(resolveProps));
-      },
-      options,
-    );
+      }).run(options);
+    });
 
-    bench(
+    test(
       packageLabel("tailwind-variants", "tailwind-variants/lite"),
-      () => {
-        consume(tvLiteProduct(resolveProps));
+      async ({ bench }) => {
+        await bench(
+          packageLabel("tailwind-variants", "tailwind-variants/lite"),
+          () => {
+            consume(tvLiteProduct(resolveProps));
+          },
+        ).run(options);
       },
-      options,
     );
 
-    bench(
-      packageLabel("tailwind-variants"),
-      () => {
+    test(packageLabel("tailwind-variants"), async ({ bench }) => {
+      await bench(packageLabel("tailwind-variants"), () => {
         consume(tvProduct(resolveProps));
-      },
-      options,
-    );
+      }).run(options);
+    });
   });
 }
 

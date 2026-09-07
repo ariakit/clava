@@ -1,5 +1,5 @@
 import { cv, splitProps } from "clava";
-import { bench, describe } from "vitest";
+import { describe, test } from "vitest";
 
 const options = {
   time: 2000,
@@ -206,17 +206,14 @@ const splitPropsInput = {
 };
 
 describe("cv", () => {
-  bench(
-    "create component with variants",
-    () => {
+  test("create component with variants", async ({ bench }) => {
+    await bench("create component with variants", () => {
       consume(cv(buttonConfig));
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve component props",
-    () => {
+  test("resolve component props", async ({ bench }) => {
+    await bench("resolve component props", () => {
       consume(
         button({
           size: "lg",
@@ -226,13 +223,11 @@ describe("cv", () => {
           style: { marginTop: 4 },
         }),
       );
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve refined component props",
-    () => {
+  test("resolve refined component props", async ({ bench }) => {
+    await bench("resolve refined component props", () => {
       consume(
         refinedButton({
           size: "lg",
@@ -242,13 +237,11 @@ describe("cv", () => {
           style: { marginTop: 4 },
         }),
       );
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve component props with inert refine",
-    () => {
+  test("resolve component props with inert refine", async ({ bench }) => {
+    await bench("resolve component props with inert refine", () => {
       consume(
         inertRefinedButton({
           size: "lg",
@@ -258,13 +251,11 @@ describe("cv", () => {
           style: { marginTop: 4 },
         }),
       );
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve html props from string style",
-    () => {
+  test("resolve html props from string style", async ({ bench }) => {
+    await bench("resolve html props from string style", () => {
       consume(
         button.html({
           size: "sm",
@@ -272,13 +263,11 @@ describe("cv", () => {
           style: "margin-top: 4px; --accent-color: blue;",
         }),
       );
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve extended function variant props",
-    () => {
+  test("resolve extended function variant props", async ({ bench }) => {
+    await bench("resolve extended function variant props", () => {
       consume(
         toolbarButton({
           size: "lg",
@@ -288,76 +277,60 @@ describe("cv", () => {
           style: { marginInlineStart: 4 },
         }),
       );
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve extended props without refine",
-    () => {
+  test("resolve extended props without refine", async ({ bench }) => {
+    await bench("resolve extended props without refine", () => {
       consume(plainExtend(refineProps));
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve extended props with inert refine",
-    () => {
+  test("resolve extended props with inert refine", async ({ bench }) => {
+    await bench("resolve extended props with inert refine", () => {
       consume(inertRefineExtend(refineProps));
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve extended props with refine setVariants",
-    () => {
+  test("resolve extended props with refine setVariants", async ({ bench }) => {
+    await bench("resolve extended props with refine setVariants", () => {
       consume(setVariantsRefineExtend(refineProps));
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve extended props with computed default",
-    () => {
+  test("resolve extended props with computed default", async ({ bench }) => {
+    await bench("resolve extended props with computed default", () => {
       consume(computedDefaultExtend(refineProps));
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "resolve extended props with inherited refine",
-    () => {
+  test("resolve extended props with inherited refine", async ({ bench }) => {
+    await bench("resolve extended props with inherited refine", () => {
       consume(inheritedRefineExtend(refineProps));
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "get variant values",
-    () => {
+  test("get variant values", async ({ bench }) => {
+    await bench("get variant values", () => {
       consume(
         toolbarButton.getVariants({
           size: "lg",
           active: true,
         }),
       );
-    },
-    options,
-  );
+    }).run(options);
+  });
 });
 
 describe("splitProps", () => {
-  bench(
-    "split props across components",
-    () => {
+  test("split props across components", async ({ bench }) => {
+    await bench("split props across components", () => {
       consume(splitProps(splitPropsInput, toolbarButton, field));
-    },
-    options,
-  );
+    }).run(options);
+  });
 
-  bench(
-    "split props across arrays and components",
-    () => {
+  test("split props across arrays and components", async ({ bench }) => {
+    await bench("split props across arrays and components", () => {
       consume(
         splitProps(
           splitPropsInput,
@@ -366,9 +339,8 @@ describe("splitProps", () => {
           field,
         ),
       );
-    },
-    options,
-  );
+    }).run(options);
+  });
 });
 
 export { sink };

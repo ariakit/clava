@@ -13,6 +13,22 @@ const THRESHOLD_PERCENT = 10;
 
 interface BenchmarkReport {
   files?: ReportFile[];
+  testResults?: JsonReportFile[];
+}
+
+interface JsonReportFile {
+  name?: string;
+  assertionResults?: JsonReportTest[];
+}
+
+interface JsonReportTest {
+  ancestorTitles?: string[];
+  benchmarks?: { tasks?: JsonReportBenchmark[] }[];
+}
+
+interface JsonReportBenchmark {
+  name?: string;
+  latency?: { mean?: number };
 }
 
 interface ReportFile {
@@ -229,9 +245,36 @@ function formatLabel({ file, name }: { file: string; name: string }): string {
   return parts.join(" > ");
 }
 
+function reportFiles(report: BenchmarkReport): ReportFile[] {
+  if (!report.testResults) {
+    return report.files ?? [];
+  }
+  return report.testResults.map((file) => ({
+    filepath: file.name,
+    groups: file.assertionResults?.map((test) => ({
+      // Keep the v4 file/suite identity when benchmarks move into tests.
+      fullName: [
+        normalizeFilePath(file.name ?? ""),
+        ...(test.ancestorTitles ?? []),
+      ].join(" > "),
+      benchmarks: test.benchmarks?.flatMap((group) =>
+        (group.tasks ?? []).map((benchmark) => {
+          const mean = getNumber(benchmark.latency?.mean);
+          return {
+            name: benchmark.name,
+            // v4 hz is the reciprocal of mean latency, not the v5 mean of rates.
+            hz: mean > 0 ? 1000 / mean : 0,
+            mean,
+          };
+        }),
+      ),
+    })),
+  }));
+}
+
 function entriesFromReport(report: BenchmarkReport): BenchmarkEntry[] {
   const entries: BenchmarkEntry[] = [];
-  for (const file of report.files ?? []) {
+  for (const file of reportFiles(report)) {
     const filePath = normalizeFilePath(file.filepath ?? "");
     for (const group of file.groups ?? []) {
       const groupName = group.fullName ?? "";
