@@ -333,6 +333,88 @@ describe("perf compare", () => {
     expect(markdown).toContain("-20% :warning:");
   });
 
+  test("pairs Vitest 5 JSON benchmarks with Vitest 4 baselines", () => {
+    const markdown = runCompare({
+      baseline: {
+        files: [
+          {
+            filepath: "/baseline/benchmark/clava.bench.ts",
+            groups: [
+              {
+                fullName: "benchmark/clava.bench.ts > cv > nested",
+                benchmarks: [{ name: "resolve", hz: 1000, mean: 1 }],
+              },
+            ],
+          },
+        ],
+      },
+      current: {
+        testResults: [
+          {
+            name: "/current/benchmark/clava.bench.ts",
+            assertionResults: [
+              {
+                ancestorTitles: ["cv", "nested"],
+                title: "resolve",
+                benchmarks: [
+                  {
+                    name: "cv > nested > resolve",
+                    tasks: [
+                      {
+                        name: "resolve",
+                        latency: { mean: 1.25 },
+                        throughput: { mean: 1800 },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(markdown).toContain("benchmark > clava.bench.ts > resolve");
+    expect(markdown).toContain("1,000 ops/sec | 800 ops/sec | -20% :warning:");
+    expect(markdown).not.toContain("### New benchmarks");
+    expect(markdown).not.toContain("### Removed benchmarks");
+  });
+
+  test("pairs Vitest 5 JSON reports and ignores tests without benchmarks", () => {
+    const report = {
+      testResults: [
+        {
+          name: "/current/benchmark/clava.bench.ts",
+          assertionResults: [
+            { ancestorTitles: ["cv"], title: "skipped", benchmarks: [] },
+            {
+              ancestorTitles: ["cv"],
+              title: "compare",
+              benchmarks: [
+                {
+                  name: "cv > compare",
+                  tasks: [
+                    { name: "first", latency: { mean: 1 } },
+                    { name: "second", latency: { mean: 2 } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const markdown = runCompare({ baseline: report, current: report });
+
+    expect(markdown).toContain("benchmark > clava.bench.ts > first");
+    expect(markdown).toContain("benchmark > clava.bench.ts > second");
+    expect(markdown).toContain("1,000 ops/sec | 1,000 ops/sec | +0%");
+    expect(markdown).toContain("500 ops/sec | 500 ops/sec | +0%");
+    expect(markdown).not.toContain("skipped");
+    expect(markdown).not.toContain("no comparable benchmarks");
+  });
+
   test("pairs versioned benchmark names with unversioned baselines", () => {
     const dir = createTempDir();
     const markdown = runCompare({

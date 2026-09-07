@@ -155,17 +155,26 @@ jobs:
         run: |
           mkdir -p .perf-results
 
+          # The baseline can still use Vitest 4 until this migration merges.
+          baseline_major=$(cd "$BASELINE_DIR" && node -p \
+            'require("./package.json").devDependencies.vitest.split(".")[0]')
+          baseline_reporter=(--reporter=default --reporter=json --outputFile)
+          if [ "$baseline_major" -lt 5 ]; then
+            baseline_reporter=(--outputJson)
+          fi
+
           run_perf_round() {
             local i="$1"
 
             echo "::group::Round $i - baseline"
             (cd "$BASELINE_DIR" && pnpm bench \
-              --outputJson "$GITHUB_WORKSPACE/.perf-results/baseline-$i.json" \
+              "${baseline_reporter[@]}" "$GITHUB_WORKSPACE/.perf-results/baseline-$i.json" \
               --passWithNoTests)
             echo "::endgroup::"
             echo "::group::Round $i - current"
             pnpm bench \
-              --outputJson ".perf-results/current-$i.json" \
+              --reporter=default --reporter=json \
+              --outputFile ".perf-results/current-$i.json" \
               --passWithNoTests
             echo "::endgroup::"
           }
