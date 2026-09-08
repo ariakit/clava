@@ -1,0 +1,15 @@
+# https://lefthook.dev/configuration/
+
+# Match files at the repository root and in nested directories.
+glob_matcher: doublestar
+
+pre-commit:
+  piped: true
+  jobs:
+    - name: oxfmt
+      run: pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+
+    - name: oxlint
+      glob: "**/*.{js,ts,jsx,tsx}"
+      run: pnpm exec oxlint --type-aware --type-check {staged_files}

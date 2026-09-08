@@ -23,8 +23,7 @@
     "format-check": "oxfmt --check .",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "changeset publish",
-    "prepare": "husky"
+    "release": "changeset publish"
   },
   "devDependencies": {
     "@changesets/apply-release-plan": "8.1.0",
@@ -32,8 +31,7 @@
     "@changesets/config": "4.0.0",
     "@changesets/types": "7.0.0",
     "@types/node": "25.9.5",
-    "husky": "9.1.7",
-    "lint-staged": "17.5.0",
+    "lefthook": "2.1.12",
     "oxfmt": "0.66.0",
     "oxlint": "1.81.0",
     "oxlint-tsgolint": "7.0.2001",
@@ -41,14 +39,6 @@
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-7": "npm:typescript@7.0.2",
     "vitest": "5.0.0"
-  },
-  "lint-staged": {
-    "*": [
-      "oxfmt --no-error-on-unmatched-pattern"
-    ],
-    "*.{js,ts,jsx,tsx}": [
-      "oxlint --type-aware --type-check"
-    ]
   },
   "devEngines": {
     "runtime": {

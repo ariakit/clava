@@ -44,7 +44,7 @@
       "platformAutomerge": true
     },
     {
-      "matchPackageNames": ["lint-staged"],
+      "matchPackageNames": ["lefthook"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
       "automergeType": "pr",
