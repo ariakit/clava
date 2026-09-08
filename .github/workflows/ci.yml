@@ -86,9 +86,9 @@ jobs:
       # single noisy run while still requiring material agreement.
       PERF_INITIAL_ROUNDS: 2
       PERF_CONFIRMATION_ROUNDS: 3
-      # Skip husky's `prepare` script: linked worktrees share `.git/hooks` with
-      # the main checkout, so installing in the baseline tree would otherwise
-      # rewrite the main repo's hooks.
+      # Skip Git hook installation in both worktrees. Keep HUSKY for baseline
+      # commits that still use its prepare script and share the Git config.
+      LEFTHOOK: 0
       HUSKY: 0
     steps:
       - uses: actions/checkout@v7
