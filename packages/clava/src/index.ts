@@ -85,9 +85,9 @@ type ComputedDefaultVariantFn = (
 
 // Internal metadata stored on components but hidden from public types.
 interface ComponentMeta {
-  identity: object;
-  extends: ComponentMeta[];
-  rebuild: (extensions: ComponentMeta[]) => ComponentMeta;
+  identity?: object;
+  extends?: ComponentMeta[];
+  rebuild?: (extensions: ComponentMeta[]) => ComponentMeta;
   baseClass: string;
   staticDefaults: Record<string, unknown>;
   // Performs a single compute pass for extending components, returning the
@@ -131,16 +131,25 @@ function deduplicateExtensions(
   const result: ComponentMeta[] = [];
   let changed = false;
   for (const meta of extensions) {
-    if (seen.has(meta.identity)) {
+    const identity = getOwn(meta, "identity") ?? meta;
+    if (seen.has(identity)) {
       changed = true;
       continue;
     }
-    seen.add(meta.identity);
-    const children = deduplicateExtensions(meta.extends, seen);
-    if (children === meta.extends) {
+    seen.add(identity);
+    // Older Clava copies expose the compute metadata but not their graph.
+    // Keep their contribution intact instead of traversing hidden ancestors.
+    const inheritedExtensions = getOwn(meta, "extends");
+    const rebuild = getOwn(meta, "rebuild");
+    if (!inheritedExtensions || !rebuild) {
+      result.push(meta);
+      continue;
+    }
+    const children = deduplicateExtensions(inheritedExtensions, seen);
+    if (children === inheritedExtensions) {
       result.push(meta);
     } else {
-      result.push(meta.rebuild(children));
+      result.push(rebuild(children));
       changed = true;
     }
   }

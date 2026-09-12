@@ -271,6 +271,8 @@ Use `extend` to compose existing Clava components. Extended base classes are ord
 
 If a component appears through several `extend` paths, Clava applies it only at its first occurrence. Its classes, styles, defaults, and refinement participate through that path. For example, if `left` and `right` both extend `base`, `cv({ extend: [left, right] })` applies `base`, then `left`, then `right`. The component's JSX and HTML helpers share the same identity. Separate components can still emit identical classes.
 
+Components created by older Clava versions retain their existing internal extension behavior. Shared ancestors inside those components can still repeat.
+
 ```ts
 const baseButton = cv({
   class: "button",
