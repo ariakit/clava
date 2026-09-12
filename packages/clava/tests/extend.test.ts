@@ -214,6 +214,66 @@ for (const config of Object.values(CONFIGS)) {
       );
     });
 
+    test("pruned branches retain their compiled configuration", () => {
+      const base = cv({ class: "base" });
+      const branchConfig = {
+        extend: [base],
+        class: "original",
+        style: { color: "red" },
+        variants: { size: { sm: "small", lg: "large" } },
+        defaultVariants: { size: "sm" as "sm" | "lg" },
+        refine: () => "original-refine",
+      };
+      const right = cv(branchConfig);
+      const left = cv({ extend: [base], class: "left" });
+      branchConfig.class = "changed";
+      branchConfig.style = { color: "blue" };
+      branchConfig.variants.size.sm = "changed-small";
+      branchConfig.defaultVariants.size = "lg";
+      branchConfig.refine = () => "changed-refine";
+      branchConfig.extend.length = 0;
+      expect(getStyleClass(right())).toEqual({
+        class: cls("base original small original-refine"),
+        color: "red",
+      });
+      const both = cv({ extend: [left, right] });
+      const component = getModeComponent(mode, both);
+      expect(getStyleClass(component())).toEqual({
+        class: cls("base left original small original-refine"),
+        color: "red",
+      });
+      expect(component.getVariants()).toEqual({ size: "sm" });
+      expect(cv({ extend: [base, both, right] }).class()).toBe(
+        cls("base left original small original-refine"),
+      );
+    });
+
+    test("pruned branches retain compiled function variants and defaults", () => {
+      const base = cv({ class: "base" });
+      const variants = { size: (value: number) => `size-${value}` };
+      const defaults = { size: () => 2 };
+      const right = cv({ extend: [base], variants, defaultVariants: defaults });
+      variants.size = () => "changed";
+      defaults.size = () => 3;
+      const component = getModeComponent(mode, cv({ extend: [base, right] }));
+      expect(getStyleClass(component())).toEqual({ class: cls("base size-2") });
+      expect(component.getVariants()).toEqual({ size: 2 });
+    });
+
+    test("pruned branches preserve compiled classes and captured style objects", () => {
+      const base = cv({ class: "base" });
+      const classes = ["original"];
+      const style = { color: "red" };
+      const right = cv({ extend: [base], class: classes, style });
+      classes[0] = "changed";
+      style.color = "blue";
+      const component = getModeComponent(mode, cv({ extend: [base, right] }));
+      expect(getStyleClass(component())).toEqual({
+        class: cls("base original"),
+        color: "blue",
+      });
+    });
+
     test("extend with variant merging", () => {
       const base = cv({ variants: { size: { sm: "base-sm", lg: "base-lg" } } });
       const component = getModeComponent(
