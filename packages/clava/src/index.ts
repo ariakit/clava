@@ -1,5 +1,6 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
 import {
+  type CreationFrame,
   REFINE_UNSTABLE_TRACKING_WINDOW,
   type VariantChange,
   accumulateUnstableVariantChanges,
@@ -84,6 +85,9 @@ type ComputedDefaultVariantFn = (
 
 // Internal metadata stored on components but hidden from public types.
 interface ComponentMeta {
+  identity: object;
+  extends: ComponentMeta[];
+  rebuild: (extensions: ComponentMeta[]) => ComponentMeta;
   baseClass: string;
   staticDefaults: Record<string, unknown>;
   // Performs a single compute pass for extending components, returning the
@@ -114,6 +118,34 @@ interface ComponentWithMeta {
 }
 
 const EMPTY_DEFAULTS: Record<string, unknown> = {};
+
+// Prune shared recipes before compiling their parent's compute path. Keeping
+// the first path preserves its overrides and factory transform boundaries.
+function deduplicateExtensions(
+  extensions: ComponentMeta[],
+  seen = new Set<object>(),
+): ComponentMeta[] {
+  if (extensions.length === 0) {
+    return extensions;
+  }
+  const result: ComponentMeta[] = [];
+  let changed = false;
+  for (const meta of extensions) {
+    if (seen.has(meta.identity)) {
+      changed = true;
+      continue;
+    }
+    seen.add(meta.identity);
+    const children = deduplicateExtensions(meta.extends, seen);
+    if (children === meta.extends) {
+      result.push(meta);
+    } else {
+      result.push(meta.rebuild(children));
+      changed = true;
+    }
+  }
+  return changed ? result : extensions;
+}
 
 const MAX_REFINE_RUNS = 50;
 
@@ -518,9 +550,14 @@ export function create(params: CreateParams = {}) {
 
   const cx = (...classes: ClsxClassValue[]) => transformClass(clsx(classes));
 
-  const cv = <V extends Variants = {}, const E extends AnyComponent[] = []>(
+  const buildComponent = <
+    V extends Variants = {},
+    const E extends AnyComponent[] = [],
+  >(
     config: CVConfig<V, E> = {},
-  ): CVComponent<V, E> => {
+    extensions?: ComponentMeta[],
+    originalCreationFrame?: CreationFrame,
+  ): { component: CVComponent<V, E>; meta: ComponentMeta } => {
     type MergedVariants = MergeVariants<V, E>;
 
     // ----- Pre-computed at creation time -----
@@ -537,13 +574,14 @@ export function create(params: CreateParams = {}) {
 
     const variantKeySet = new Set<string>();
     const staticDefaults: Record<string, unknown> = {};
+    const inheritedComputedDefaultKeys = new Set<string>();
 
     // Pre-build extended component info, so the render path doesn't need to
     // read component metadata. Extends from a different `create()`
     // factory (different `transformClass` identity) need their contribution
     // transformed by their own `transformClass` before being joined into our
     // class string.
-    const extMetas: ComponentMeta[] = [];
+    let extMetas: ComponentMeta[] = [];
     const extBaseClassesArr: string[] = [];
     const extIsolated: boolean[] = [];
     let hasIsolatedExt = false;
@@ -559,16 +597,27 @@ export function create(params: CreateParams = {}) {
         const meta = (ext as AnyComponent & ComponentWithMeta)[META_KEY];
         if (!meta) continue;
         extMetas.push(meta);
-        Object.assign(staticDefaults, meta.staticDefaults);
-
-        const isolated = meta.transformClass !== transformClass;
-        extIsolated.push(isolated);
-        if (isolated) {
-          hasIsolatedExt = true;
-          extBaseClassesArr.push(meta.transformClass(meta.baseClass));
-        } else {
-          extBaseClassesArr.push(meta.baseClass);
+        // A later branch can read a computed default contributed by the first
+        // path, even when that shared ancestor is pruned from this branch.
+        for (const key of meta.computedDefaultKeys) {
+          inheritedComputedDefaultKeys.add(key);
         }
+      }
+    }
+    if (extensions) {
+      extMetas = extensions;
+    } else if (extMetas.length > 1) {
+      extMetas = deduplicateExtensions(extMetas);
+    }
+    for (const meta of extMetas) {
+      Object.assign(staticDefaults, meta.staticDefaults);
+      const isolated = meta.transformClass !== transformClass;
+      extIsolated.push(isolated);
+      if (isolated) {
+        hasIsolatedExt = true;
+        extBaseClassesArr.push(meta.transformClass(meta.baseClass));
+      } else {
+        extBaseClassesArr.push(meta.baseClass);
       }
     }
     const extCount = extMetas.length;
@@ -678,14 +727,6 @@ export function create(params: CreateParams = {}) {
       }
     }
 
-    const inheritedComputedDefaultKeys = new Set<string>();
-    for (let i = 0; i < extCount; i++) {
-      const keys = extMetas[i].computedDefaultKeys;
-      for (const key of keys) {
-        inheritedComputedDefaultKeys.add(key);
-      }
-    }
-
     // Filter to only extends with computed default or refine work in their
     // chain. Those are the components that can change resolved variants across
     // fixed-point iterations.
@@ -723,8 +764,9 @@ export function create(params: CreateParams = {}) {
     // unless the warning actually fires.
     const canTriggerRefineWarning =
       !!refine || computedDefaultCount > 0 || extMetasWithRefineCount > 0;
-    const creationFrame =
-      canTriggerRefineWarning && process.env.NODE_ENV !== "production"
+    const creationFrame = extensions
+      ? originalCreationFrame
+      : canTriggerRefineWarning && process.env.NODE_ENV !== "production"
         ? captureCreationFrame(cv)
         : undefined;
 
@@ -1685,6 +1727,13 @@ export function create(params: CreateParams = {}) {
       return computeResult(props).className;
     };
     const meta: ComponentMeta = {
+      identity: {},
+      extends: extMetas,
+      rebuild: (extensions) => {
+        const rebuilt = buildComponent(config, extensions, creationFrame).meta;
+        rebuilt.identity = meta.identity;
+        return rebuilt;
+      },
       baseClass: computedBaseClass,
       staticDefaults,
       compute: computeOnce,
@@ -1757,8 +1806,12 @@ export function create(params: CreateParams = {}) {
     defaultComponent.html = htmlComponent;
     defaultComponent.htmlObj = htmlObjComponent;
 
-    return defaultComponent;
+    return { component: defaultComponent, meta };
   };
+
+  const cv = <V extends Variants = {}, const E extends AnyComponent[] = []>(
+    config: CVConfig<V, E> = {},
+  ): CVComponent<V, E> => buildComponent(config).component;
 
   return { cv, cx };
 }

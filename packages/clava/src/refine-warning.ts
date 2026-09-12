@@ -36,8 +36,8 @@ export function captureCreationFrame(
   // Engines without `Error.captureStackTrace` (SpiderMonkey, JavaScriptCore)
   // can't strip internal frames, but their `Error.stack` getter is still
   // lazy, so returning the Error instance defers the format cost. The
-  // resulting trace includes 1–2 extra frames at the top from this helper and
-  // `cv` itself.
+  // resulting trace includes extra frames from this helper, `buildComponent`,
+  // and `cv` itself.
   return new Error();
 }
 
@@ -68,6 +68,9 @@ export function formatCreationStack(frame: CreationFrame): string | undefined {
 
 function isInternalCreationFrame(line: string): boolean {
   if (line.includes("captureCreationFrame")) return true;
+  if (line.startsWith("at buildComponent ")) return true;
+  if (line.startsWith("at buildComponent(")) return true;
+  if (line.startsWith("buildComponent@")) return true;
   if (line.startsWith("at cv ")) return true;
   if (line.startsWith("at cv(")) return true;
   if (line.startsWith("cv@")) return true;
