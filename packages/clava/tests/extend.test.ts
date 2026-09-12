@@ -39,6 +39,241 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
+    test("extend a shared base once at its first position", () => {
+      const base = cv({
+        class: "base",
+        style: { color: "red" },
+        variants: { size: { sm: "size-sm", lg: "size-lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const left = cv({
+        extend: [base],
+        class: "left",
+        style: { color: "blue" },
+      });
+      const right = cv({ extend: [base], class: "right" });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [left, right], class: "both" }),
+      );
+      expect(getStyleClass(component())).toEqual({
+        class: cls("base left right both size-sm"),
+        color: "blue",
+      });
+      expect(getStyleClass(component({ size: "lg" }))).toEqual({
+        class: cls("base left right both size-lg"),
+        color: "blue",
+      });
+      expect(component.getVariants()).toEqual({ size: "sm" });
+      expect(getStyleClass(right())).toEqual({
+        class: cls("base right size-sm"),
+        color: "red",
+      });
+    });
+
+    test("extend deduplicates component modes but keeps distinct recipes", () => {
+      const base = cv({ class: "same" });
+      const other = cv({ class: "same" });
+      const component = getModeComponent(
+        mode,
+        cv({ extend: [base, base.jsx, base.html, base.htmlObj, other] }),
+      );
+      expect(getStyleClass(component())).toEqual({ class: cls("same same") });
+    });
+
+    test("extend preserves first-path defaults and later own defaults", () => {
+      const base = cv({
+        variants: { size: { sm: "sm", lg: "lg" } },
+        defaultVariants: { size: "sm" },
+      });
+      const left = cv({ extend: [base], defaultVariants: { size: "lg" } });
+      const right = cv({ extend: [base] });
+      const component = cv({ extend: [left, right] });
+      expect(component.getVariants()).toEqual({ size: "lg" });
+      expect(component.class()).toBe(cls("lg"));
+      const override = cv({ extend: [base], defaultVariants: { size: "sm" } });
+      const overridden = cv({ extend: [left, override] });
+      expect(overridden.getVariants()).toEqual({ size: "sm" });
+      expect(overridden.class()).toBe(cls("sm"));
+    });
+
+    test("extend applies shared callbacks once per resolution pass", () => {
+      const calls: string[] = [];
+      const base = cv({
+        variants: { size: (value: number) => `size-${value}` },
+        defaultVariants: {
+          size: () => {
+            calls.push("default");
+            return 2;
+          },
+        },
+        refine: () => {
+          calls.push("base");
+          return "refined";
+        },
+      });
+      const left = cv({
+        extend: [base],
+        refine: () => {
+          calls.push("left");
+        },
+      });
+      const right = cv({
+        extend: [base],
+        refine: ({ variants }) => {
+          calls.push("right");
+          return `right-${variants.size}`;
+        },
+      });
+      const component = getModeComponent(mode, cv({ extend: [left, right] }));
+      expect(getStyleClass(component())).toEqual({
+        class: cls("size-2 refined right-2"),
+      });
+      expect(calls).toEqual([
+        "default",
+        "base",
+        "left",
+        "right",
+        "default",
+        "base",
+        "left",
+        "right",
+      ]);
+      calls.length = 0;
+      expect(component.getVariants()).toEqual({ size: 2 });
+      expect(calls).toEqual([
+        "default",
+        "base",
+        "left",
+        "right",
+        "default",
+        "base",
+        "left",
+        "right",
+      ]);
+    });
+
+    test("extend preserves inherited computed defaults on later paths", () => {
+      const base = cv({
+        variants: { size: { sm: "size-sm", lg: "size-lg" } },
+        defaultVariants: { size: () => "lg" as const },
+      });
+      const left = cv({ extend: [base] });
+      const right = cv({
+        extend: [base],
+        defaultVariants: { size: (value) => value },
+      });
+      const component = getModeComponent(mode, cv({ extend: [left, right] }));
+      expect(getStyleClass(component())).toEqual({ class: cls("size-lg") });
+      expect(component.getVariants()).toEqual({ size: "lg" });
+      expect(getStyleClass(component({ size: "sm" }))).toEqual({
+        class: cls("size-sm"),
+      });
+    });
+
+    test("extend preserves inherited defaults before adding implicit false", () => {
+      const base = cv({
+        variants: { active: { true: "active" } },
+        defaultVariants: { active: true },
+      });
+      const left = cv({ extend: [base] });
+      const right = cv({
+        extend: [base],
+        variants: { active: { false: "inactive" } },
+      });
+      const component = getModeComponent(mode, cv({ extend: [left, right] }));
+      expect(getStyleClass(component())).toEqual({ class: cls("active") });
+      expect(component.getVariants()).toEqual({ active: true });
+      expect(getStyleClass(component({ active: false }))).toEqual({
+        class: cls("inactive"),
+      });
+    });
+
+    test("extend keeps shared variant suppression on its first path", () => {
+      const base = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
+      const left = cv({ extend: [base], variants: { size: { sm: null } } });
+      const right = cv({ extend: [base] });
+      const leftFirst = cv({ extend: [left, right] });
+      const rightFirst = cv({ extend: [right, left] });
+      // @ts-expect-error sm is disabled, but JavaScript callers can pass it
+      expect(leftFirst.class({ size: "sm" })).toBe("");
+      // @ts-expect-error sm is disabled, but JavaScript callers can pass it
+      expect(rightFirst.class({ size: "sm" })).toBe(cls("sm"));
+    });
+
+    test("extend deduplicates nested diamonds and direct ancestors", () => {
+      const base = cv({ class: "base" });
+      const left = cv({ extend: [base], class: "left" });
+      const right = cv({ extend: [base], class: "right" });
+      const both = cv({ extend: [left, right], class: "both" });
+      expect(cv({ extend: [base, both, left, right] }).class()).toBe(
+        cls("base left right both"),
+      );
+      expect(cv({ extend: [both, base, right] }).class()).toBe(
+        cls("base left right both"),
+      );
+    });
+
+    test("pruned branches retain their compiled configuration", () => {
+      const base = cv({ class: "base" });
+      const branchConfig = {
+        extend: [base],
+        class: "original",
+        style: { color: "red" },
+        variants: { size: { sm: "small", lg: "large" } },
+        defaultVariants: { size: "sm" as "sm" | "lg" },
+        refine: () => "original-refine",
+      };
+      const right = cv(branchConfig);
+      const left = cv({ extend: [base], class: "left" });
+      branchConfig.class = "changed";
+      branchConfig.style = { color: "blue" };
+      branchConfig.variants.size.sm = "changed-small";
+      branchConfig.defaultVariants.size = "lg";
+      branchConfig.refine = () => "changed-refine";
+      branchConfig.extend.length = 0;
+      expect(getStyleClass(right())).toEqual({
+        class: cls("base original small original-refine"),
+        color: "red",
+      });
+      const both = cv({ extend: [left, right] });
+      const component = getModeComponent(mode, both);
+      expect(getStyleClass(component())).toEqual({
+        class: cls("base left original small original-refine"),
+        color: "red",
+      });
+      expect(component.getVariants()).toEqual({ size: "sm" });
+      expect(cv({ extend: [base, both, right] }).class()).toBe(
+        cls("base left original small original-refine"),
+      );
+    });
+
+    test("pruned branches retain compiled function variants and defaults", () => {
+      const base = cv({ class: "base" });
+      const variants = { size: (value: number) => `size-${value}` };
+      const defaults = { size: () => 2 };
+      const right = cv({ extend: [base], variants, defaultVariants: defaults });
+      variants.size = () => "changed";
+      defaults.size = () => 3;
+      const component = getModeComponent(mode, cv({ extend: [base, right] }));
+      expect(getStyleClass(component())).toEqual({ class: cls("base size-2") });
+      expect(component.getVariants()).toEqual({ size: 2 });
+    });
+
+    test("pruned branches preserve compiled classes and captured style objects", () => {
+      const base = cv({ class: "base" });
+      const classes = ["original"];
+      const style = { color: "red" };
+      const right = cv({ extend: [base], class: classes, style });
+      classes[0] = "changed";
+      style.color = "blue";
+      const component = getModeComponent(mode, cv({ extend: [base, right] }));
+      expect(getStyleClass(component())).toEqual({
+        class: cls("base original"),
+        color: "blue",
+      });
+    });
+
     test("extend with variant merging", () => {
       const base = cv({ variants: { size: { sm: "base-sm", lg: "base-lg" } } });
       const component = getModeComponent(
@@ -365,6 +600,29 @@ describe("non-idempotent transformClass", () => {
     });
     expect(top({ size: "sm" }).class).toBe("tw-base tw-middle tw-top tw-sm");
   });
+});
+
+test("shared recipes keep the transform boundaries of their first path", () => {
+  const { cv } = create();
+  const { cv: prefixed } = create({
+    transformClass: (className) =>
+      className
+        .split(" ")
+        .filter(Boolean)
+        .map((word) => `p-${word}`)
+        .join(" "),
+  });
+  const base = cv({
+    class: "base",
+    variants: { size: { sm: "sm" } },
+    defaultVariants: { size: "sm" },
+  });
+  const left = prefixed({ extend: [base], class: "left" });
+  const right = cv({ extend: [base], class: "right" });
+  expect(cv({ extend: [left, right] }).class()).toBe(
+    "p-base p-left right p-sm",
+  );
+  expect(cv({ extend: [right, left] }).class()).toBe("base right p-left sm");
 });
 
 function toUpperCase(className: string) {
