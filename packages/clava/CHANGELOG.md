@@ -1,5 +1,9 @@
 # clava
 
+## 0.6.4
+
+- Fixed shared components in [`cv`](https://clava.style/docs/reference/cv) extension chains to apply only at their first occurrence, preventing repeated base classes and variant output when several components extend the same base.
+
 ## 0.6.3
 
 ### Improved runtime performance of the `refine` chain
