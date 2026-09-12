@@ -171,6 +171,24 @@ for (const config of Object.values(CONFIGS)) {
       });
     });
 
+    test("extend preserves inherited defaults before adding implicit false", () => {
+      const base = cv({
+        variants: { active: { true: "active" } },
+        defaultVariants: { active: true },
+      });
+      const left = cv({ extend: [base] });
+      const right = cv({
+        extend: [base],
+        variants: { active: { false: "inactive" } },
+      });
+      const component = getModeComponent(mode, cv({ extend: [left, right] }));
+      expect(getStyleClass(component())).toEqual({ class: cls("active") });
+      expect(component.getVariants()).toEqual({ active: true });
+      expect(getStyleClass(component({ active: false }))).toEqual({
+        class: cls("inactive"),
+      });
+    });
+
     test("extend keeps shared variant suppression on its first path", () => {
       const base = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
       const left = cv({ extend: [base], variants: { size: { sm: null } } });

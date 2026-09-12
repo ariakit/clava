@@ -604,6 +604,7 @@ export function create(params: CreateParams = {}) {
         }
       }
     }
+    const originalExtMetas = extMetas;
     if (extensions) {
       extMetas = extensions;
     } else if (extMetas.length > 1) {
@@ -653,9 +654,13 @@ export function create(params: CreateParams = {}) {
           disabledValuesBuilder ??= {};
           disabledValuesBuilder[name] = prebuiltVariant.disabledValues;
         }
+        // Pruning contributions must not introduce an implicit default that
+        // the original branch's inherited defaults prevented.
         if (
           prebuiltVariant.values?.has("false") &&
-          !hasOwn(staticDefaults, name)
+          !hasOwn(staticDefaults, name) &&
+          (!extensions ||
+            !originalExtMetas.some((meta) => hasOwn(meta.staticDefaults, name)))
         ) {
           staticDefaults[name] = false;
         }
