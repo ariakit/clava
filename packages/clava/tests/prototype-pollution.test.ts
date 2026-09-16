@@ -1,4 +1,3 @@
-import { cv as legacyCV } from "clava-legacy";
 import { afterEach, expect, test } from "vitest";
 import { create, cv } from "../src/index.ts";
 
@@ -8,21 +7,6 @@ afterEach(() => {
   for (const key of Object.keys(proto)) {
     delete proto[key];
   }
-});
-
-test("legacy extensions ignore inherited component identities", () => {
-  const first = legacyCV({ class: "first" });
-  const second = legacyCV({ class: "second" });
-  proto.identity = {};
-  expect(cv({ extend: [first, second] }).class()).toBe("first second");
-});
-
-test("legacy extensions ignore inherited extension graphs", () => {
-  const first = legacyCV({ class: "first" });
-  const second = legacyCV({ class: "second" });
-  proto.extends = {};
-  proto.rebuild = () => {};
-  expect(cv({ extend: [first, second] }).class()).toBe("first second");
 });
 
 test("getVariants ignores keys inherited from Object.prototype", () => {

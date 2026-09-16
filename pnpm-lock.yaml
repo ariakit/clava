@@ -262,9 +262,6 @@ importers:
       '@types/react':
         specifier: 19.3.0
         version: 19.3.0
-      clava-legacy:
-        specifier: npm:clava@0.6.3
-        version: clava@0.6.3
       rolldown:
         specifier: 1.2.8
         version: 1.2.8
@@ -1083,9 +1080,6 @@ packages:
 
   class-variance-authority@0.7.1:
     resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
-
-  clava@0.6.3:
-    resolution: {integrity: sha512-+laIWj6kY/TzWPwU2y6sa9YsN46/qZhQjde98bDe4GVM512zbzqX05CfmXdZSWOr8VwPZL2U0Gil/lEal4KcTQ==}
 
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
@@ -2196,11 +2190,6 @@ snapshots:
   class-variance-authority@0.7.1:
     dependencies:
       clsx: 2.1.1
-
-  clava@0.6.3:
-    dependencies:
-      clsx: 2.1.1
-      csstype: 3.2.3
 
   clsx@2.1.1: {}
 
