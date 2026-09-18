@@ -286,6 +286,7 @@ export interface Recipe<
 export type AnyRecipe = Recipe<any, any, any> | ModalRecipe<any, any>;
 
 // Ignore metadata on either recipe, even when both use the same metadata key.
+// https://github.com/ariakit/clava/pull/539#discussion_r4045599590
 type RecipeMembers<T> = Pick<T, keyof T & keyof Recipe<any, any, any>>;
 
 type SameRecipe<T, Base> = [RecipeMembers<T>] extends [RecipeMembers<Base>]
@@ -294,6 +295,9 @@ type SameRecipe<T, Base> = [RecipeMembers<T>] extends [RecipeMembers<Base>]
     : false
   : false;
 
+// Check each candidate in a union separately; ExtensionOf accepts the union
+// only when every result is true.
+// https://github.com/ariakit/clava/pull/539#discussion_r4046021870
 type IsRecipeExtension<T, Base> = T extends unknown
   ? SameRecipe<T, Base> extends true
     ? true
