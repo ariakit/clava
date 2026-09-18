@@ -1,8 +1,9 @@
 import type { ComponentProps } from "react";
 import { expectTypeOf, test } from "vitest";
 import {
-  type ExtensionOf,
+  type RecipeLike,
   type VariantProps,
+  type VariantPropsWithRecipe,
   cv,
   splitProps,
 } from "../src/index.ts";
@@ -19,13 +20,11 @@ const navDisclosure = cv({
 });
 
 type DisclosureProps<
-  R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
-> = ComponentProps<"div"> &
-  VariantProps<R> &
-  ([R] extends [typeof disclosure] ? { recipe?: R } : { recipe: R });
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+> = ComponentProps<"div"> & VariantPropsWithRecipe<typeof disclosure, R>;
 
 function Disclosure<
-  R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
 >(props: DisclosureProps<R>) {
   const { recipe = disclosure, ...rest } = props;
   const [variantProps, elementProps] = splitProps(rest, recipe.propKeys);
@@ -34,11 +33,11 @@ function Disclosure<
   return { ...elementProps, ...recipe.jsx(variantProps), open, padding };
 }
 
-function acceptRecipe<R extends ExtensionOf<typeof disclosure, R>>(recipe: R) {
+function acceptRecipe<R extends RecipeLike<typeof disclosure, R>>(recipe: R) {
   return recipe;
 }
 
-function readKeys<R extends ExtensionOf<typeof disclosure, R>>(recipe: R) {
+function readKeys<R extends RecipeLike<typeof disclosure, R>>(recipe: R) {
   return {
     variantKeys: recipe.variantKeys,
     propKeys: recipe.propKeys,
@@ -48,7 +47,7 @@ function readKeys<R extends ExtensionOf<typeof disclosure, R>>(recipe: R) {
   };
 }
 
-function readVariants<R extends ExtensionOf<typeof disclosure, R>>(
+function readVariants<R extends RecipeLike<typeof disclosure, R>>(
   recipe: R,
   props: VariantProps<R>,
 ) {
@@ -70,6 +69,22 @@ test("accepts the base recipe and extensions with additional variants", () => {
     recipe: navDisclosure,
     $placement: "bottom",
   });
+});
+
+test("accepts independently defined recipes with compatible variants", () => {
+  const independent = cv({
+    variants: {
+      $padding: { sm: "p-1", md: "p-3" },
+      $open: "expanded",
+      $placement: { top: "top-1", bottom: "bottom-1" },
+    },
+  });
+  expectTypeOf(acceptRecipe(independent)).toEqualTypeOf<typeof independent>();
+  Disclosure({ recipe: independent, $placement: "top", $open: true });
+  const keys = readKeys(independent);
+  expectTypeOf(keys.variantKeys).toEqualTypeOf<
+    ("$padding" | "$open" | "$placement")[]
+  >();
 });
 
 test("accepts indirect and multiple extensions", () => {
@@ -101,7 +116,7 @@ test("accepts recipes with added metadata and their extensions", () => {
   >();
 });
 
-test("ignores base metadata added after an extension was created", () => {
+test("ignores metadata on the base and candidate", () => {
   const namedBase = Object.assign(disclosure, {
     displayName: "Disclosure" as const,
   });
@@ -112,41 +127,41 @@ test("ignores base metadata added after an extension was created", () => {
     displayName: "RenamedDisclosure" as const,
   });
   expectTypeOf(disclosure).toExtend<
-    ExtensionOf<typeof namedBase, typeof disclosure>
+    RecipeLike<typeof namedBase, typeof disclosure>
   >();
   expectTypeOf(navDisclosure).toExtend<
-    ExtensionOf<typeof namedBase, typeof navDisclosure>
+    RecipeLike<typeof namedBase, typeof navDisclosure>
   >();
   expectTypeOf(namedChild).toExtend<
-    ExtensionOf<typeof namedBase, typeof namedChild>
+    RecipeLike<typeof namedBase, typeof namedChild>
   >();
   expectTypeOf(renamedBase).toExtend<
-    ExtensionOf<typeof namedBase, typeof renamedBase>
+    RecipeLike<typeof namedBase, typeof renamedBase>
   >();
 
   const nested = cv({
     extend: [navDisclosure],
     variants: { $nested: "nested" },
   });
-  expectTypeOf(nested).toExtend<ExtensionOf<typeof namedBase, typeof nested>>();
+  expectTypeOf(nested).toExtend<RecipeLike<typeof namedBase, typeof nested>>();
 
   const unrelated = cv({ variants: { $other: "other" } });
   const partial = cv({ variants: { $open: "open" } });
   const sibling = cv({ extend: [frame], variants: { $disabled: "disabled" } });
   expectTypeOf<
-    ExtensionOf<typeof namedBase, typeof unrelated>
+    RecipeLike<typeof namedBase, typeof unrelated>
   >().toEqualTypeOf<never>();
   expectTypeOf<
-    ExtensionOf<typeof namedBase, typeof partial>
+    RecipeLike<typeof namedBase, typeof partial>
   >().toEqualTypeOf<never>();
   expectTypeOf<
-    ExtensionOf<typeof namedBase, typeof sibling>
+    RecipeLike<typeof namedBase, typeof sibling>
   >().toEqualTypeOf<never>();
   expectTypeOf<
-    ExtensionOf<typeof namedBase, typeof frame>
+    RecipeLike<typeof namedBase, typeof frame>
   >().toEqualTypeOf<never>();
   expectTypeOf({ ...navDisclosure }).not.toExtend<
-    ExtensionOf<typeof namedBase, typeof navDisclosure>
+    RecipeLike<typeof namedBase, typeof navDisclosure>
   >();
 });
 
@@ -179,9 +194,7 @@ test("indexes variant props with their keys without casts", () => {
 });
 
 test("preserves mode calls and base variants inside a generic function", () => {
-  const useRecipe = <R extends ExtensionOf<typeof disclosure, R>>(
-    recipe: R,
-  ) => {
+  const useRecipe = <R extends RecipeLike<typeof disclosure, R>>(recipe: R) => {
     expectTypeOf(recipe({ $open: true }).class).toEqualTypeOf<string>();
     expectTypeOf(recipe.class({ $padding: "sm" })).toEqualTypeOf<string>();
     expectTypeOf(recipe.style()).toEqualTypeOf<
@@ -227,18 +240,18 @@ test("requires the recipe when component props select an extension", () => {
   Disclosure({ $open: true });
 });
 
-test("rejects unrelated recipes, partial matches, siblings, and ancestors", () => {
+test("requires every base variant regardless of recipe ancestry", () => {
   const unrelated = cv({ variants: { $other: "other" } });
   const partial = cv({ variants: { $open: "open" } });
   const sibling = cv({ extend: [frame], variants: { $disabled: "disabled" } });
 
-  // @ts-expect-error The recipe is unrelated to disclosure.
+  // @ts-expect-error The recipe does not define the base variants.
   acceptRecipe(unrelated);
-  // @ts-expect-error Sharing a variant does not establish an extension.
+  // @ts-expect-error The recipe does not define padding.
   acceptRecipe(partial);
-  // @ts-expect-error Sharing an ancestor does not establish an extension.
+  // @ts-expect-error The sibling does not define open.
   acceptRecipe(sibling);
-  // @ts-expect-error The base's ancestor does not extend the base.
+  // @ts-expect-error The ancestor does not define open.
   acceptRecipe(frame);
 });
 
@@ -255,12 +268,23 @@ test("rejects changes that break the base variant contract", () => {
   acceptRecipe(wider);
   // @ts-expect-error The child cannot accept every base variant value.
   acceptRecipe(narrower);
+
+  const differentType = cv({
+    variants: {
+      $padding: { sm: "p-1", md: "p-3" },
+      $open: { open: "expanded", closed: "collapsed" },
+    },
+  });
+  // @ts-expect-error The open variant must accept and return booleans.
+  acceptRecipe(differentType);
 });
 
 test("accepts structurally identical recipes without per-call identity", () => {
   const identical = cv({
-    extend: [frame],
-    variants: { $open: "different-class" },
+    variants: {
+      $padding: { sm: "p-1", md: "p-3" },
+      $open: "different-class",
+    },
   });
   expectTypeOf(acceptRecipe(identical)).toEqualTypeOf<typeof identical>();
 });
@@ -270,9 +294,7 @@ test("does not make the extending recipe assignable to the base recipe", () => {
   const base: typeof disclosure = navDisclosure;
   expectTypeOf(base).toEqualTypeOf<typeof disclosure>();
 
-  const useRecipe = <R extends ExtensionOf<typeof disclosure, R>>(
-    recipe: R,
-  ) => {
+  const useRecipe = <R extends RecipeLike<typeof disclosure, R>>(recipe: R) => {
     // @ts-expect-error A generic extension may contain additional keys.
     const base: typeof disclosure = recipe;
     // @ts-expect-error A generic extension's keys may include placement.
@@ -282,13 +304,15 @@ test("does not make the extending recipe assignable to the base recipe", () => {
   useRecipe(navDisclosure);
 });
 
-test("checks ancestry through full recipes rather than mode helpers", () => {
+test("accepts recipes composed from mode helpers", () => {
   const throughMode = cv({
     extend: [disclosure.jsx],
     variants: { $placement: { top: "top-0" } },
   });
-  // @ts-expect-error A mode helper does not retain its recipe's extend list.
-  acceptRecipe(throughMode);
+  expectTypeOf(acceptRecipe(throughMode)).toEqualTypeOf<typeof throughMode>();
+  Disclosure({ recipe: throughMode, $placement: "top" });
+  // @ts-expect-error The component requires a full recipe with all modes.
+  acceptRecipe(disclosure.jsx);
 });
 
 test("handles nested extension trees and empty bases", () => {
@@ -303,7 +327,10 @@ test("handles nested extension trees and empty bases", () => {
   const empty = cv();
   const extension = cv({ extend: [empty], variants: { $open: "open" } });
   expectTypeOf(extension).toExtend<
-    ExtensionOf<typeof empty, typeof extension>
+    RecipeLike<typeof empty, typeof extension>
+  >();
+  expectTypeOf(disclosure).toExtend<
+    RecipeLike<typeof empty, typeof disclosure>
   >();
 });
 
@@ -316,13 +343,34 @@ test("accepts a union only when all its members satisfy the constraint", () => {
   >();
 
   const chooseUnrelated = (child: boolean) => (child ? navDisclosure : frame);
-  // @ts-expect-error One union member is not an extension of disclosure.
+  // @ts-expect-error One union member does not define open.
   acceptRecipe(chooseUnrelated(true));
+
+  const partial = cv({ variants: { $open: "expanded" } });
+  const choosePartial = (complete: boolean) =>
+    complete ? navDisclosure : partial;
+  // @ts-expect-error A shared optional variant cannot hide missing padding.
+  acceptRecipe(choosePartial(true));
+
+  const independent = cv({
+    variants: {
+      $padding: { sm: "p-1", md: "p-3" },
+      $open: "expanded",
+      $side: { left: "left-0", right: "right-0" },
+    },
+  });
+  const chooseCompatible = (navigation: boolean) =>
+    navigation ? navDisclosure : independent;
+  const compatible = chooseCompatible(true);
+  expectTypeOf(acceptRecipe(compatible)).toEqualTypeOf<typeof compatible>();
+  expectTypeOf(readKeys(compatible).variantKeys).toEqualTypeOf<
+    ("$padding" | "$open" | "$placement" | "$side")[]
+  >();
 });
 
 test("retains exact keys when a component defaults to its base recipe", () => {
   const getKeys = <
-    R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
+    R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
   >(
     props: DisclosureProps<R>,
   ) => {
