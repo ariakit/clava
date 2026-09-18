@@ -11,6 +11,7 @@ import type {
   ClassValue,
   DefaultVariants,
   ExtendableVariants,
+  ExtensionOf,
   HTMLObjProps,
   HTMLProps,
   JSXProps,
@@ -207,6 +208,7 @@ export type {
   HTMLProps,
   HTMLObjProps,
   Recipe,
+  ExtensionOf,
 };
 
 /**

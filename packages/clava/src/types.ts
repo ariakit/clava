@@ -285,6 +285,89 @@ export interface Recipe<
 
 export type AnyRecipe = Recipe<any, any, any> | ModalRecipe<any, any>;
 
+// Ignore metadata on either recipe, even when both use the same metadata key.
+// https://github.com/ariakit/clava/pull/539#discussion_r4045599590
+type RecipeMembers<T> = Pick<T, keyof T & keyof Recipe<any, any, any>>;
+
+type SameRecipe<T, Base> = [RecipeMembers<T>] extends [RecipeMembers<Base>]
+  ? [RecipeMembers<Base>] extends [RecipeMembers<T>]
+    ? true
+    : false
+  : false;
+
+// Check each candidate in a union separately; ExtensionOf accepts the union
+// only when every result is true.
+// https://github.com/ariakit/clava/pull/539#discussion_r4046021870
+type IsRecipeExtension<T, Base> = T extends unknown
+  ? SameRecipe<T, Base> extends true
+    ? true
+    : T extends Recipe<infer _Variants, infer Extended, infer _Result>
+      ? HasRecipeExtension<Extended, Base>
+      : false
+  : never;
+
+type HasRecipeExtension<Extended, Base> = Extended extends readonly [
+  infer First,
+  ...infer Rest,
+]
+  ? IsRecipeExtension<First, Base> extends true
+    ? true
+    : HasRecipeExtension<Rest, Base>
+  : false;
+
+// Derive keys from the arrays, not getVariants: its base return constraint can
+// hide added keys when a generic recipe is combined with its default recipe.
+type ExtensionVariantKeys<T> = T extends {
+  variantKeys: (infer Key extends string)[];
+}
+  ? Key
+  : never;
+
+// Keep keys tied to the candidate while retaining the base's callable contract.
+// Copying the base's key arrays would reject recipes that add variants.
+interface RecipeExtensionMode<Base extends AnyRecipe, Candidate> {
+  (props?: Parameters<Base>[0]): ReturnType<Base>;
+  class: Base["class"];
+  style: Base["style"];
+  getVariants: (
+    variants?: Parameters<Base["getVariants"]>[0],
+  ) => ReturnType<Base["getVariants"]> &
+    Partial<Record<ExtensionVariantKeys<Candidate>, unknown>>;
+  variantKeys: ExtensionVariantKeys<Candidate>[];
+  propKeys: (
+    | ExtensionVariantKeys<Candidate>
+    | RecipePropKey<ReturnType<Base>>
+  )[];
+}
+
+/**
+ * Constrains a recipe to a base recipe or one of its direct or indirect
+ * extensions through full recipes. Added variants retain their prop and key
+ * types in generic code. Mode helpers do not retain their extension lists.
+ * Existing variants must remain compatible with the base's callable contract.
+ * Structurally identical recipes cannot be distinguished by this type.
+ *
+ * @example
+ * ```ts
+ * import { type ExtensionOf, type VariantProps, cv } from "clava";
+ *
+ * const disclosure = cv({ variants: { $open: "open" } });
+ *
+ * type DisclosureProps<
+ *   R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
+ * > = VariantProps<R> &
+ *   ([R] extends [typeof disclosure] ? { recipe?: R } : { recipe: R });
+ * ```
+ */
+export type ExtensionOf<Base extends Recipe<any, any, any>, Candidate> =
+  IsRecipeExtension<Candidate, Base> extends true
+    ? RecipeExtensionMode<Base, Candidate> & {
+        jsx: RecipeExtensionMode<Base["jsx"], Candidate>;
+        html: RecipeExtensionMode<Base["html"], Candidate>;
+        htmlObj: RecipeExtensionMode<Base["htmlObj"], Candidate>;
+      }
+    : never;
+
 type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
   ? ExtractVariants<First> & MergeExtendedVariants<Rest>
   : {};
