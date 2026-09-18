@@ -279,7 +279,7 @@ describe("perf compare", () => {
       dir,
       "current.json",
       createReport(dir, [
-        { name: "create component with variants", hz: 100, mean: 0.01 },
+        { name: "create recipe with variants", hz: 100, mean: 0.01 },
       ]),
     );
 
@@ -294,7 +294,7 @@ describe("perf compare", () => {
     );
 
     expect(markdown).toContain(
-      "benchmark > clava.bench.ts > create component with variants",
+      "benchmark > clava.bench.ts > create recipe with variants",
     );
     expect(markdown).not.toContain("benchmark/");
   });
@@ -444,10 +444,10 @@ describe("perf compare", () => {
     const dir = createTempDir();
     const markdown = runCompare({
       baseline: createReport(dir, [
-        { name: "create component with variants", hz: 100, mean: 0.01 },
+        { name: "create recipe with variants", hz: 100, mean: 0.01 },
       ]),
       current: createReport(dir, [
-        { name: "create component with variants", hz: 80, mean: 0.0125 },
+        { name: "create recipe with variants", hz: 80, mean: 0.0125 },
       ]),
     });
 

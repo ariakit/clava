@@ -1,21 +1,21 @@
 import { describe, expect, test, vi } from "vitest";
-import type { AnyComponent } from "../src/types.ts";
+import type { AnyRecipe } from "../src/types.ts";
 import {
   CONFIGS,
   createCVFromConfig,
   getConfigDescription,
   getConfigMode,
   getConfigTransformClass,
-  getModeComponent,
+  getModeRecipe,
   getStyleClass,
 } from "./_utils.ts";
 
-function extendComponent(
+function extendRecipe(
   cv: ReturnType<typeof createCVFromConfig>,
-  component: AnyComponent,
+  recipe: AnyRecipe,
   depth: number,
 ) {
-  let extended = component;
+  let extended = recipe;
   for (let i = 0; i < depth; i++) {
     extended = cv({ extend: [extended] });
   }
@@ -29,7 +29,7 @@ for (const config of Object.values(CONFIGS)) {
 
   describe(getConfigDescription(config), () => {
     test("refine", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -37,12 +37,12 @@ for (const config of Object.values(CONFIGS)) {
             variants.size === "lg" ? "refine-lg" : null,
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg refine-lg") });
     });
 
     test("refine with setVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -56,12 +56,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
     test("refine re-runs when it changes variants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -78,14 +78,14 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg red refine-red"),
       });
     });
 
     test("refine re-runs when computed defaultVariants change variants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -104,7 +104,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("lg red refine-lg"),
       });
@@ -112,7 +112,7 @@ for (const config of Object.values(CONFIGS)) {
 
     test("refine converges with NaN computed defaultVariants", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -129,11 +129,11 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("nan refine-nan"),
       });
-      expect(component.getVariants()).toEqual({ value: Number.NaN });
+      expect(recipe.getVariants()).toEqual({ value: Number.NaN });
       expect(warn).not.toHaveBeenCalled();
     });
 
@@ -152,13 +152,13 @@ for (const config of Object.values(CONFIGS)) {
           push: (_, variants) => (variants.invert ? 20 : undefined),
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [base] }));
+      const recipe = getModeRecipe(mode, cv({ extend: [base] }));
 
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("offset"),
       });
-      expect(component.getVariants()).toEqual({
+      expect(recipe.getVariants()).toEqual({
         offset: true,
       });
       expect(warn).not.toHaveBeenCalled();
@@ -214,13 +214,13 @@ for (const config of Object.values(CONFIGS)) {
           calls.control += 1;
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [control] }));
+      const recipe = getModeRecipe(mode, cv({ extend: [control] }));
 
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("layer offset frame control"),
       });
-      expect(component.getVariants()).toEqual({
+      expect(recipe.getVariants()).toEqual({
         layer: true,
         offset: true,
         frame: true,
@@ -233,7 +233,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("computed defaultVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -246,12 +246,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
     test("computed defaultVariants do not override props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -263,7 +263,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg", color: "blue" });
+      const props = recipe({ size: "lg", color: "blue" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg blue") });
     });
 
@@ -272,7 +272,7 @@ for (const config of Object.values(CONFIGS)) {
         variants: { color: { red: "red", blue: "blue" } },
         defaultVariants: { color: "red" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -283,7 +283,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("blue sm") });
     });
 
@@ -294,7 +294,7 @@ for (const config of Object.values(CONFIGS)) {
           size: () => "lg" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -302,7 +302,7 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { size: "sm", color: "red" },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
@@ -314,7 +314,7 @@ for (const config of Object.values(CONFIGS)) {
             variants.large ? "lg" : defaultValue,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -322,7 +322,7 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { size: "sm", color: "red", large: true },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
@@ -335,8 +335,8 @@ for (const config of Object.values(CONFIGS)) {
         },
       });
       const child = cv({ extend: [parent], defaultVariants: { size: "sm" } });
-      const component = getModeComponent(mode, cv({ extend: [child] }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ extend: [child] }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
@@ -347,7 +347,7 @@ for (const config of Object.values(CONFIGS)) {
           size: () => "lg" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -358,7 +358,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
     });
 
@@ -369,7 +369,7 @@ for (const config of Object.values(CONFIGS)) {
           size: () => "lg" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -378,17 +378,17 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("lg") });
-      expect(component.getVariants()).toEqual({ size: "lg" });
+      expect(recipe.getVariants()).toEqual({ size: "lg" });
     });
 
-    test("refine in extended component does not see foreign variant keys", () => {
+    test("refine in extended recipe does not see foreign variant keys", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: { size: "sm" },
         refine: ({ variants, addClass }) => {
-          // `color` is added by the parent component below — it must not
+          // `color` is added by the parent recipe below — it must not
           // leak into base's `ctx.variants`, whose shape is declared as
           // `{ size }` only.
           if ("color" in (variants as Record<string, unknown>)) {
@@ -398,7 +398,7 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -406,13 +406,13 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { size: "sm" },
         }),
       );
-      const props = component({ color: "red" });
+      const props = recipe({ color: "red" });
       expect(getStyleClass(props)).toEqual({
         class: cls("sm base-no-foreign red"),
       });
     });
 
-    test("computed defaultVariants in extended component do not branch on foreign variant keys", () => {
+    test("computed defaultVariants in extended recipe do not branch on foreign variant keys", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: {
@@ -422,7 +422,7 @@ for (const config of Object.values(CONFIGS)) {
               : defaultValue,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -430,9 +430,9 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { size: "sm" },
         }),
       );
-      const props = component({ color: "red" });
+      const props = recipe({ color: "red" });
       expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
-      expect(component.getVariants({ color: "red" })).toEqual({
+      expect(recipe.getVariants({ color: "red" })).toEqual({
         size: "sm",
         color: "red",
       });
@@ -445,7 +445,7 @@ for (const config of Object.values(CONFIGS)) {
           setVariants({ small: true });
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -457,11 +457,11 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm red") });
     });
 
-    test("refine re-runs when base component refine changes variants", () => {
+    test("refine re-runs when base recipe refine changes variants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" }, active: "" },
         defaultVariants: { size: "sm" },
@@ -471,7 +471,7 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -483,7 +483,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ active: true });
+      const props = recipe({ active: true });
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
@@ -504,13 +504,13 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [base] }));
-      const props = component({ active: true });
+      const recipe = getModeRecipe(mode, cv({ extend: [base] }));
+      const props = recipe({ active: true });
       expect(getStyleClass(props)).toEqual({ class: cls("lg on") });
     });
 
     test("refine setVariants uses the latest pending value", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -521,13 +521,13 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
     test("refine setVariants restores a value it cleared in the same pass", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -543,12 +543,12 @@ for (const config of Object.values(CONFIGS)) {
       // first call recorded. Reading the recorded value with `??` instead would
       // fall back to the resolved `"sm"`, drop the restore, and leave the chain
       // flipping between `undefined` and `"sm"` until it hits the run limit.
-      expect(getStyleClass(component())).toEqual({ class: cls("sm") });
+      expect(getStyleClass(recipe())).toEqual({ class: cls("sm") });
       expect(warn).not.toHaveBeenCalled();
     });
 
     test("refine setVariants clears a variant it has not already assigned", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -567,14 +567,14 @@ for (const config of Object.values(CONFIGS)) {
       // The clear-and-restore pair keeps `size` in the record on every pass,
       // so the third call reads `tone` from `ownVariants`. Drop the first call
       // and the record is empty, where a record-only lookup also passes.
-      expect(getStyleClass(component())).toEqual({ class: cls("sm") });
+      expect(getStyleClass(recipe())).toEqual({ class: cls("sm") });
     });
 
     test("refine setVariants does not mutate props with plain extends", () => {
       const base = cv({
         variants: { color: { red: "red", blue: "blue" } },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -587,11 +587,11 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       const mutableProps = { active: true };
-      component(mutableProps);
+      recipe(mutableProps);
       expect(mutableProps).toEqual({ active: true });
 
       const frozenProps = Object.freeze({ active: true });
-      const getProps = () => component(frozenProps);
+      const getProps = () => recipe(frozenProps);
       expect(getProps).not.toThrow();
       expect(getStyleClass(getProps())).toEqual({ class: cls("red") });
     });
@@ -603,7 +603,7 @@ for (const config of Object.values(CONFIGS)) {
           color: () => "blue" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -616,7 +616,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("red sm") });
     });
 
@@ -627,7 +627,7 @@ for (const config of Object.values(CONFIGS)) {
           color: () => "blue" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -639,7 +639,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("red") });
     });
 
@@ -660,11 +660,11 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base], defaultVariants: { size: "sm" } }),
       );
-      const props = component({ active: true });
+      const props = recipe({ active: true });
       expect(getStyleClass(props)).toEqual({ class: cls("lg on") });
     });
 
@@ -684,13 +684,13 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [layer], defaultVariants: { a: "two" } }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("two b-false") });
-      expect(component.getVariants()).toEqual({ a: "two", b: false });
+      expect(recipe.getVariants()).toEqual({ a: "two", b: false });
     });
 
     test("setVariants from earlier extends overrides computed defaultVariants from later extends", () => {
@@ -706,8 +706,8 @@ for (const config of Object.values(CONFIGS)) {
           color: () => "blue" as const,
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [first, second] }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ extend: [first, second] }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("first-red second-red"),
       });
@@ -726,8 +726,8 @@ for (const config of Object.values(CONFIGS)) {
           color: () => "blue" as const,
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [first, second] }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ extend: [first, second] }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("first-blue second-blue"),
       });
@@ -740,7 +740,7 @@ for (const config of Object.values(CONFIGS)) {
           setVariants({ color: "red" });
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -751,14 +751,14 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("base-red child-red"),
       });
     });
 
     test("computed defaultVariants do not override setVariants from a previous pass", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -776,7 +776,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("red") });
     });
 
@@ -790,10 +790,10 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const extension = extendComponent(cv, base, 50);
-      const component = cv({ extend: [extension] });
+      const extension = extendRecipe(cv, base, 50);
+      const recipe = cv({ extend: [extension] });
 
-      expect(component.getVariants()).toEqual({ state: "ready" });
+      expect(recipe.getVariants()).toEqual({ state: "ready" });
       expect(warn).not.toHaveBeenCalled();
     });
 
@@ -805,10 +805,10 @@ for (const config of Object.values(CONFIGS)) {
           addStyle({ color: "red" });
         },
       });
-      const extension = extendComponent(cv, base, 50);
-      const component = getModeComponent(mode, cv({ extend: [extension] }));
+      const extension = extendRecipe(cv, base, 50);
+      const recipe = getModeRecipe(mode, cv({ extend: [extension] }));
 
-      expect(getStyleClass(component())).toEqual({
+      expect(getStyleClass(recipe())).toEqual({
         color: "red",
         class: cls("refined"),
       });
@@ -826,10 +826,10 @@ for (const config of Object.values(CONFIGS)) {
           setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
         },
       });
-      const extension = extendComponent(cv, base, 50);
-      const component = getModeComponent(mode, cv({ extend: [extension] }));
+      const extension = extendRecipe(cv, base, 50);
+      const recipe = getModeRecipe(mode, cv({ extend: [extension] }));
 
-      component();
+      recipe();
       expect(refineRuns).toBe(50);
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(
@@ -839,7 +839,7 @@ for (const config of Object.values(CONFIGS)) {
 
     test("refine warns when variants keep changing", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -850,13 +850,13 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      component();
+      recipe();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining("Maximum refine iterations exceeded"),
       );
     });
 
-    test("refine warning is shared across extended components", () => {
+    test("refine warning is shared across extended recipes", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
@@ -865,9 +865,9 @@ for (const config of Object.values(CONFIGS)) {
           setVariants({ size: variants.size === "sm" ? "lg" : "sm" });
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [base] }));
+      const recipe = getModeRecipe(mode, cv({ extend: [base] }));
 
-      component();
+      recipe();
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining("Maximum refine iterations exceeded"),
@@ -883,13 +883,13 @@ for (const config of Object.values(CONFIGS)) {
         ),
       );
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("Component created at:"),
+        expect.stringContaining("Recipe created at:"),
       );
     });
 
     test("getVariants warns when variants keep changing", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -900,7 +900,7 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      component.getVariants();
+      recipe.getVariants();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining("Maximum refine iterations exceeded"),
       );
@@ -915,14 +915,14 @@ for (const config of Object.values(CONFIGS)) {
         ),
       );
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("Component created at:"),
+        expect.stringContaining("Recipe created at:"),
       );
     });
 
     test("refine warning is omitted in production", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.stubEnv("NODE_ENV", "production");
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -934,7 +934,7 @@ for (const config of Object.values(CONFIGS)) {
       );
 
       try {
-        component();
+        recipe();
         expect(warn).not.toHaveBeenCalled();
       } finally {
         vi.unstubAllEnvs();
@@ -943,7 +943,7 @@ for (const config of Object.values(CONFIGS)) {
 
     test("refine warning names the variant key that did not stabilize", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -957,7 +957,7 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      component();
+      recipe();
       expect(warn).toHaveBeenCalledWith(
         expect.stringMatching(
           /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
@@ -975,7 +975,7 @@ for (const config of Object.values(CONFIGS)) {
       // `size` flips every iteration, `color` flips every other iteration, so
       // the final pair may agree on one of them — the warning must still name
       // both keys because each contributed to a transition.
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -997,7 +997,7 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      component();
+      recipe();
       expect(warn).toHaveBeenCalledWith(
         expect.stringMatching(
           /Variant\(s\) that did not stabilize: [^\n]*\bsize\b/,
@@ -1015,9 +1015,9 @@ for (const config of Object.values(CONFIGS)) {
       );
     });
 
-    test("refine warning includes the component creation stack", () => {
+    test("refine warning includes the recipe creation stack", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1028,9 +1028,9 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      component();
+      recipe();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("Component created at:"),
+        expect.stringContaining("Recipe created at:"),
       );
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining("refine.test.ts"),
@@ -1050,7 +1050,7 @@ for (const config of Object.values(CONFIGS)) {
       const captureStackTrace = ErrorWithCaptureStackTrace.captureStackTrace;
       Reflect.deleteProperty(ErrorWithCaptureStackTrace, "captureStackTrace");
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1062,9 +1062,9 @@ for (const config of Object.values(CONFIGS)) {
       );
 
       try {
-        component();
+        recipe();
         expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining("Component created at:"),
+          expect.stringContaining("Recipe created at:"),
         );
         expect(warn).toHaveBeenCalledWith(
           expect.stringContaining("refine.test.ts"),
@@ -1082,7 +1082,7 @@ for (const config of Object.values(CONFIGS)) {
     test("refine warning omits the creation stack when cv ran in production", () => {
       using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.stubEnv("NODE_ENV", "production");
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1095,17 +1095,17 @@ for (const config of Object.values(CONFIGS)) {
 
       try {
         vi.unstubAllEnvs();
-        component();
+        recipe();
         const message = String(warn.mock.calls.at(-1)?.[0]);
         expect(message).toContain("Maximum refine iterations exceeded");
-        expect(message).not.toContain("Component created at:");
+        expect(message).not.toContain("Recipe created at:");
       } finally {
         vi.unstubAllEnvs();
       }
     });
 
     test("computed defaultVariants run when explicitly passing undefined", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -1117,12 +1117,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg", color: undefined });
+      const props = recipe({ size: "lg", color: undefined });
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
     test("refine with defaultVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -1134,7 +1134,7 @@ for (const config of Object.values(CONFIGS)) {
             variants.size === "lg" ? "refine-lg" : null,
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("lg refine-lg") });
     });
 
@@ -1143,7 +1143,7 @@ for (const config of Object.values(CONFIGS)) {
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: { size: "lg" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -1151,7 +1151,7 @@ for (const config of Object.values(CONFIGS)) {
             variants.size === "lg" ? "refine-lg" : null,
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("lg refine-lg") });
     });
 
@@ -1169,7 +1169,7 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -1179,7 +1179,7 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { border: false },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
@@ -1198,7 +1198,7 @@ for (const config of Object.values(CONFIGS)) {
         },
       });
       const base2 = cv({ extend: [base] });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base2],
@@ -1208,7 +1208,7 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { border: false },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
@@ -1226,7 +1226,7 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -1235,7 +1235,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ border: false });
+      const props = recipe({ border: false });
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
@@ -1253,7 +1253,7 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -1262,7 +1262,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ border: true });
+      const props = recipe({ border: true });
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
@@ -1281,7 +1281,7 @@ for (const config of Object.values(CONFIGS)) {
         },
       });
       const base2 = cv({ extend: [base] });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base2],
@@ -1290,12 +1290,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ border: true });
+      const props = recipe({ border: true });
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
     test("refine with style", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1303,7 +1303,7 @@ for (const config of Object.values(CONFIGS)) {
             variants.size === "lg" ? { style: { fontSize: "20px" } } : null,
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: "20px",
@@ -1311,7 +1311,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine with class and style", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1321,7 +1321,7 @@ for (const config of Object.values(CONFIGS)) {
               : null,
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg refine-lg"),
         fontSize: "20px",
@@ -1329,7 +1329,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine style does not accept numbers", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1343,7 +1343,7 @@ for (const config of Object.values(CONFIGS)) {
               : null,
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg refine-lg"),
         fontSize: expect.toBeOneOf(["20", "20px"]),
@@ -1351,7 +1351,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine setVariants does not accept invalid keys", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1363,12 +1363,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg") });
     });
 
     test("refine setVariants does not accept invalid values", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1382,13 +1382,13 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       // Invalid value overrides the valid one, resulting in no match
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("refine addClass with string", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1399,12 +1399,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg added-lg") });
     });
 
     test("refine addClass with array", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1415,14 +1415,14 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg added-lg extra-class"),
       });
     });
 
     test("refine addStyle", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1433,7 +1433,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: "20px",
@@ -1441,7 +1441,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine addClass combined with return value", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1453,14 +1453,14 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg added-class returned-class"),
       });
     });
 
     test("refine addStyle combined with return value", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1472,7 +1472,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: "20px",
@@ -1481,7 +1481,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine addClass and addStyle together", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1493,7 +1493,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg added-lg"),
         fontSize: "20px",
@@ -1501,7 +1501,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine addClass and addStyle with return value", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1517,7 +1517,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg added-lg returned-class"),
         fontSize: "20px",
@@ -1526,7 +1526,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine addClass multiple calls", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1539,14 +1539,14 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg first second third"),
       });
     });
 
     test("refine addStyle multiple calls merges styles", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1559,7 +1559,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: "20px",
@@ -1569,7 +1569,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine addStyle later call overrides earlier", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1581,7 +1581,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: "20px",
@@ -1589,7 +1589,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("refine addStyle does not accept numbers", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -1603,7 +1603,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: expect.toBeOneOf(["20", "20px"]),

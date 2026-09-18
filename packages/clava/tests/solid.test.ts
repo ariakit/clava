@@ -5,13 +5,12 @@ import { type VariantProps, cv, splitProps } from "../src/index.ts";
 import { type HTMLObjProps } from "../src/types.ts";
 
 test("splitProps", () => {
-  const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
+  const recipe = cv({ variants: { size: { sm: "sm", md: "md" } } });
 
-  interface Props
-    extends ComponentProps<"div">, VariantProps<typeof component> {}
+  interface Props extends ComponentProps<"div">, VariantProps<typeof recipe> {}
   const props: Props = { class: "custom", size: "md", id: "my-div" };
 
-  const [variantProps, rest] = splitProps(props, component);
+  const [variantProps, rest] = splitProps(props, recipe);
   expectTypeOf(variantProps.style).toEqualTypeOf<
     string | JSX.CSSProperties | undefined
   >();
@@ -21,29 +20,28 @@ test("splitProps", () => {
   expect(rest).toEqual({ id: "my-div" });
 });
 
-test("split props feed back into the component", () => {
-  const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
+test("split props feed back into the recipe", () => {
+  const recipe = cv({ variants: { size: { sm: "sm", md: "md" } } });
 
-  interface Props
-    extends ComponentProps<"div">, VariantProps<typeof component> {}
+  interface Props extends ComponentProps<"div">, VariantProps<typeof recipe> {}
   const props: Props = { style: { color: "red" }, size: "md" };
 
   // Solid types `style` as `string | JSX.CSSProperties`, whose `-${string}`
   // index allows `undefined`, so the style input type must keep accepting it.
   // https://github.com/ariakit/clava/issues/483#issuecomment-5447514407
-  const [variantProps] = splitProps(props, component);
-  expect(component.htmlObj(variantProps)).toEqual({
+  const [variantProps] = splitProps(props, recipe);
+  expect(recipe.htmlObj(variantProps)).toEqual({
     class: "md",
     style: { color: "red" },
   });
 });
 
-test("component props", () => {
-  const component = cv({
+test("recipe props", () => {
+  const recipe = cv({
     style: { fontSize: "16px" },
     variants: { size: { sm: "sm", md: "md" } },
   }).htmlObj;
-  const props = component({ size: "sm", className: "custom" });
+  const props = recipe({ size: "sm", className: "custom" });
   expectTypeOf(props).toEqualTypeOf<HTMLObjProps>();
   expect(props).toEqual({
     class: "sm custom",
@@ -52,30 +50,27 @@ test("component props", () => {
 });
 
 test("solid splitProps accepts html propKeys", () => {
-  const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
-  expect(component.html.propKeys).toEqual(["class", "style", "size"]);
+  const recipe = cv({ variants: { size: { sm: "sm", md: "md" } } });
+  expect(recipe.html.propKeys).toEqual(["class", "style", "size"]);
 
   interface Props
-    extends ComponentProps<"button">, VariantProps<typeof component> {}
+    extends ComponentProps<"button">, VariantProps<typeof recipe> {}
   const props: Props = { class: "custom", size: "md", id: "my-button" };
 
-  const [variantProps, rest] = splitSolidProps(props, component.html.propKeys);
+  const [variantProps, rest] = splitSolidProps(props, recipe.html.propKeys);
   expect(variantProps).toEqual({ class: "custom", size: "md" });
   expect(rest).toEqual({ id: "my-button" });
 });
 
 test("solid splitProps accepts htmlObj propKeys", () => {
-  const component = cv({ variants: { size: { sm: "sm", md: "md" } } });
-  expect(component.htmlObj.propKeys).toEqual(["class", "style", "size"]);
+  const recipe = cv({ variants: { size: { sm: "sm", md: "md" } } });
+  expect(recipe.htmlObj.propKeys).toEqual(["class", "style", "size"]);
 
   interface Props
-    extends ComponentProps<"button">, VariantProps<typeof component> {}
+    extends ComponentProps<"button">, VariantProps<typeof recipe> {}
   const props: Props = { class: "custom", size: "md", id: "my-button" };
 
-  const [variantProps, rest] = splitSolidProps(
-    props,
-    component.htmlObj.propKeys,
-  );
+  const [variantProps, rest] = splitSolidProps(props, recipe.htmlObj.propKeys);
   expect(variantProps).toEqual({ class: "custom", size: "md" });
   expect(rest).toEqual({ id: "my-button" });
 });

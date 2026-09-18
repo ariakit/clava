@@ -17,7 +17,7 @@ import type { Variant, VariantProps } from "clava";
 - [Classes And Styles](#classes-and-styles)
 - [Variants](#variants)
 - [Function Variants](#function-variants)
-- [Extending Components](#extending-components)
+- [Extending Recipes](#extending-recipes)
 - [Refine](#refine)
 - [Splitting Props](#splitting-props)
 - [React](#react)
@@ -43,7 +43,7 @@ yarn add clava
 
 ## Quick Start
 
-Use `cv()` to create a callable style component. The default callable component returns normalized `{ class, style }` props.
+Use `cv()` to create a callable style recipe. The default callable recipe returns normalized `{ class, style }` props.
 
 ```ts
 import { cv } from "clava";
@@ -85,7 +85,7 @@ Input props may use `class` or `className` in any output mode. Both are appended
 
 ## Output Modes
 
-Every Clava component has four output modes:
+Every Clava recipe has four output modes:
 
 ```ts
 const label = cv({
@@ -106,7 +106,7 @@ label.htmlObj();
 // { class: "label", style: { "font-size": "14px", "--accent": "red" } }
 ```
 
-Use the default callable component when you want Clava's own normalized shape. Use `.jsx()` for React-style `className` props, `.html()` when you need an HTML style string, and `.htmlObj()` when you need hyphenated CSS property names.
+Use the default callable recipe when you want Clava's own normalized shape. Use `.jsx()` for React-style `className` props, `.html()` when you need an HTML style string, and `.htmlObj()` when you need hyphenated CSS property names.
 
 Each mode also exposes helpers:
 
@@ -228,7 +228,7 @@ item({ active: true, interactive: true }).class;
 // "item-active item-interactive focus-visible:ring"
 ```
 
-Variant values can be class values, arrays, `{ class, style }` objects, or [functions](#function-variants). Use `null` in an extending component to disable inherited variants or inherited variant values.
+Variant values can be class values, arrays, `{ class, style }` objects, or [functions](#function-variants). Use `null` in an extending recipe to disable inherited variants or inherited variant values.
 
 ## Function Variants
 
@@ -263,15 +263,15 @@ grid({ columns: 3, color: null });
 // }
 ```
 
-Function variants can return any class value, `{ class, style }`, a default Clava component result, `null`, or `undefined`. A function variant with the same key as an extended variant replaces that inherited variant's prop type and output.
+Function variants can return any class value, `{ class, style }`, a default Clava recipe result, `null`, or `undefined`. A function variant with the same key as an extended variant replaces that inherited variant's prop type and output.
 
-## Extending Components
+## Extending Recipes
 
-Use `extend` to compose existing Clava components. Extended base classes are ordered before the child class, and extended variant output is applied before child variant output.
+Use `extend` to compose existing Clava recipes. Extended base classes are ordered before the child class, and extended variant output is applied before child variant output.
 
-If a component appears through several `extend` paths, Clava applies it only at its first occurrence. Its classes, styles, defaults, and refinement participate through that path. For example, if `left` and `right` both extend `base`, `cv({ extend: [left, right] })` applies `base`, then `left`, then `right`. The component's JSX and HTML helpers share the same identity. Separate components can still emit identical classes.
+If a recipe appears through several `extend` paths, Clava applies it only at its first occurrence. Its classes, styles, defaults, and refinement participate through that path. For example, if `left` and `right` both extend `base`, `cv({ extend: [left, right] })` applies `base`, then `left`, then `right`. The recipe's JSX and HTML helpers share the same identity. Separate recipes can still emit identical classes.
 
-Components created by older Clava versions retain their existing internal extension behavior. Shared ancestors inside those components can still repeat.
+Recipes created by older Clava versions retain their existing internal extension behavior. Shared ancestors inside those recipes can still repeat.
 
 ```ts
 const baseButton = cv({
@@ -312,7 +312,7 @@ iconButton({ size: "sm" }).class;
 // "button icon-button button-sm button-neutral icon-button-sm"
 
 iconButton({ intent: "brand" });
-// TypeScript error: "brand" was disabled by the child component.
+// TypeScript error: "brand" was disabled by the child recipe.
 ```
 
 Set an inherited variant to `null` to remove it entirely:
@@ -326,13 +326,13 @@ const plainButton = cv({
 });
 ```
 
-You can extend any component mode, including `baseButton.jsx`, `baseButton.html`, and `baseButton.htmlObj`.
+You can extend any recipe mode, including `baseButton.jsx`, `baseButton.html`, and `baseButton.htmlObj`.
 
 ## Refine
 
 Use computed `defaultVariants` for dependent defaults. A function entry receives the current default value for that key as the first parameter and the resolved variants snapshot as the second parameter, then returns the next default value.
 
-Use `refine` for final variant overrides and class/style adjustments. It receives the resolved variant values for the component and can return class/style output.
+Use `refine` for final variant overrides and class/style adjustments. It receives the resolved variant values for the recipe and can return class/style output.
 
 ```ts
 const toolbarButton = cv({
@@ -409,13 +409,13 @@ function Button(props: ButtonProps) {
 }
 ```
 
-The first component source claims variant props plus the styling props exposed by that component's `propKeys`. The base component claims `class`, `className`, and `style`; mode-specific components claim their own styling props. Later component sources receive only their variant props. Array sources receive exactly the listed keys and do not claim styling props.
+The first recipe source claims variant props plus the styling props exposed by that recipe's `propKeys`. The base recipe claims `class`, `className`, and `style`; mode-specific recipes claim their own styling props. Later recipe sources receive only their variant props. Array sources receive exactly the listed keys and do not claim styling props.
 
 ```ts
 const [buttonProps, fieldProps, rest] = splitProps(props, button, field);
 // buttonProps: button variants + class/style props
 // fieldProps: field variants only
-// rest: props not claimed by either component
+// rest: props not claimed by either recipe
 
 const [dataProps, variantProps, otherProps] = splitProps(
   props,
@@ -427,7 +427,7 @@ const [dataProps, variantProps, otherProps] = splitProps(
 // otherProps: remaining props
 ```
 
-`splitProps()` only moves props that are actually present in the input object. It does not inject `defaultVariants`; call `component.getVariants()` when you need resolved variant values.
+`splitProps()` only moves props that are actually present in the input object. It does not inject `defaultVariants`; call `recipe.getVariants()` when you need resolved variant values.
 
 ## React
 
@@ -510,11 +510,11 @@ title().class;
 // "tw-text-lg tw-font-semibold"
 ```
 
-When a component created by one factory extends a component created by another factory, the extended component's transform is preserved for its own classes and the parent transform still runs on the final joined string.
+When a recipe created by one factory extends a recipe created by another factory, the extended recipe's transform is preserved for its own classes and the parent transform still runs on the final joined string.
 
 ## Type Helpers
 
-Use `VariantProps<typeof component>` to add a Clava component's variant props to framework component props.
+Use `VariantProps<typeof recipe>` to add a Clava recipe's variant props to framework component props.
 
 ```ts
 import type { ComponentProps } from "react";
@@ -524,7 +524,7 @@ interface ButtonProps
   extends ComponentProps<"button">, VariantProps<typeof button> {}
 ```
 
-Use `Variant<typeof component, "key">` to constrain a new variant map to the same values as another component's variant.
+Use `Variant<typeof recipe, "key">` to constrain a new variant map to the same values as another recipe's variant.
 
 ```ts
 import { type Variant, cv } from "clava";
@@ -549,7 +549,17 @@ const icon = cv({
 });
 ```
 
-The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleClassValue`, `JSXProps`, `HTMLProps`, `HTMLObjProps`, `CVComponent`, and `CVConfig`.
+Use `Recipe` when you need an explicit type for a recipe:
+
+```ts
+import { type Recipe, cv } from "clava";
+
+const button: Recipe<{ size: { sm: string; lg: string } }> = cv({
+  variants: { size: { sm: "button-sm", lg: "button-lg" } },
+});
+```
+
+The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleClassValue`, `JSXProps`, `HTMLProps`, `HTMLObjProps`, and `CVConfig`.
 
 ## Comparison
 
@@ -559,7 +569,7 @@ This table compares Clava with the packages used by the repository's alternative
 | ---------------------------------------------------- | -------------- | ------------------ | ------------------ | ------------------ | ------------------ |
 | Typed variants and default variants                  | Yes            | Yes                | Yes                | Yes                | Yes                |
 | Boolean shorthand variants                           | Yes            | No                 | No                 | No                 | No                 |
-| Component extension or composition                   | `extend`       | No helper          | `compose()`        | `extend`           | `extend`           |
+| Recipe extension or composition                      | `extend`       | No helper          | `compose()`        | `extend`           | `extend`           |
 | Cross-variant conditions                             | `refine()`     | `compoundVariants` | `compoundVariants` | `compoundVariants` | `compoundVariants` |
 | Function variant values                              | Yes            | No                 | No                 | No                 | No                 |
 | Computed default variants                            | Yes            | No                 | No                 | No                 | No                 |
@@ -593,7 +603,7 @@ The second group adds the same cross-variant conditions at the interaction and p
 | `class-variance-authority@0.7.1` |   500,557 |      2.67x slower |
 | `cva@1.0.0-beta.8`               |   313,641 |      4.26x slower |
 
-Dividing one table by the other shows what each library charges for cross-variant conditions. `cva` charges the least at 1.30x, Clava sits at 1.79x, both `tailwind-variants` entry points are near 2.31x, and `class-variance-authority` charges the most at 3.74x. The exact ratios move by several percent between runs, so read the ordering rather than the digits, and reach for the group that matches your components rather than reading either table as the whole picture.
+Dividing one table by the other shows what each library charges for cross-variant conditions. `cva` charges the least at 1.30x, Clava sits at 1.79x, both `tailwind-variants` entry points are near 2.31x, and `class-variance-authority` charges the most at 3.74x. The exact ratios move by several percent between runs, so read the ordering rather than the digits, and reach for the group that matches your recipes rather than reading either table as the whole picture.
 
 Benchmark results vary by runtime and hardware, so treat them as a reproducible snapshot of this repository's composed-variant case rather than a universal ranking. Rows within a few percent of each other sit inside run-to-run noise, so their relative order is not meaningful. That covers the two `tailwind-variants` entry points, which land within a few percent in both groups and swap order between runs.
 
@@ -601,25 +611,25 @@ Both groups resolve one fixed prop set on every iteration, so every package with
 
 ## API Summary
 
-`cv(config?)` creates a typed Clava component. Supported config keys are `extend`, `class`, `style`, `variants`, `defaultVariants`, and `refine`.
+`cv(config?)` creates a typed Clava recipe. Supported config keys are `extend`, `class`, `style`, `variants`, `defaultVariants`, and `refine`.
 
-`component(props?)` returns `{ class, style }` with normalized camelCase style keys.
+`recipe(props?)` returns `{ class, style }` with normalized camelCase style keys.
 
-`component.jsx(props?)` returns `{ className, style }`.
+`recipe.jsx(props?)` returns `{ className, style }`.
 
-`component.html(props?)` returns `{ class, style }`, where `style` is a CSS string.
+`recipe.html(props?)` returns `{ class, style }`, where `style` is a CSS string.
 
-`component.htmlObj(props?)` returns `{ class, style }`, where `style` is a hyphenated CSS property object.
+`recipe.htmlObj(props?)` returns `{ class, style }`, where `style` is a hyphenated CSS property object.
 
-`component.class(props?)` returns only the resolved class string.
+`recipe.class(props?)` returns only the resolved class string.
 
-`component.style(props?)` returns only the resolved style value for that component mode.
+`recipe.style(props?)` returns only the resolved style value for that recipe mode.
 
-`component.getVariants(props?)` returns resolved variant values after static defaults, inherited defaults, computed defaults, and `refine` updates.
+`recipe.getVariants(props?)` returns resolved variant values after static defaults, inherited defaults, computed defaults, and `refine` updates.
 
-`component.propKeys` lists style props plus variant props for that component mode.
+`recipe.propKeys` lists style props plus variant props for that recipe mode.
 
-`component.variantKeys` lists only variant prop keys.
+`recipe.variantKeys` lists only variant prop keys.
 
 `splitProps(props, source1, ...sources)` returns one object per source plus a final rest object.
 

@@ -23,7 +23,7 @@ export const REFINE_UNSTABLE_TRACKING_WINDOW = 10;
 // build time can drop the entire warning machinery. The underlying `.stack`
 // string is formatted lazily on first access in every major engine (V8,
 // SpiderMonkey, JavaScriptCore), so holding the captured frame for the
-// lifetime of the component is cheap when no warning fires.
+// lifetime of the recipe is cheap when no warning fires.
 export function captureCreationFrame(
   skipFn: Function,
 ): CreationFrame | undefined {
@@ -36,7 +36,7 @@ export function captureCreationFrame(
   // Engines without `Error.captureStackTrace` (SpiderMonkey, JavaScriptCore)
   // can't strip internal frames, but their `Error.stack` getter is still
   // lazy, so returning the Error instance defers the format cost. The
-  // resulting trace includes extra frames from this helper, `buildComponent`,
+  // resulting trace includes extra frames from this helper, `buildRecipe`,
   // and `cv` itself.
   return new Error();
 }
@@ -68,9 +68,9 @@ export function formatCreationStack(frame: CreationFrame): string | undefined {
 
 function isInternalCreationFrame(line: string): boolean {
   if (line.includes("captureCreationFrame")) return true;
-  if (line.startsWith("at buildComponent ")) return true;
-  if (line.startsWith("at buildComponent(")) return true;
-  if (line.startsWith("buildComponent@")) return true;
+  if (line.startsWith("at buildRecipe ")) return true;
+  if (line.startsWith("at buildRecipe(")) return true;
+  if (line.startsWith("buildRecipe@")) return true;
   if (line.startsWith("at cv ")) return true;
   if (line.startsWith("at cv(")) return true;
   if (line.startsWith("cv@")) return true;
@@ -151,7 +151,7 @@ export function warnRefineLimit({
   if (creationFrame) {
     const creationStack = formatCreationStack(creationFrame);
     if (creationStack) {
-      message += `\nComponent created at:\n${creationStack}`;
+      message += `\nRecipe created at:\n${creationStack}`;
     }
   }
   console.warn(message);

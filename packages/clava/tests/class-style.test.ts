@@ -16,22 +16,22 @@ import {
   getConfigDescription,
   getConfigMode,
   getConfigTransformClass,
-  getModeComponent,
+  getModeRecipe,
   getStyleClass,
 } from "./_utils.ts";
 
 test("serializes Microsoft-prefixed properties through public modes", () => {
-  const component = cv({ style: { msTransition: "none" } });
-  expect(component.html().style).toBe("-ms-transition: none;");
-  expect(component.htmlObj().style).toEqual({ "-ms-transition": "none" });
+  const recipe = cv({ style: { msTransition: "none" } });
+  expect(recipe.html().style).toBe("-ms-transition: none;");
+  expect(recipe.htmlObj().style).toEqual({ "-ms-transition": "none" });
 });
 
 test("parses Microsoft-prefixed properties through public inputs", () => {
-  const component = cv();
-  expect(component({ style: "-ms-transition: none" }).style).toEqual({
+  const recipe = cv();
+  expect(recipe({ style: "-ms-transition: none" }).style).toEqual({
     msTransition: "none",
   });
-  expect(component({ style: { "-ms-transition": "none" } }).style).toEqual({
+  expect(recipe({ style: { "-ms-transition": "none" } }).style).toEqual({
     msTransition: "none",
   });
 });
@@ -57,11 +57,11 @@ for (const config of [CONFIGS.default, CONFIGS.uppercase]) {
 
   describe(getConfigDescription(config), () => {
     test("style has correct shape for mode", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: "base", style: { backgroundColor: "red" } }),
       );
-      const props = component();
+      const props = recipe();
       assertDefaultProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe(cls("base"));
@@ -71,8 +71,8 @@ for (const config of [CONFIGS.default, CONFIGS.uppercase]) {
     });
 
     test("no argument still returns normalized shape", () => {
-      const component = getModeComponent(mode, cv());
-      const props = component();
+      const recipe = getModeRecipe(mode, cv());
+      const props = recipe();
       assertDefaultProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe("");
@@ -90,11 +90,11 @@ for (const config of [CONFIGS.jsx]) {
 
   describe(getConfigDescription(config), () => {
     test("style has correct shape for mode", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: "base", style: { backgroundColor: "red" } }),
       );
-      const props = component();
+      const props = recipe();
       assertJSXProps(props);
       expect(props).not.toHaveProperty("class");
       expect(props.className).toBe(cls("base"));
@@ -103,8 +103,8 @@ for (const config of [CONFIGS.jsx]) {
     });
 
     test("no argument still returns jsx shape", () => {
-      const component = getModeComponent(mode, cv());
-      const props = component();
+      const recipe = getModeRecipe(mode, cv());
+      const props = recipe();
       assertJSXProps(props);
       expect(props).not.toHaveProperty("class");
       expect(props.className).toBe("");
@@ -147,11 +147,11 @@ for (const config of [CONFIGS.html]) {
 
   describe(getConfigDescription(config), () => {
     test("style has correct shape for mode", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: "base", style: { backgroundColor: "red" } }),
       );
-      const props = component();
+      const props = recipe();
       assertHTMLProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe(cls("base"));
@@ -159,8 +159,8 @@ for (const config of [CONFIGS.html]) {
     });
 
     test("no argument still returns html shape", () => {
-      const component = getModeComponent(mode, cv());
-      const props = component();
+      const recipe = getModeRecipe(mode, cv());
+      const props = recipe();
       assertHTMLProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe("");
@@ -168,8 +168,8 @@ for (const config of [CONFIGS.html]) {
     });
 
     test("numeric style values use property-aware units", () => {
-      const component = getModeComponent(mode, cv());
-      const props = component({
+      const recipe = getModeRecipe(mode, cv());
+      const props = recipe({
         style: { opacity: 0.5, "--columns": 3, marginTop: 4 },
       });
       expect(props.style).toBe("opacity: 0.5; --columns: 3; margin-top: 4px;");
@@ -184,11 +184,11 @@ for (const config of [CONFIGS.htmlObj]) {
 
   describe(getConfigDescription(config), () => {
     test("style has correct shape for mode", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: "base", style: { backgroundColor: "red" } }),
       );
-      const props = component();
+      const props = recipe();
       assertHTMLObjProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe(cls("base"));
@@ -197,8 +197,8 @@ for (const config of [CONFIGS.htmlObj]) {
     });
 
     test("no argument still returns htmlObj shape", () => {
-      const component = getModeComponent(mode, cv());
-      const props = component();
+      const recipe = getModeRecipe(mode, cv());
+      const props = recipe();
       assertHTMLObjProps(props);
       expect(props).not.toHaveProperty("className");
       expect(props.class).toBe("");
@@ -241,91 +241,91 @@ for (const config of Object.values(CONFIGS)) {
 
   describe(getConfigDescription(config), () => {
     test("no argument", () => {
-      const component = getModeComponent(mode, cv());
-      const props = component();
+      const recipe = getModeRecipe(mode, cv());
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("null class", () => {
-      const component = getModeComponent(mode, cv({ class: null }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ class: null }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("empty array class", () => {
-      const component = getModeComponent(mode, cv({ class: [] }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ class: [] }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("string class", () => {
-      const component = getModeComponent(mode, cv({ class: "foo bar" }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ class: "foo bar" }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("foo bar") });
     });
 
     test("nested array class", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: ["foo", ["bar", ["baz"]]] }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("foo bar baz") });
     });
 
     test("nested array class with falsy values", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: ["foo", null, ["bar", false, ["baz", 0]]] }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("foo bar baz") });
     });
 
     test("merge class from props", () => {
-      const component = getModeComponent(mode, cv({ class: "foo bar" }));
-      const props = component({ class: "baz qux" });
+      const recipe = getModeRecipe(mode, cv({ class: "foo bar" }));
+      const props = recipe({ class: "baz qux" });
       expect(getStyleClass(props)).toEqual({ class: cls("foo bar baz qux") });
     });
 
     test("merge className from props", () => {
-      const component = getModeComponent(mode, cv({ class: "foo bar" }));
-      const props = component({ className: "baz qux" });
+      const recipe = getModeRecipe(mode, cv({ class: "foo bar" }));
+      const props = recipe({ className: "baz qux" });
       expect(getStyleClass(props)).toEqual({ class: cls("foo bar baz qux") });
     });
 
     test("merge class and className from props", () => {
-      const component = getModeComponent(mode, cv({ class: "foo bar" }));
-      const props = component({ class: "baz qux", className: "quux corge" });
+      const recipe = getModeRecipe(mode, cv({ class: "foo bar" }));
+      const props = recipe({ class: "baz qux", className: "quux corge" });
       expect(getStyleClass(props)).toEqual({
         class: cls("foo bar baz qux quux corge"),
       });
     });
 
     test("merge null class from props", () => {
-      const component = getModeComponent(mode, cv({ class: "foo bar" }));
-      const props = component({ class: null });
+      const recipe = getModeRecipe(mode, cv({ class: "foo bar" }));
+      const props = recipe({ class: null });
       expect(getStyleClass(props)).toEqual({ class: cls("foo bar") });
     });
 
     test("merge null className from props", () => {
-      const component = getModeComponent(mode, cv({ class: "foo bar" }));
-      const props = component({ className: null });
+      const recipe = getModeRecipe(mode, cv({ class: "foo bar" }));
+      const props = recipe({ className: null });
       expect(getStyleClass(props)).toEqual({ class: cls("foo bar") });
     });
 
     test("empty style", () => {
-      const component = getModeComponent(mode, cv({ style: {} }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ style: {} }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("style with properties", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ style: { backgroundColor: "red", fontSize: "16px" } }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
@@ -334,7 +334,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("style does not accept numbers", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           style: {
@@ -344,7 +344,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
@@ -358,8 +358,8 @@ for (const config of Object.values(CONFIGS)) {
         "--custom-var": "value",
         "--custom-number": 1,
       } satisfies StyleValue;
-      const component = getModeComponent(mode, cv({ style }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ style }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
@@ -369,11 +369,11 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("merge style from props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ style: { backgroundColor: "red" } }),
       );
-      const props = component({ style: { fontSize: "16px" } });
+      const props = recipe({ style: { fontSize: "16px" } });
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
@@ -382,11 +382,11 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("merge jsx style from props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ style: { backgroundColor: "red" } }),
       );
-      const props = component({ style: { fontSize: 16 } });
+      const props = recipe({ style: { fontSize: 16 } });
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
@@ -395,11 +395,11 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("merge html style from props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ style: { backgroundColor: "red" } }),
       );
-      const props = component({ style: "font-size: 16px" });
+      const props = recipe({ style: "font-size: 16px" });
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
@@ -408,11 +408,11 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("merge htmlObj style from props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ style: { backgroundColor: "red" } }),
       );
-      const props = component({ style: { "font-size": 16 } });
+      const props = recipe({ style: { "font-size": 16 } });
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
@@ -421,11 +421,11 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("merge null style from props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ style: { backgroundColor: "red" } }),
       );
-      const props = component({ style: null });
+      const props = recipe({ style: null });
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",

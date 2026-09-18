@@ -48,7 +48,7 @@ export type StyleProperty =
   | string;
 
 /**
- * The prop object returned by a component's `.jsx()` mode.
+ * The prop object returned by a recipe's `.jsx()` mode.
  *
  * @example
  * ```ts
@@ -64,7 +64,7 @@ export interface JSXProps {
 }
 
 /**
- * The prop object returned by a component's `.html()` mode. The `style` value
+ * The prop object returned by a recipe's `.html()` mode. The `style` value
  * is serialized as an HTML style string.
  *
  * @example
@@ -81,7 +81,7 @@ export interface HTMLProps {
 }
 
 /**
- * The prop object returned by a component's `.htmlObj()` mode. The `style`
+ * The prop object returned by a recipe's `.htmlObj()` mode. The `style`
  * value uses hyphenated CSS property names.
  *
  * @example
@@ -98,7 +98,7 @@ export interface HTMLObjProps {
 }
 
 /**
- * The default prop object returned by a Clava component. It uses `class`
+ * The default prop object returned by a Clava recipe. It uses `class`
  * rather than `className` and keeps styles as a normalized object.
  *
  * @example
@@ -120,18 +120,18 @@ export interface StyleProps {
   htmlObj: HTMLObjProps;
 }
 
-export type ComponentResult =
+export type RecipeResult =
   | JSXProps
   | HTMLProps
   | HTMLObjProps
   | StyleClassProps;
 
-type AllComponentResultKeys =
+type AllRecipeResultKeys =
   | keyof JSXProps
   | keyof HTMLProps
   | keyof HTMLObjProps;
 
-type ComponentResultValue<K extends AllComponentResultKeys> = K extends "style"
+type RecipeResultValue<K extends AllRecipeResultKeys> = K extends "style"
   ? StyleProperty
   : K extends "className"
     ? string
@@ -139,31 +139,31 @@ type ComponentResultValue<K extends AllComponentResultKeys> = K extends "style"
       ? string
       : never;
 
-export type NullableComponentResult = {
-  [K in AllComponentResultKeys]?: ComponentResultValue<K> | null;
+export type NullableRecipeResult = {
+  [K in AllRecipeResultKeys]?: RecipeResultValue<K> | null;
 };
 
-export type ComponentProps<V = {}> = VariantValues<V> & NullableComponentResult;
+export type RecipeProps<V = {}> = VariantValues<V> & NullableRecipeResult;
 
 export type GetVariants<V> = (variants?: VariantValues<V>) => VariantValues<V>;
 
-type ComponentPropKey<R extends ComponentResult> =
+type RecipePropKey<R extends RecipeResult> =
   | keyof R
   | (R extends StyleClassProps ? "className" : never);
 
 // Key source types - what can be passed as additional parameters to splitProps
 export type KeySourceArray = readonly string[];
-export interface KeySourceComponent {
+export interface KeySourceRecipe {
   propKeys: readonly string[];
   variantKeys: readonly string[];
   getVariants: () => Record<string, unknown>;
 }
-export type KeySource = KeySourceArray | KeySourceComponent;
+export type KeySource = KeySourceArray | KeySourceRecipe;
 
-// Check if source is a component (has getVariants)
-type IsComponent<S> = S extends { getVariants: () => unknown } ? true : false;
+// Check if source is a recipe (has getVariants)
+type IsRecipe<S> = S extends { getVariants: () => unknown } ? true : false;
 
-// Extract keys from a source (includes class/style for components)
+// Extract keys from a source (includes class/style for recipes)
 type SourceKeys<S> = S extends readonly (infer K)[]
   ? K
   : S extends { propKeys: readonly (infer K)[] }
@@ -177,28 +177,28 @@ type SourceVariantKeys<S> = S extends readonly (infer K)[]
     ? K
     : never;
 
-// Extract defaults from a source (components have defaults, arrays don't)
+// Extract defaults from a source (recipes have defaults, arrays don't)
 type SourceDefaults<S> = S extends { getVariants: () => infer Defaults }
   ? Defaults
   : {};
 
 // Result type for a source when styling is NOT yet claimed
 // - Arrays: use listed keys (no defaults)
-// - Components: use full keys including class/style (with defaults)
+// - Recipes: use full keys including class/style (with defaults)
 type SourceResultWithStyling<T, S> = Pick<T, Extract<keyof T, SourceKeys<S>>> &
   Omit<SourceDefaults<S>, keyof T>;
 
 // Result type for a source when styling IS already claimed
 // - Arrays: use listed keys (no defaults)
-// - Components: use only variant keys (with defaults)
+// - Recipes: use only variant keys (with defaults)
 type SourceResultWithoutStyling<T, S> =
-  IsComponent<S> extends true
+  IsRecipe<S> extends true
     ? Pick<T, Extract<keyof T, SourceVariantKeys<S>>> &
         Omit<SourceDefaults<S>, keyof T>
     : Pick<T, Extract<keyof T, SourceKeys<S>>>;
 
 // Recursive helper to build the result tuple for sources after S1
-// StylingClaimed: whether a component has already claimed styling
+// StylingClaimed: whether a recipe has already claimed styling
 // UsedKeys: accumulator for all keys used so far (for the rest object)
 type BuildSourceResults<
   T,
@@ -216,7 +216,7 @@ type BuildSourceResults<
       ...BuildSourceResults<
         T,
         Rest,
-        StylingClaimed extends true ? true : IsComponent<Current>,
+        StylingClaimed extends true ? true : IsRecipe<Current>,
         UsedKeys | SourceKeys<Current>
       >,
     ]
@@ -234,35 +234,35 @@ export type SplitPropsFunction = <
 ) => SplitPropsFunctionResult<T, S1, Sources>;
 
 // Result type for standalone splitProps function
-// S1: First source - uses SourceResultWithStyling (either array or first component gets styling)
-// Sources: Subsequent sources - use SourceResultWithStyling if no prior component, else SourceResultWithoutStyling
+// S1: First source - uses SourceResultWithStyling (either array or first recipe gets styling)
+// Sources: Subsequent sources - use SourceResultWithStyling if no prior recipe, else SourceResultWithoutStyling
 type SplitPropsFunctionResult<
   T,
   S1 extends KeySource,
   Sources extends readonly KeySource[],
 > = [
   SourceResultWithStyling<T, S1>,
-  ...BuildSourceResults<T, Sources, IsComponent<S1>, SourceKeys<S1>>,
+  ...BuildSourceResults<T, Sources, IsRecipe<S1>, SourceKeys<S1>>,
 ];
 
-export interface ModalComponent<V, R extends ComponentResult> {
-  (props?: ComponentProps<V>): R;
-  class: (props?: ComponentProps<V>) => string;
-  style: (props?: ComponentProps<V>) => R["style"];
+export interface ModalRecipe<V, R extends RecipeResult> {
+  (props?: RecipeProps<V>): R;
+  class: (props?: RecipeProps<V>) => string;
+  style: (props?: RecipeProps<V>) => R["style"];
   getVariants: GetVariants<V>;
   variantKeys: (keyof V)[];
-  propKeys: (keyof V | ComponentPropKey<R>)[];
+  propKeys: (keyof V | RecipePropKey<R>)[];
 }
 
 /**
- * A callable Clava component returned by `cv()`. It includes the default
+ * A callable Clava recipe returned by `cv()`. It includes the default
  * output mode plus `.jsx()`, `.html()`, and `.htmlObj()` mode helpers.
  *
  * @example
  * ```ts
- * import { type CVComponent, cv } from "clava";
+ * import { type Recipe, cv } from "clava";
  *
- * const button: CVComponent<{
+ * const button: Recipe<{
  *   size: { sm: string; lg: string };
  * }> = cv({
  *   variants: {
@@ -273,29 +273,27 @@ export interface ModalComponent<V, R extends ComponentResult> {
  * button.jsx({ size: "lg" });
  * ```
  */
-export interface CVComponent<
+export interface Recipe<
   V extends Variants = {},
-  E extends AnyComponent[] = [],
-  R extends ComponentResult = StyleClassProps,
-> extends ModalComponent<MergeVariants<V, E>, R> {
-  jsx: ModalComponent<MergeVariants<V, E>, JSXProps>;
-  html: ModalComponent<MergeVariants<V, E>, HTMLProps>;
-  htmlObj: ModalComponent<MergeVariants<V, E>, HTMLObjProps>;
+  E extends AnyRecipe[] = [],
+  R extends RecipeResult = StyleClassProps,
+> extends ModalRecipe<MergeVariants<V, E>, R> {
+  jsx: ModalRecipe<MergeVariants<V, E>, JSXProps>;
+  html: ModalRecipe<MergeVariants<V, E>, HTMLProps>;
+  htmlObj: ModalRecipe<MergeVariants<V, E>, HTMLObjProps>;
 }
 
-export type AnyComponent =
-  | CVComponent<any, any, any>
-  | ModalComponent<any, any>;
+export type AnyRecipe = Recipe<any, any, any> | ModalRecipe<any, any>;
 
 type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
   ? ExtractVariants<First> & MergeExtendedVariants<Rest>
   : {};
 
-// Returns a component's effective variants so an intermediate component's
+// Returns a recipe's effective variants so an intermediate recipe's
 // static variant hides a grandparent's function variant from descendants.
-// CVComponent and its mode helpers instantiate ModalComponent with the already
+// Recipe and its mode helpers instantiate ModalRecipe with the already
 // merged MergeVariants<V, E>, so inferring V yields that effective chain.
-type ExtractVariants<T> = T extends ModalComponent<infer V, any> ? V : {};
+type ExtractVariants<T> = T extends ModalRecipe<infer V, any> ? V : {};
 
 // A function value in `variants` (a function variant) replaces any inherited
 // variant for the same key. An object value merges value-by-value with an
@@ -320,7 +318,7 @@ type MergeVariantMaps<Child, Parent> = Omit<Parent, keyof Child> &
     >;
   };
 
-export type MergeVariants<V, E extends AnyComponent[]> = MergeVariantMaps<
+export type MergeVariants<V, E extends AnyRecipe[]> = MergeVariantMaps<
   NoInfer<V>,
   MergeExtendedVariants<E>
 >;
@@ -425,7 +423,7 @@ type NullablePartial<T> =
 
 export type ExtendableVariants<
   V extends Variants,
-  E extends AnyComponent[],
+  E extends AnyRecipe[],
 > = V & {
   [K in keyof MergeExtendedVariants<E>]?:
     | NullablePartial<MergeExtendedVariants<E>[K]>

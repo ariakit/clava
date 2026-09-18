@@ -6,7 +6,7 @@ import {
   getConfigDescription,
   getConfigMode,
   getConfigTransformClass,
-  getModeComponent,
+  getModeRecipe,
   getStyleClass,
 } from "./_utils.ts";
 
@@ -16,24 +16,24 @@ for (const config of Object.values(CONFIGS)) {
   const cls = getConfigTransformClass(config);
 
   describe(getConfigDescription(config), () => {
-    test("extend single component", () => {
+    test("extend single recipe", () => {
       const base = cv({ class: "base", variants: { size: { sm: "sm" } } });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base], class: "extended" }),
       );
-      const props = component({ size: "sm" });
+      const props = recipe({ size: "sm" });
       expect(getStyleClass(props)).toEqual({ class: cls("base extended sm") });
     });
 
-    test("extend multiple components", () => {
+    test("extend multiple recipes", () => {
       const base1 = cv({ class: "base1" });
       const base2 = cv({ class: "base2" });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base1, base2], class: "extended" }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("base1 base2 extended"),
       });
@@ -52,33 +52,33 @@ for (const config of Object.values(CONFIGS)) {
         style: { color: "blue" },
       });
       const right = cv({ extend: [base], class: "right" });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [left, right], class: "both" }),
       );
-      expect(getStyleClass(component())).toEqual({
+      expect(getStyleClass(recipe())).toEqual({
         class: cls("base left right both size-sm"),
         color: "blue",
       });
-      expect(getStyleClass(component({ size: "lg" }))).toEqual({
+      expect(getStyleClass(recipe({ size: "lg" }))).toEqual({
         class: cls("base left right both size-lg"),
         color: "blue",
       });
-      expect(component.getVariants()).toEqual({ size: "sm" });
+      expect(recipe.getVariants()).toEqual({ size: "sm" });
       expect(getStyleClass(right())).toEqual({
         class: cls("base right size-sm"),
         color: "red",
       });
     });
 
-    test("extend deduplicates component modes but keeps distinct recipes", () => {
+    test("extend deduplicates recipe modes but keeps distinct recipes", () => {
       const base = cv({ class: "same" });
       const other = cv({ class: "same" });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base, base.jsx, base.html, base.htmlObj, other] }),
       );
-      expect(getStyleClass(component())).toEqual({ class: cls("same same") });
+      expect(getStyleClass(recipe())).toEqual({ class: cls("same same") });
     });
 
     test("extend preserves first-path defaults and later own defaults", () => {
@@ -88,9 +88,9 @@ for (const config of Object.values(CONFIGS)) {
       });
       const left = cv({ extend: [base], defaultVariants: { size: "lg" } });
       const right = cv({ extend: [base] });
-      const component = cv({ extend: [left, right] });
-      expect(component.getVariants()).toEqual({ size: "lg" });
-      expect(component.class()).toBe(cls("lg"));
+      const recipe = cv({ extend: [left, right] });
+      expect(recipe.getVariants()).toEqual({ size: "lg" });
+      expect(recipe.class()).toBe(cls("lg"));
       const override = cv({ extend: [base], defaultVariants: { size: "sm" } });
       const overridden = cv({ extend: [left, override] });
       expect(overridden.getVariants()).toEqual({ size: "sm" });
@@ -125,8 +125,8 @@ for (const config of Object.values(CONFIGS)) {
           return `right-${variants.size}`;
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [left, right] }));
-      expect(getStyleClass(component())).toEqual({
+      const recipe = getModeRecipe(mode, cv({ extend: [left, right] }));
+      expect(getStyleClass(recipe())).toEqual({
         class: cls("size-2 refined right-2"),
       });
       expect(calls).toEqual([
@@ -140,7 +140,7 @@ for (const config of Object.values(CONFIGS)) {
         "right",
       ]);
       calls.length = 0;
-      expect(component.getVariants()).toEqual({ size: 2 });
+      expect(recipe.getVariants()).toEqual({ size: 2 });
       expect(calls).toEqual([
         "default",
         "base",
@@ -163,10 +163,10 @@ for (const config of Object.values(CONFIGS)) {
         extend: [base],
         defaultVariants: { size: (value) => value },
       });
-      const component = getModeComponent(mode, cv({ extend: [left, right] }));
-      expect(getStyleClass(component())).toEqual({ class: cls("size-lg") });
-      expect(component.getVariants()).toEqual({ size: "lg" });
-      expect(getStyleClass(component({ size: "sm" }))).toEqual({
+      const recipe = getModeRecipe(mode, cv({ extend: [left, right] }));
+      expect(getStyleClass(recipe())).toEqual({ class: cls("size-lg") });
+      expect(recipe.getVariants()).toEqual({ size: "lg" });
+      expect(getStyleClass(recipe({ size: "sm" }))).toEqual({
         class: cls("size-sm"),
       });
     });
@@ -181,10 +181,10 @@ for (const config of Object.values(CONFIGS)) {
         extend: [base],
         variants: { active: { false: "inactive" } },
       });
-      const component = getModeComponent(mode, cv({ extend: [left, right] }));
-      expect(getStyleClass(component())).toEqual({ class: cls("active") });
-      expect(component.getVariants()).toEqual({ active: true });
-      expect(getStyleClass(component({ active: false }))).toEqual({
+      const recipe = getModeRecipe(mode, cv({ extend: [left, right] }));
+      expect(getStyleClass(recipe())).toEqual({ class: cls("active") });
+      expect(recipe.getVariants()).toEqual({ active: true });
+      expect(getStyleClass(recipe({ active: false }))).toEqual({
         class: cls("inactive"),
       });
     });
@@ -237,12 +237,12 @@ for (const config of Object.values(CONFIGS)) {
         color: "red",
       });
       const both = cv({ extend: [left, right] });
-      const component = getModeComponent(mode, both);
-      expect(getStyleClass(component())).toEqual({
+      const recipe = getModeRecipe(mode, both);
+      expect(getStyleClass(recipe())).toEqual({
         class: cls("base left original small original-refine"),
         color: "red",
       });
-      expect(component.getVariants()).toEqual({ size: "sm" });
+      expect(recipe.getVariants()).toEqual({ size: "sm" });
       expect(cv({ extend: [base, both, right] }).class()).toBe(
         cls("base left original small original-refine"),
       );
@@ -255,9 +255,9 @@ for (const config of Object.values(CONFIGS)) {
       const right = cv({ extend: [base], variants, defaultVariants: defaults });
       variants.size = () => "changed";
       defaults.size = () => 3;
-      const component = getModeComponent(mode, cv({ extend: [base, right] }));
-      expect(getStyleClass(component())).toEqual({ class: cls("base size-2") });
-      expect(component.getVariants()).toEqual({ size: 2 });
+      const recipe = getModeRecipe(mode, cv({ extend: [base, right] }));
+      expect(getStyleClass(recipe())).toEqual({ class: cls("base size-2") });
+      expect(recipe.getVariants()).toEqual({ size: 2 });
     });
 
     test("pruned branches preserve compiled classes and captured style objects", () => {
@@ -267,8 +267,8 @@ for (const config of Object.values(CONFIGS)) {
       const right = cv({ extend: [base], class: classes, style });
       classes[0] = "changed";
       style.color = "blue";
-      const component = getModeComponent(mode, cv({ extend: [base, right] }));
-      expect(getStyleClass(component())).toEqual({
+      const recipe = getModeRecipe(mode, cv({ extend: [base, right] }));
+      expect(getStyleClass(recipe())).toEqual({
         class: cls("base original"),
         color: "blue",
       });
@@ -276,11 +276,11 @@ for (const config of Object.values(CONFIGS)) {
 
     test("extend with variant merging", () => {
       const base = cv({ variants: { size: { sm: "base-sm", lg: "base-lg" } } });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base], variants: { size: { sm: "extended-sm" } } }),
       );
-      const props = component({ size: "sm" });
+      const props = recipe({ size: "sm" });
       expect(getStyleClass(props)).toEqual({
         class: cls("base-sm extended-sm"),
       });
@@ -288,14 +288,14 @@ for (const config of Object.values(CONFIGS)) {
 
     test("extend with variant merging setting base variant", () => {
       const base = cv({ variants: { size: { sm: "base-sm", lg: "base-lg" } } });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
           variants: { size: { sm: "extended-sm" } },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("base-lg") });
     });
 
@@ -304,7 +304,7 @@ for (const config of Object.values(CONFIGS)) {
         variants: { size: { sm: "base-sm", lg: "base-lg" } },
         defaultVariants: { size: "sm" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -317,7 +317,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({
+      const props = recipe({
         // @ts-expect-error disabled variant cannot be set
         size:
           // no error
@@ -331,7 +331,7 @@ for (const config of Object.values(CONFIGS)) {
         variants: { size: { sm: "base-sm", lg: "base-lg" } },
         defaultVariants: { size: "sm" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -344,14 +344,14 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const disabledProps = component({
+      const disabledProps = recipe({
         // @ts-expect-error disabled variant value cannot be set
         size:
           // no error
           "sm",
       });
       expect(getStyleClass(disabledProps)).toEqual({ class: "" });
-      const enabledProps = component({ size: "lg" });
+      const enabledProps = recipe({ size: "lg" });
       expect(getStyleClass(enabledProps)).toEqual({ class: cls("base-lg") });
     });
 
@@ -364,7 +364,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -372,7 +372,7 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { size: "lg" },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("base-lg"),
         fontSize: "16px",
@@ -388,7 +388,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         },
       });
-      const validComponent = getModeComponent(
+      const validRecipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -398,12 +398,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      expect(getStyleClass(validComponent())).toEqual({
+      expect(getStyleClass(validRecipe())).toEqual({
         class: cls("base-lg"),
         fontSize: "16px",
       });
 
-      const invalidComponent = getModeComponent(
+      const invalidRecipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -416,7 +416,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      expect(getStyleClass(invalidComponent())).toEqual({ class: "" });
+      expect(getStyleClass(invalidRecipe())).toEqual({ class: "" });
     });
 
     test("extend filters disabled values from inherited computed defaultVariants", () => {
@@ -431,7 +431,7 @@ for (const config of Object.values(CONFIGS)) {
           size: () => "sm" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -445,11 +445,11 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      expect(getStyleClass(component())).toEqual({
+      expect(getStyleClass(recipe())).toEqual({
         class: cls("base-lg blue"),
         fontSize: "16px",
       });
-      expect(component.getVariants()).toEqual({
+      expect(recipe.getVariants()).toEqual({
         size: "lg",
         color: "blue",
       });
@@ -464,7 +464,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         },
       });
-      const validComponent = getModeComponent(
+      const validRecipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -474,12 +474,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      expect(getStyleClass(validComponent())).toEqual({
+      expect(getStyleClass(validRecipe())).toEqual({
         class: cls("base-lg"),
         fontSize: "16px",
       });
 
-      const invalidComponent = getModeComponent(
+      const invalidRecipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -494,7 +494,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      expect(getStyleClass(invalidComponent())).toEqual({ class: "" });
+      expect(getStyleClass(invalidRecipe())).toEqual({ class: "" });
     });
 
     test("extend inherits defaultVariants", () => {
@@ -502,8 +502,8 @@ for (const config of Object.values(CONFIGS)) {
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: { size: "sm" },
       });
-      const component = getModeComponent(mode, cv({ extend: [base] }));
-      const props = component();
+      const recipe = getModeRecipe(mode, cv({ extend: [base] }));
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
@@ -512,56 +512,56 @@ for (const config of Object.values(CONFIGS)) {
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: { size: "sm" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base], defaultVariants: { size: "lg" } }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("lg") });
     });
 
-    test("extend jsx modal component preserves style", () => {
+    test("extend jsx modal recipe preserves style", () => {
       const base = cv({
         class: "base",
         style: { backgroundColor: "red" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base.jsx], class: "extended" }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("base extended"),
         backgroundColor: "red",
       });
     });
 
-    test("extend html modal component preserves style", () => {
+    test("extend html modal recipe preserves style", () => {
       const base = cv({
         class: "base",
         style: { backgroundColor: "red" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base.html], class: "extended" }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("base extended"),
         backgroundColor: "red",
       });
     });
 
-    test("extend htmlObj modal component preserves style", () => {
+    test("extend htmlObj modal recipe preserves style", () => {
       const base = cv({
         class: "base",
         style: { backgroundColor: "red" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base.htmlObj], class: "extended" }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({
         class: cls("base extended"),
         backgroundColor: "red",
@@ -586,8 +586,8 @@ describe("non-idempotent transformClass", () => {
 
   test("base class is transformed exactly once across single extend", () => {
     const base = cv({ class: "base" });
-    const component = cv({ extend: [base], class: "extended" });
-    expect(component().class).toBe("tw-base tw-extended");
+    const recipe = cv({ extend: [base], class: "extended" });
+    expect(recipe().class).toBe("tw-base tw-extended");
   });
 
   test("base class is transformed exactly once across multi-level extend", () => {
@@ -635,8 +635,8 @@ function toLowerCase(className: string) {
 
 describe("extend across `create()` factories", () => {
   // The extend's own `transformClass` must apply to its own classes even when
-  // the extending component comes from a different `create()` call. The
-  // optimized compute path bypasses the public-component round-trip, so it
+  // the extending recipe comes from a different `create()` call. The
+  // optimized compute path bypasses the public-recipe round-trip, so it
   // detects mixed-factory extends by reference identity and runs the extend's
   // transform on its contribution before joining.
   const { cv: cvUpper } = create({ transformClass: toUpperCase });
@@ -644,8 +644,8 @@ describe("extend across `create()` factories", () => {
 
   test("extend's transformClass applies to its base class", () => {
     const base = cvUpper({ class: "base" });
-    const component = cvDefault({ extend: [base], class: "extended" });
-    expect(component().class).toBe("BASE extended");
+    const recipe = cvDefault({ extend: [base], class: "extended" });
+    expect(recipe().class).toBe("BASE extended");
   });
 
   test("extend's transformClass applies to its variant classes", () => {
@@ -653,15 +653,15 @@ describe("extend across `create()` factories", () => {
       class: "base",
       variants: { size: { sm: "sm", lg: "lg" } },
     });
-    const component = cvDefault({ extend: [base], class: "extended" });
-    expect(component({ size: "sm" }).class).toBe("BASE extended SM");
+    const recipe = cvDefault({ extend: [base], class: "extended" });
+    expect(recipe({ size: "sm" }).class).toBe("BASE extended SM");
   });
 
   test("extend's transformClass cascades through grandparent chain", () => {
     const grandparent = cvUpper({ class: "grandparent" });
     const parent = cvUpper({ extend: [grandparent], class: "parent" });
-    const component = cvDefault({ extend: [parent], class: "child" });
-    expect(component().class).toBe("GRANDPARENT PARENT child");
+    const recipe = cvDefault({ extend: [parent], class: "child" });
+    expect(recipe().class).toBe("GRANDPARENT PARENT child");
   });
 
   test("parent's transformClass applies on top of extend's transformed output", () => {
@@ -670,10 +670,10 @@ describe("extend across `create()` factories", () => {
       class: "base",
       variants: { size: { sm: "sm" } },
     });
-    const component = cvLower({ extend: [base], class: "child" });
+    const recipe = cvLower({ extend: [base], class: "child" });
     // The extend uppercases its own contribution, then the parent's
     // transformClass runs on the joined string and lowercases everything —
     // mirrors main's `parentTransform(clsx(extTransform(extOutput), …))`.
-    expect(component({ size: "sm" }).class).toBe("base child sm");
+    expect(recipe({ size: "sm" }).class).toBe("base child sm");
   });
 });

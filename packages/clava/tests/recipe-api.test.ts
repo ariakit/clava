@@ -1,5 +1,12 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
-import { type Variant, create, cv as cvBase, cx } from "../src/index.ts";
+import {
+  type Recipe,
+  type Variant,
+  type VariantProps,
+  create,
+  cv as cvBase,
+  cx,
+} from "../src/index.ts";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -7,10 +14,23 @@ import {
   getConfigMode,
   getConfigTransformClass,
   getExpectedPropsKeys,
-  getModeComponent,
+  getModeRecipe,
   getStyle,
   getStyleClass,
 } from "./_utils.ts";
+
+test("cv returns a Recipe with inferred variants", () => {
+  const button = cvBase({
+    variants: { size: { sm: "button-sm", lg: "button-lg" } },
+  });
+
+  expectTypeOf(button).toEqualTypeOf<
+    Recipe<{ size: { sm: string; lg: string } }>
+  >();
+  expectTypeOf<VariantProps<typeof button>>().toEqualTypeOf<{
+    size?: "sm" | "lg";
+  }>();
+});
 
 test("cx joins classes and applies factory transforms once", () => {
   expect(cx("button", ["active", false], { disabled: true })).toBe(
@@ -35,41 +55,41 @@ for (const config of Object.values(CONFIGS)) {
 
   describe(getConfigDescription(config), () => {
     test("class method", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: "foo", variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const className = component.class({ size: "lg" });
+      const className = recipe.class({ size: "lg" });
       expect(className).toBe(cls("foo lg"));
     });
 
     test("style method", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ style: { backgroundColor: "red" } }),
       );
-      const style = component.style();
+      const style = recipe.style();
       expect(getStyle({ style })).toEqual({ backgroundColor: "red" });
     });
 
     test("getVariants returns variant values", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
         }),
       );
-      const variants = component.getVariants({ size: "lg" });
+      const variants = recipe.getVariants({ size: "lg" });
       expect(variants).toEqual({ size: "lg" });
     });
 
     test("getVariants ignores unknown variant keys", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const variants = component.getVariants({
+      const variants = recipe.getVariants({
         size: "lg",
         // @ts-expect-error unknown is not a declared variant
         unknown: "value",
@@ -78,7 +98,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("getVariants reads non-enumerable declared variant keys", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -89,12 +109,12 @@ for (const config of Object.values(CONFIGS)) {
         value: "lg",
         enumerable: false,
       });
-      expect(component.getVariants(props)).toEqual({ size: "lg" });
+      expect(recipe.getVariants(props)).toEqual({ size: "lg" });
     });
 
     test("getVariants excludes unknown variant keys from refine", () => {
       let refinedVariants: Record<string, unknown> | undefined;
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -107,7 +127,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants({
+      const variants = recipe.getVariants({
         size: "lg",
         // @ts-expect-error unknown is not a declared variant
         unknown: "value",
@@ -120,14 +140,14 @@ for (const config of Object.values(CONFIGS)) {
       const base = cv({
         variants: { tone: { quiet: "quiet", loud: "loud" } },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
           variants: { size: { sm: "sm", lg: "lg" } },
         }),
       );
-      const variants = component.getVariants({
+      const variants = recipe.getVariants({
         tone: "quiet",
         size: "lg",
         // @ts-expect-error unknown is not a declared variant
@@ -141,7 +161,7 @@ for (const config of Object.values(CONFIGS)) {
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: { size: () => "sm" as const },
       });
-      const component = getModeComponent(mode, cv({ extend: [base] }));
+      const recipe = getModeRecipe(mode, cv({ extend: [base] }));
       let unknownReads = 0;
       let inheritedSetterCalls = 0;
       const props = {};
@@ -164,7 +184,7 @@ for (const config of Object.values(CONFIGS)) {
         enumerable: true,
         value: "lg",
       });
-      expect(component.getVariants(props)).toEqual({ size: "lg" });
+      expect(recipe.getVariants(props)).toEqual({ size: "lg" });
       expect(unknownReads).toBe(0);
       expect(inheritedSetterCalls).toBe(0);
     });
@@ -180,11 +200,11 @@ for (const config of Object.values(CONFIGS)) {
             variants.size === "lg" ? "neutral" : defaultValue,
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [base] }));
+      const recipe = getModeRecipe(mode, cv({ extend: [base] }));
       // A computed default re-runs the refine chain, so an uncopied props
       // record would read the accessor once per pass. A caller can pass a
       // record whose reads are observable, such as a Solid props proxy handed
-      // straight to the component, so the count is not an internal detail.
+      // straight to the recipe, so the count is not an internal detail.
       let intentReads = 0;
       const props = {};
       Object.defineProperty(props, "size", {
@@ -198,7 +218,7 @@ for (const config of Object.values(CONFIGS)) {
           return undefined;
         },
       });
-      expect(getStyleClass(component(props))).toEqual({
+      expect(getStyleClass(recipe(props))).toEqual({
         class: cls("lg neutral"),
       });
       expect(intentReads).toBe(1);
@@ -215,9 +235,9 @@ for (const config of Object.values(CONFIGS)) {
             variants.size === "lg" ? "neutral" : defaultValue,
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [base] }));
+      const recipe = getModeRecipe(mode, cv({ extend: [base] }));
       // `getVariants` copies the caller's record on its own branch, separate
-      // from the one the component call uses, so it needs its own coverage.
+      // from the one the recipe call uses, so it needs its own coverage.
       let intentReads = 0;
       const props = {};
       Object.defineProperty(props, "size", {
@@ -231,7 +251,7 @@ for (const config of Object.values(CONFIGS)) {
           return undefined;
         },
       });
-      expect(component.getVariants(props)).toEqual({
+      expect(recipe.getVariants(props)).toEqual({
         size: "lg",
         intent: "neutral",
       });
@@ -239,26 +259,26 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("getVariants returns default variants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ size: "sm" });
     });
 
     test("getVariants omits undefined defaultVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: undefined },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toStrictEqual({});
       expect(Object.hasOwn(variants, "size")).toBe(false);
     });
@@ -268,17 +288,17 @@ for (const config of Object.values(CONFIGS)) {
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: { size: "sm" },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base], defaultVariants: { size: undefined } }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toStrictEqual({});
       expect(Object.hasOwn(variants, "size")).toBe(false);
     });
 
     test("getVariants returns variants set by refine setVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -292,12 +312,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants({ size: "lg" });
+      const variants = recipe.getVariants({ size: "lg" });
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
     test("getVariants re-runs when refine changes variants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -314,12 +334,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants({ size: "lg" });
+      const variants = recipe.getVariants({ size: "lg" });
       expect(variants).toEqual({ size: "sm", color: "red" });
     });
 
     test("getVariants re-runs when computed defaultVariants change variants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -333,12 +353,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
     test("getVariants returns computed defaultVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -351,12 +371,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants({ size: "lg" });
+      const variants = recipe.getVariants({ size: "lg" });
       expect(variants).toEqual({ size: "lg", color: "blue" });
     });
 
     test("getVariants computed defaultVariants do not override props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -368,12 +388,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants({ color: "red" });
+      const variants = recipe.getVariants({ color: "red" });
       expect(variants).toEqual({ color: "red" });
     });
 
     test("getVariants setVariants overrides props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -385,18 +405,18 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants({ color: "red" });
+      const variants = recipe.getVariants({ color: "red" });
       expect(variants).toEqual({ color: "blue" });
     });
 
-    test("getVariants picks up computed defaultVariants from extended component", () => {
+    test("getVariants picks up computed defaultVariants from extended recipe", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: {
           size: () => "lg" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -404,11 +424,11 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { color: "red" },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
-    test("getVariants picks up computed defaultVariants from grandparent component", () => {
+    test("getVariants picks up computed defaultVariants from grandparent recipe", () => {
       const grandparent = cv({
         variants: { size: { sm: "sm", lg: "lg" } },
         defaultVariants: {
@@ -416,7 +436,7 @@ for (const config of Object.values(CONFIGS)) {
         },
       });
       const parent = cv({ extend: [grandparent] });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [parent],
@@ -424,11 +444,11 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { color: "red" },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ size: "lg", color: "red" });
     });
 
-    test("getVariants re-runs when base component refine changes variants", () => {
+    test("getVariants re-runs when base recipe refine changes variants", () => {
       const base = cv({
         variants: { size: { sm: "sm", lg: "lg" }, active: "" },
         defaultVariants: { size: "sm" },
@@ -438,7 +458,7 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -450,7 +470,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants({ active: true });
+      const variants = recipe.getVariants({ active: true });
       expect(variants).toEqual({ size: "lg", active: true, color: "red" });
     });
 
@@ -471,13 +491,13 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [base] }));
-      const variants = component.getVariants({ active: true });
+      const recipe = getModeRecipe(mode, cv({ extend: [base] }));
+      const variants = recipe.getVariants({ active: true });
       expect(variants).toEqual({ size: "lg", active: true, mode: "on" });
     });
 
     test("getVariants setVariants uses the latest pending value", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -488,7 +508,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ size: "sm" });
     });
 
@@ -499,7 +519,7 @@ for (const config of Object.values(CONFIGS)) {
           color: () => "blue" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -512,7 +532,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ color: "red", size: "sm" });
     });
 
@@ -523,7 +543,7 @@ for (const config of Object.values(CONFIGS)) {
           color: () => "blue" as const,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -535,7 +555,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ color: "red", done: true });
     });
 
@@ -556,11 +576,11 @@ for (const config of Object.values(CONFIGS)) {
           }
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ extend: [base], defaultVariants: { size: "sm" } }),
       );
-      const variants = component.getVariants({ active: true });
+      const variants = recipe.getVariants({ active: true });
       expect(variants).toEqual({ size: "lg", active: true, mode: "on" });
     });
 
@@ -577,8 +597,8 @@ for (const config of Object.values(CONFIGS)) {
           color: () => "blue" as const,
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [first, second] }));
-      const variants = component.getVariants();
+      const recipe = getModeRecipe(mode, cv({ extend: [first, second] }));
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ color: "red" });
     });
 
@@ -595,8 +615,8 @@ for (const config of Object.values(CONFIGS)) {
           color: () => "blue" as const,
         },
       });
-      const component = getModeComponent(mode, cv({ extend: [first, second] }));
-      const variants = component.getVariants();
+      const recipe = getModeRecipe(mode, cv({ extend: [first, second] }));
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ color: "blue" });
     });
 
@@ -607,7 +627,7 @@ for (const config of Object.values(CONFIGS)) {
           setVariants({ color: "red" });
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -618,12 +638,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ color: "red" });
     });
 
     test("getVariants computed defaultVariants do not override setVariants from a previous pass", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -641,74 +661,74 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const variants = component.getVariants();
+      const variants = recipe.getVariants();
       expect(variants).toEqual({ color: "red", done: true });
     });
 
     test("variantKeys property", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm" }, color: { red: "red" } },
         }),
       );
-      expectTypeOf(component.variantKeys).toEqualTypeOf<("size" | "color")[]>();
-      expect(component.variantKeys).toEqual(["size", "color"]);
+      expectTypeOf(recipe.variantKeys).toEqualTypeOf<("size" | "color")[]>();
+      expect(recipe.variantKeys).toEqual(["size", "color"]);
     });
 
     test("propKeys property", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm" }, color: { red: "red" } } }),
       );
-      expectTypeOf(component.propKeys).toExtend<
+      expectTypeOf(recipe.propKeys).toExtend<
         ("class" | "className" | "style" | "size" | "color")[]
       >();
-      expect(component.propKeys).toEqual(
+      expect(recipe.propKeys).toEqual(
         getExpectedPropsKeys(config, "size", "color"),
       );
     });
 
     test("propKeys on different modes", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm" } } }),
       );
-      expect(component.propKeys).toEqual(getExpectedPropsKeys(config, "size"));
+      expect(recipe.propKeys).toEqual(getExpectedPropsKeys(config, "size"));
     });
   });
 }
 
 test("propKeys are mode-specific", () => {
-  const component = cvBase({
+  const recipe = cvBase({
     variants: { size: { sm: "sm", md: "md" } },
   });
 
-  expectTypeOf(component.propKeys).toEqualTypeOf<
+  expectTypeOf(recipe.propKeys).toEqualTypeOf<
     ("class" | "className" | "style" | "size")[]
   >();
-  expectTypeOf(component.jsx.propKeys).toEqualTypeOf<
+  expectTypeOf(recipe.jsx.propKeys).toEqualTypeOf<
     ("className" | "style" | "size")[]
   >();
-  expectTypeOf(component.html.propKeys).toEqualTypeOf<
+  expectTypeOf(recipe.html.propKeys).toEqualTypeOf<
     ("class" | "style" | "size")[]
   >();
-  expectTypeOf(component.htmlObj.propKeys).toEqualTypeOf<
+  expectTypeOf(recipe.htmlObj.propKeys).toEqualTypeOf<
     ("class" | "style" | "size")[]
   >();
 
-  expect(component.propKeys).toEqual(["class", "className", "style", "size"]);
-  expect(component.jsx.propKeys).toEqual(["className", "style", "size"]);
-  expect(component.html.propKeys).toEqual(["class", "style", "size"]);
-  expect(component.htmlObj.propKeys).toEqual(["class", "style", "size"]);
+  expect(recipe.propKeys).toEqual(["class", "className", "style", "size"]);
+  expect(recipe.jsx.propKeys).toEqual(["className", "style", "size"]);
+  expect(recipe.html.propKeys).toEqual(["class", "style", "size"]);
+  expect(recipe.htmlObj.propKeys).toEqual(["class", "style", "size"]);
 });
 
 describe("Variant utility type", () => {
-  test("matches variant keys from another component", () => {
+  test("matches variant keys from another recipe", () => {
     const base = cvBase({
       variants: { foo: { sm: "foo-sm", lg: "foo-lg" } },
     });
-    const component = cvBase({
+    const recipe = cvBase({
       extend: [base],
       variants: {
         bar: {
@@ -717,7 +737,7 @@ describe("Variant utility type", () => {
         } satisfies Variant<typeof base, "foo">,
       },
     });
-    expect(component({ bar: "sm" }).class).toContain("bar-sm");
+    expect(recipe({ bar: "sm" }).class).toContain("bar-sm");
   });
 
   test("rejects invalid variant keys", () => {

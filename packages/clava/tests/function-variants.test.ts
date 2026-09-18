@@ -5,7 +5,7 @@ import {
   getConfigDescription,
   getConfigMode,
   getConfigTransformClass,
-  getModeComponent,
+  getModeRecipe,
   getStyleClass,
 } from "./_utils.ts";
 
@@ -16,7 +16,7 @@ for (const config of Object.values(CONFIGS)) {
 
   describe(getConfigDescription(config), () => {
     test("function variant", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -24,7 +24,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("large") });
     });
 
@@ -32,15 +32,15 @@ for (const config of Object.values(CONFIGS)) {
       const size = vi.fn((value: "sm" | "lg") =>
         value === "sm" ? "small" : "large",
       );
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size },
         }),
       );
 
-      const defaultProps = component();
-      const undefinedProps = component({ size: undefined });
+      const defaultProps = recipe();
+      const undefinedProps = recipe({ size: undefined });
 
       expect(getStyleClass(defaultProps)).toEqual({ class: "" });
       expect(getStyleClass(undefinedProps)).toEqual({ class: "" });
@@ -51,7 +51,7 @@ for (const config of Object.values(CONFIGS)) {
       const size = vi.fn((value: "sm" | "lg") =>
         value === "sm" ? "small" : "large",
       );
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size },
@@ -59,14 +59,14 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
 
-      const props = component({ size: undefined });
+      const props = recipe({ size: undefined });
 
       expect(getStyleClass(props)).toEqual({ class: cls("small") });
       expect(size).toHaveBeenCalledExactlyOnceWith("sm");
     });
 
     test("function variant with style", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -77,14 +77,14 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("large"),
         fontSize: "16px",
       });
     });
 
-    test("function variant can return another component default result", () => {
+    test("function variant can return another recipe default result", () => {
       const button = cv({
         variants: {
           size: {
@@ -93,7 +93,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -103,7 +103,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("button-lg"),
         fontSize: "16px",
@@ -119,7 +119,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -133,7 +133,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("extended-lg"),
         backgroundColor: "gray",
@@ -149,7 +149,7 @@ for (const config of Object.values(CONFIGS)) {
           }),
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -163,7 +163,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("extended-lg"),
         backgroundColor: "gray",
@@ -171,7 +171,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("function variant style does not accept numbers", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -183,7 +183,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({
         class: cls("large"),
         fontSize: expect.toBeOneOf(["16", "16px"]),
@@ -194,7 +194,7 @@ for (const config of Object.values(CONFIGS)) {
       const base = cv({
         variants: { disabled: { true: "disabled", false: "enabled" } },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -207,17 +207,17 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      component({
+      recipe({
         // @ts-expect-error
         disabled: true,
       });
-      const props = component({ disabled: "maybe" });
+      const props = recipe({ disabled: "maybe" });
       expect(getStyleClass(props)).toEqual({ class: cls("state-pending") });
     });
 
     test("function variant changes extended string variant to boolean", () => {
       const base = cv({ variants: { size: { sm: "sm", md: "md", lg: "lg" } } });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -226,18 +226,18 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      component({
+      recipe({
         // @ts-expect-error
         size: "sm",
       });
-      const propsTrue = component({ size: true });
+      const propsTrue = recipe({ size: true });
       expect(getStyleClass(propsTrue)).toEqual({ class: cls("size-large") });
-      const propsFalse = component({ size: false });
+      const propsFalse = recipe({ size: false });
       expect(getStyleClass(propsFalse)).toEqual({ class: cls("size-small") });
     });
 
     test("function variant with number type", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -248,7 +248,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ columns: 3 });
+      const props = recipe({ columns: 3 });
       expect(getStyleClass(props)).toEqual({
         class: cls("grid-cols-3"),
         "--grid-columns": "3",
@@ -256,7 +256,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("function variant with number type returns dynamic styles", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -272,7 +272,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ gap: 4, padding: 16 });
+      const props = recipe({ gap: 4, padding: 16 });
       expect(getStyleClass(props)).toEqual({
         class: "",
         "--gap": "16px",
@@ -282,7 +282,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("function variant with nullable type", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -293,12 +293,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const propsWithValue = component({ color: "red" });
+      const propsWithValue = recipe({ color: "red" });
       expect(getStyleClass(propsWithValue)).toEqual({
         class: cls("color-red"),
         "--color": "red",
       });
-      const propsWithNull = component({ color: null });
+      const propsWithNull = recipe({ color: null });
       expect(getStyleClass(propsWithNull)).toEqual({
         class: cls("color-default"),
         "--color": "inherit",
@@ -309,7 +309,7 @@ for (const config of Object.values(CONFIGS)) {
       const base = cv({
         variants: { size: { sm: "text-sm", md: "text-md", lg: "text-lg" } },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -321,19 +321,19 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      component({
+      recipe({
         // @ts-expect-error
         size: "sm",
       });
-      const props = component({ size: 18 });
+      const props = recipe({ size: 18 });
       expect(getStyleClass(props)).toEqual({
         class: cls("text-custom"),
         fontSize: "18px",
       });
     });
 
-    test("static and function variants combine within the same component", () => {
-      const component = getModeComponent(
+    test("static and function variants combine within the same recipe", () => {
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -342,7 +342,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg", columns: 3 });
+      const props = recipe({ size: "lg", columns: 3 });
       expect(getStyleClass(props)).toEqual({
         class: cls("size-lg cols-3"),
       });
@@ -358,7 +358,7 @@ for (const config of Object.values(CONFIGS)) {
           size: (value: number) => `base-fn-${value}`,
         },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [base],
@@ -367,9 +367,9 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const propsSm = component({ size: "sm" });
+      const propsSm = recipe({ size: "sm" });
       expect(getStyleClass(propsSm)).toEqual({ class: cls("child-sm") });
-      const propsLg = component({ size: "lg" });
+      const propsLg = recipe({ size: "lg" });
       expect(getStyleClass(propsLg)).toEqual({ class: cls("child-lg") });
     });
 
@@ -378,14 +378,14 @@ for (const config of Object.values(CONFIGS)) {
         variants: { size: (value: number) => `base-fn-${value}` },
       });
       const middle = cv({ extend: [base], class: "middle" });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [middle],
           variants: { size: { sm: "gc-sm", lg: "gc-lg" } },
         }),
       );
-      const props = component({ size: "sm" });
+      const props = recipe({ size: "sm" });
       expect(getStyleClass(props)).toEqual({ class: cls("middle gc-sm") });
     });
 
@@ -397,7 +397,7 @@ for (const config of Object.values(CONFIGS)) {
         extend: [base],
         variants: { size: { sm: "middle-sm", md: "middle-md" } },
       });
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           extend: [middle],
@@ -406,7 +406,7 @@ for (const config of Object.values(CONFIGS)) {
       );
       // Middle already replaced the grandparent function with an object, so
       // child sees only objects in the chain — both objects merge by value.
-      const props = component({ size: "sm" });
+      const props = recipe({ size: "sm" });
       expect(getStyleClass(props)).toEqual({
         class: cls("middle-sm child-sm"),
       });
