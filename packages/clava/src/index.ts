@@ -7,19 +7,19 @@ import {
   warnRefineLimit,
 } from "./refine-warning.ts";
 import type {
-  AnyComponent,
-  CVComponent,
+  AnyRecipe,
   ClassValue,
-  ComponentProps,
-  ComponentResult,
   DefaultVariants,
   ExtendableVariants,
   HTMLObjProps,
   HTMLProps,
   JSXProps,
-  KeySourceComponent,
+  KeySourceRecipe,
   MergeVariants,
-  ModalComponent,
+  ModalRecipe,
+  Recipe,
+  RecipeProps,
+  RecipeResult,
   Refine,
   SplitPropsFunction,
   StyleClassProps,
@@ -38,8 +38,8 @@ import {
 } from "./utils.ts";
 
 // Internal compute path: pushes the variant classes contributed by this
-// component (and its extends chain) into `classesOut` and merges any styles
-// into `styleOut`. Base class is handled by callers via ComponentMeta.baseClass
+// recipe (and its extends chain) into `classesOut` and merges any styles
+// into `styleOut`. Base class is handled by callers via RecipeMeta.baseClass
 // to avoid string-parsing round trips. Both outputs are mutated in place to
 // avoid intermediate allocations.
 type ComputeFn = (
@@ -82,38 +82,38 @@ type ComputedDefaultVariantFn = (
   variants: Readonly<Record<string, unknown>>,
 ) => unknown;
 
-// Internal metadata stored on components but hidden from public types.
-interface ComponentMeta {
+// Internal metadata stored on recipes but hidden from public types.
+interface RecipeMeta {
   identity?: object;
-  extends?: ComponentMeta[];
-  rebuild?: (extensions: ComponentMeta[]) => ComponentMeta;
+  extends?: RecipeMeta[];
+  rebuild?: (extensions: RecipeMeta[]) => RecipeMeta;
   baseClass: string;
   staticDefaults: Record<string, unknown>;
-  // Performs a single compute pass for extending components, returning the
+  // Performs a single compute pass for extending recipes, returning the
   // resolved variants while pushing classes and styles into the output values.
   compute: ComputeOnceFn;
   resolveRefine: ResolveRefineOnceFn | null;
   // Reference identity is used to detect mixed-factory `extend`. When a
-  // component is extended by a parent from a different `create()` call, the
+  // recipe is extended by a parent from a different `create()` call, the
   // parent applies this transform to the extend's contribution before joining,
   // preserving each factory's transform boundary.
   transformClass: (className: string) => string;
-  // Variant keys whose effective definition in this component's chain is a
-  // function. An extending component that supplies a non-function variant for
+  // Variant keys whose effective definition in this recipe's chain is a
+  // function. An extending recipe that supplies a non-function variant for
   // the same key uses this to tell us to skip that key (matching the
   // type-level "function variant is replaced by anything in the child" rule).
   // Empty when no key in this chain is a function variant.
   functionVariantKeys: Set<string>;
-  // Variant keys with computed defaults anywhere in this component's chain.
-  // Child components use this to preserve inherited computed defaults through
+  // Variant keys with computed defaults anywhere in this recipe's chain.
+  // Child recipes use this to preserve inherited computed defaults through
   // `defaultValue` without preserving their own prior computed result.
   computedDefaultKeys: Set<string>;
 }
 
 const META_KEY = "__meta";
 
-interface ComponentWithMeta {
-  [META_KEY]?: ComponentMeta;
+interface RecipeWithMeta {
+  [META_KEY]?: RecipeMeta;
 }
 
 const EMPTY_DEFAULTS: Record<string, unknown> = {};
@@ -121,13 +121,13 @@ const EMPTY_DEFAULTS: Record<string, unknown> = {};
 // Prune shared recipes before compiling their parent's compute path. Keeping
 // the first path preserves its overrides and factory transform boundaries.
 function deduplicateExtensions(
-  extensions: ComponentMeta[],
+  extensions: RecipeMeta[],
   seen = new Set<object>(),
-): ComponentMeta[] {
+): RecipeMeta[] {
   if (extensions.length === 0) {
     return extensions;
   }
-  const result: ComponentMeta[] = [];
+  const result: RecipeMeta[] = [];
   let changed = false;
   for (const meta of extensions) {
     const identity = getOwn(meta, "identity") ?? meta;
@@ -206,12 +206,12 @@ export type {
   JSXProps,
   HTMLProps,
   HTMLObjProps,
-  CVComponent,
+  Recipe,
 };
 
 /**
- * Extracts the variant props inferred for a Clava component. Use it to add a
- * component's variant props to framework component props.
+ * Extracts the variant props inferred for a Clava recipe. Use it to add a
+ * recipe's variant props to framework component props.
  *
  * @example
  * ```ts
@@ -235,15 +235,16 @@ export type {
  * };
  * ```
  */
-export type VariantProps<T extends Pick<AnyComponent, "getVariants">> =
-  ReturnType<T["getVariants"]>;
+export type VariantProps<T extends Pick<AnyRecipe, "getVariants">> = ReturnType<
+  T["getVariants"]
+>;
 
 // Variant props expose booleans, but variant object keys are always strings.
 type VariantKey<T> = T extends boolean ? "true" | "false" : Extract<T, string>;
 
 /**
  * Constrains a variant map to the same value keys as a variant on another
- * component. Boolean variants are represented with `"true"` and `"false"`
+ * recipe. Boolean variants are represented with `"true"` and `"false"`
  * object keys.
  *
  * @example
@@ -268,7 +269,7 @@ type VariantKey<T> = T extends boolean ? "true" | "false" : Extract<T, string>;
  * ```
  */
 export type Variant<
-  T extends Pick<AnyComponent, "getVariants">,
+  T extends Pick<AnyRecipe, "getVariants">,
   K extends keyof VariantProps<T>,
 > = Record<
   VariantKey<NonNullable<VariantProps<T>[K]>>,
@@ -277,7 +278,7 @@ export type Variant<
 
 /**
  * The configuration object accepted by `cv()`. It defines base class/style
- * output, variants, default variants, component extensions, and refinement
+ * output, variants, default variants, recipe extensions, and refinement
  * logic.
  *
  * @example
@@ -301,10 +302,7 @@ export type Variant<
  * const alert = cv(config);
  * ```
  */
-export interface CVConfig<
-  V extends Variants = {},
-  E extends AnyComponent[] = [],
-> {
+export interface CVConfig<V extends Variants = {}, E extends AnyRecipe[] = []> {
   extend?: E;
   class?: ClassValue;
   style?: StyleValue;
@@ -344,7 +342,7 @@ function normalizeStyle(style: unknown): StyleValue {
 
 /**
  * Pre-extracts the class and (normalized) style from a variant value once at
- * component creation time. Returns `null` if the value contributes nothing.
+ * recipe creation time. Returns `null` if the value contributes nothing.
  */
 interface PrebuiltValue {
   class: ClassValue;
@@ -387,7 +385,7 @@ function getVariantValueKey(value: unknown): string | undefined {
 
 const EMPTY_KEYS: readonly string[] = [];
 
-function isComponentKeySource(source: unknown): source is KeySourceComponent {
+function isRecipeKeySource(source: unknown): source is KeySourceRecipe {
   if (!source) return false;
   if (typeof source !== "object" && typeof source !== "function") {
     return false;
@@ -400,19 +398,19 @@ function isComponentKeySource(source: unknown): source is KeySourceComponent {
 
 /**
  * Splits props into multiple groups based on key sources. Only the first
- * component claims styling props (class/className/style). Subsequent components
+ * recipe claims styling props (class/className/style). Subsequent recipes
  * only receive variant props. Arrays always receive their listed keys but don't
  * claim styling props.
  */
 function splitPropsImpl(
   selfKeys: readonly string[],
-  selfIsComponent: boolean,
+  selfIsRecipe: boolean,
   props: Record<string, unknown>,
   sources: unknown[],
 ): Record<string, unknown>[] {
   const sourcesLength = sources.length;
   const results: Record<string, unknown>[] = [];
-  let stylingClaimed = selfIsComponent;
+  let stylingClaimed = selfIsRecipe;
 
   const selfResult: Record<string, unknown> = {};
   const selfKeysLength = selfKeys.length;
@@ -431,12 +429,12 @@ function splitPropsImpl(
   for (let s = 0; s < sourcesLength; s++) {
     const source = sources[s];
     const sourceResult: Record<string, unknown> = {};
-    let sourceIsComponent = false;
+    let sourceIsRecipe = false;
     let effectiveKeys: readonly string[];
     if (Array.isArray(source)) {
       effectiveKeys = source;
-    } else if (isComponentKeySource(source)) {
-      sourceIsComponent = true;
+    } else if (isRecipeKeySource(source)) {
+      sourceIsRecipe = true;
       effectiveKeys = stylingClaimed ? source.variantKeys : source.propKeys;
     } else {
       effectiveKeys = EMPTY_KEYS;
@@ -452,7 +450,7 @@ function splitPropsImpl(
     results.push(sourceResult);
     effectiveKeyArrays.push(effectiveKeys);
 
-    if (sourceIsComponent && !stylingClaimed) {
+    if (sourceIsRecipe && !stylingClaimed) {
       stylingClaimed = true;
     }
   }
@@ -481,8 +479,8 @@ function splitPropsImpl(
 
 /**
  * Splits props into multiple groups based on key sources. Each source gets its
- * own result object containing all its matching keys. The first component
- * source claims styling props (class/className/style). Subsequent components
+ * own result object containing all its matching keys. The first recipe
+ * source claims styling props (class/className/style). Subsequent recipes
  * only receive variant props. Arrays receive their listed keys but don't claim
  * styling props. The last element is always the "rest" containing keys not
  * claimed by any source.
@@ -495,7 +493,7 @@ export const splitProps: SplitPropsFunction = ((
   if (Array.isArray(source1)) {
     return splitPropsImpl(source1, false, props, sources);
   }
-  if (isComponentKeySource(source1)) {
+  if (isRecipeKeySource(source1)) {
     return splitPropsImpl(source1.propKeys, true, props, sources);
   }
   return splitPropsImpl(EMPTY_KEYS, false, props, sources);
@@ -558,12 +556,12 @@ export function create(params: CreateParams = {}) {
 
   const cx = (...classes: ClsxClassValue[]) => transformClass(clsx(classes));
 
-  const buildComponent = <
+  const buildRecipe = <
     V extends Variants = {},
-    const E extends AnyComponent[] = [],
+    const E extends AnyRecipe[] = [],
   >(
     config: CVConfig<V, E> = {},
-  ): { component: CVComponent<V, E>; meta: ComponentMeta } => {
+  ): { recipe: Recipe<V, E>; meta: RecipeMeta } => {
     type MergedVariants = MergeVariants<V, E>;
 
     // Compile caller-owned configuration once. Rebuilding a pruned branch
@@ -576,7 +574,7 @@ export function create(params: CreateParams = {}) {
     const baseClassValue = getOwn(config, "class");
     const variantKeySet = new Set<string>();
     const inheritedComputedDefaultKeys = new Set<string>();
-    const originalExtMetas: ComponentMeta[] = [];
+    const originalExtMetas: RecipeMeta[] = [];
     if (extend) {
       for (const ext of extend) {
         const extKeys = ext.variantKeys as readonly string[];
@@ -585,7 +583,7 @@ export function create(params: CreateParams = {}) {
           if (key === undefined) continue;
           variantKeySet.add(key);
         }
-        const meta = (ext as AnyComponent & ComponentWithMeta)[META_KEY];
+        const meta = (ext as AnyRecipe & RecipeWithMeta)[META_KEY];
         if (!meta) continue;
         originalExtMetas.push(meta);
         // A later branch can read a computed default contributed by the first
@@ -682,10 +680,10 @@ export function create(params: CreateParams = {}) {
     // Only extension-dependent state is rebuilt. Own tables, callbacks,
     // inheritance visibility, and the creation frame stay shared and unchanged.
     const build = (
-      extMetas: ComponentMeta[],
+      extMetas: RecipeMeta[],
     ): {
-      component: CVComponent<V, E>;
-      meta: ComponentMeta;
+      recipe: Recipe<V, E>;
+      meta: RecipeMeta;
     } => {
       const hasExtend = extMetas.length > 0;
       const extCount = extMetas.length;
@@ -733,9 +731,9 @@ export function create(params: CreateParams = {}) {
       }
 
       // Filter to only extends with computed default or refine work in their
-      // chain. Those are the components that can change resolved variants across
+      // chain. Those are the recipes that can change resolved variants across
       // fixed-point iterations.
-      const extMetasWithRefine: ComponentMeta[] = [];
+      const extMetasWithRefine: RecipeMeta[] = [];
       for (let i = 0; i < extCount; i++) {
         const meta = extMetas[i];
         if (meta.resolveRefine) {
@@ -747,7 +745,7 @@ export function create(params: CreateParams = {}) {
       // Only a `refine` callback protects variants, through `setVariants`. This
       // over-approximates: `extMetasWithRefineCount` also counts extends that
       // only have computed defaults. Tightening it would mean tracking `refine`
-      // separately in `ComponentMeta` to save one allocation. The record inside
+      // separately in `RecipeMeta` to save one allocation. The record inside
       // the holder is created only when a callback assigns something.
       const canProtectVariants = !!refine || extMetasWithRefineCount > 0;
 
@@ -761,10 +759,10 @@ export function create(params: CreateParams = {}) {
         computedDefaultCount > 0 || inheritedComputedDefaultKeys.size > 0;
 
       // Function variant keys inherited from extends, filtered through this
-      // component's own variants: a static (object/shorthand) variant in this
-      // component replaces an inherited function variant for the same key.
-      // The closure is exposed on `ComponentMeta` so any further extending
-      // component can detect "ancestor's effective variant for K is a function"
+      // recipe's own variants: a static (object/shorthand) variant in this
+      // recipe replaces an inherited function variant for the same key.
+      // The closure is exposed on `RecipeMeta` so any further extending
+      // recipe can detect "ancestor's effective variant for K is a function"
       // and skip it when overriding K with a non-function.
       const functionVariantKeys = new Set<string>();
       for (let i = 0; i < extCount; i++) {
@@ -778,8 +776,8 @@ export function create(params: CreateParams = {}) {
         functionVariantKeys.add(functionVariantNames[i]);
       }
       for (let i = 0; i < variantEntryCount; i++) {
-        // A static variant in this component replaces an inherited function
-        // variant for the same key; from this component onward, the key is no
+        // A static variant in this recipe replaces an inherited function
+        // variant for the same key; from this recipe onward, the key is no
         // longer a function variant.
         functionVariantKeys.delete(variantEntryNames[i]);
       }
@@ -803,7 +801,7 @@ export function create(params: CreateParams = {}) {
         }
       }
 
-      // A static variant in this component replaces an inherited function
+      // A static variant in this recipe replaces an inherited function
       // variant, so the ancestor must skip that key.
       if (variantEntryCount > 0 && extCount > 0) {
         for (let i = 0; i < variantEntryCount; i++) {
@@ -1016,7 +1014,7 @@ export function create(params: CreateParams = {}) {
         if (refine) {
           let ownVariants = resolved;
           if (filterOwnVariants) {
-            // When this component is being extended, `resolved` is the parent's
+            // When this recipe is being extended, `resolved` is the parent's
             // workingResolved (a superset of our variant keys). Filter to our own
             // keys for `ctx.variants` so the user's `refine` callback sees the
             // shape declared by `VariantValues<V>` and not foreign parent keys.
@@ -1049,7 +1047,7 @@ export function create(params: CreateParams = {}) {
               }
               for (const key in newVariants) {
                 if (!hasOwn(newVariants, key)) continue;
-                // `disabledVariantKeys` is empty unless this component disables a
+                // `disabledVariantKeys` is empty unless this recipe disables a
                 // variant, so the lookup replaces a `hasAnyDisabled` branch. The
                 // key is checked before the value is read, because reading it can
                 // run a caller-defined accessor.
@@ -1128,8 +1126,8 @@ export function create(params: CreateParams = {}) {
       };
 
       // Core compute path. Called both for top-level rendering (via
-      // `computeResult`) and recursively when this component is used as an
-      // `extend` target by another component. Pushes variant classes (excluding
+      // `computeResult`) and recursively when this recipe is used as an
+      // `extend` target by another recipe. Pushes variant classes (excluding
       // base class) into `classesOut` and merges styles into `styleOut`.
       const computeOnce: ComputeOnceFn = (
         resolved,
@@ -1234,8 +1232,8 @@ export function create(params: CreateParams = {}) {
           }
         }
 
-        // Run own computed defaults after extended components so defaults resolve
-        // from base to child. They still run before this component's `refine`.
+        // Run own computed defaults after extended recipes so defaults resolve
+        // from base to child. They still run before this recipe's `refine`.
         if (!renderOnly && computedDefaultCount > 0) {
           workingResolved = runComputedDefaults(
             workingResolved,
@@ -1247,7 +1245,7 @@ export function create(params: CreateParams = {}) {
         }
 
         // Run own `refine` (if any). May modify resolved variants and emit
-        // classes and styles that are applied after this component's variants.
+        // classes and styles that are applied after this recipe's variants.
         if (refine) {
           const refineResult = runRefineContext(
             workingResolved,
@@ -1602,7 +1600,7 @@ export function create(params: CreateParams = {}) {
       // Top-level: resolves variants from user props, calls compute, then
       // assembles className and style with user-provided class/style overrides.
       const computeResult = (
-        props: ComponentProps<MergedVariants> = EMPTY_DEFAULTS as ComponentProps<MergedVariants>,
+        props: RecipeProps<MergedVariants> = EMPTY_DEFAULTS as RecipeProps<MergedVariants>,
       ): { className: string; style: StyleValue } => {
         const propsRecord = props as Record<string, unknown>;
 
@@ -1684,7 +1682,7 @@ export function create(params: CreateParams = {}) {
         // this record cannot see an undeclared key as an explicitly passed
         // variant, and cannot re-run a caller accessor once per refine pass. The
         // gate is narrower than that purpose: it misses a chain whose only
-        // computed default is this component's own.
+        // computed default is this recipe's own.
         // See https://github.com/ariakit/clava/issues/494
         if (variants && extMetasWithRefineCount > 0) {
           variantProps = {};
@@ -1716,11 +1714,11 @@ export function create(params: CreateParams = {}) {
         ? clsx(extBaseClassesArr, baseClass)
         : baseClass;
 
-      // Shared closures across the default and modal components.
-      const classFn = (props: ComponentProps<MergedVariants> = {}) => {
+      // Shared closures across the default and modal recipes.
+      const classFn = (props: RecipeProps<MergedVariants> = {}) => {
         return computeResult(props).className;
       };
-      const meta: ComponentMeta = {
+      const meta: RecipeMeta = {
         identity,
         extends: extMetas,
         rebuild: (extensions) => build(extensions).meta,
@@ -1733,81 +1731,75 @@ export function create(params: CreateParams = {}) {
         computedDefaultKeys,
       };
 
-      const initComponent = <
-        R extends ComponentResult,
-        T extends ModalComponent<MergedVariants, R>,
+      const initRecipe = <
+        R extends RecipeResult,
+        T extends ModalRecipe<MergedVariants, R>,
       >(
-        c: T,
+        recipe: T,
         propKeys: string[],
         style: T["style"],
       ): T => {
-        c.class = classFn;
-        c.style = style;
-        c.getVariants = getVariants;
-        c.variantKeys = variantKeys;
-        c.propKeys = propKeys;
-        (c as AnyComponent & ComponentWithMeta)[META_KEY] = meta;
-        return c;
+        recipe.class = classFn;
+        recipe.style = style;
+        recipe.getVariants = getVariants;
+        recipe.variantKeys = variantKeys;
+        recipe.propKeys = propKeys;
+        (recipe as AnyRecipe & RecipeWithMeta)[META_KEY] = meta;
+        return recipe;
       };
 
-      // Default component
-      const defaultComponent = ((
-        props: ComponentProps<MergedVariants> = {},
-      ) => {
+      // Default recipe
+      const defaultRecipe = ((props: RecipeProps<MergedVariants> = {}) => {
         const { className, style } = computeResult(props);
         return { class: className, style };
-      }) as CVComponent<V, E>;
-      initComponent(defaultComponent, inputPropsKeys, (props = {}) => {
+      }) as Recipe<V, E>;
+      initRecipe(defaultRecipe, inputPropsKeys, (props = {}) => {
         return computeResult(props).style;
       });
 
-      // JSX component
-      const jsxComponent = ((props: ComponentProps<MergedVariants> = {}) => {
+      // JSX recipe
+      const jsxRecipe = ((props: RecipeProps<MergedVariants> = {}) => {
         const { className, style } = computeResult(props);
         return { className, style };
-      }) as ModalComponent<MergedVariants, JSXProps>;
-      initComponent(
-        jsxComponent,
+      }) as ModalRecipe<MergedVariants, JSXProps>;
+      initRecipe(
+        jsxRecipe,
         ["className", "style", ...variantKeys],
         (props = {}) => computeResult(props).style,
       );
 
-      // HTML component
-      const htmlComponent = ((props: ComponentProps<MergedVariants> = {}) => {
+      // HTML recipe
+      const htmlRecipe = ((props: RecipeProps<MergedVariants> = {}) => {
         const { className, style } = computeResult(props);
         return { class: className, style: styleValueToHTMLStyle(style) };
-      }) as ModalComponent<MergedVariants, HTMLProps>;
-      initComponent(
-        htmlComponent,
-        ["class", "style", ...variantKeys],
-        (props = {}) => styleValueToHTMLStyle(computeResult(props).style),
+      }) as ModalRecipe<MergedVariants, HTMLProps>;
+      initRecipe(htmlRecipe, ["class", "style", ...variantKeys], (props = {}) =>
+        styleValueToHTMLStyle(computeResult(props).style),
       );
 
-      // HTMLObj component
-      const htmlObjComponent = ((
-        props: ComponentProps<MergedVariants> = {},
-      ) => {
+      // HTMLObj recipe
+      const htmlObjRecipe = ((props: RecipeProps<MergedVariants> = {}) => {
         const { className, style } = computeResult(props);
         return { class: className, style: styleValueToHTMLObjStyle(style) };
-      }) as ModalComponent<MergedVariants, HTMLObjProps>;
-      initComponent(
-        htmlObjComponent,
+      }) as ModalRecipe<MergedVariants, HTMLObjProps>;
+      initRecipe(
+        htmlObjRecipe,
         ["class", "style", ...variantKeys],
         (props = {}) => styleValueToHTMLObjStyle(computeResult(props).style),
       );
 
-      defaultComponent.jsx = jsxComponent;
-      defaultComponent.html = htmlComponent;
-      defaultComponent.htmlObj = htmlObjComponent;
+      defaultRecipe.jsx = jsxRecipe;
+      defaultRecipe.html = htmlRecipe;
+      defaultRecipe.htmlObj = htmlObjRecipe;
 
-      return { component: defaultComponent, meta };
+      return { recipe: defaultRecipe, meta };
     };
     return build(initialExtensions);
   };
 
-  const cv = <V extends Variants = {}, const E extends AnyComponent[] = []>(
+  const cv = <V extends Variants = {}, const E extends AnyRecipe[] = []>(
     config: CVConfig<V, E> = {},
-  ): CVComponent<V, E> => buildComponent(config).component;
+  ): Recipe<V, E> => buildRecipe(config).recipe;
 
   return { cv, cx };
 }

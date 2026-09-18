@@ -5,7 +5,7 @@ import {
   getConfigDescription,
   getConfigMode,
   getConfigTransformClass,
-  getModeComponent,
+  getModeRecipe,
   getStyleClass,
 } from "./_utils.ts";
 
@@ -16,43 +16,43 @@ for (const config of Object.values(CONFIGS)) {
 
   describe(getConfigDescription(config), () => {
     test("variant no value empty class", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("variant no value with class", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: "foo", variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("foo") });
     });
 
     test("variant with value", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg") });
     });
 
     test("variant with value and class", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ class: "foo", variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("foo lg") });
     });
 
     test("variant with style value", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -63,7 +63,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ color: "red" });
+      const props = recipe({ color: "red" });
       expect(getStyleClass(props)).toEqual({
         class: "",
         backgroundColor: "red",
@@ -71,7 +71,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("rejects inline style object without style wrapper", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -82,14 +82,14 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ color: "red" });
+      const props = recipe({ color: "red" });
       expect(getStyleClass(props)).toEqual({
         class: "",
       });
     });
 
     test("variant with class and style value", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -100,7 +100,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ color: "red" });
+      const props = recipe({ color: "red" });
       expect(getStyleClass(props)).toEqual({
         class: cls("text-red"),
         backgroundColor: "red",
@@ -108,7 +108,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("multiple variants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -117,102 +117,102 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "lg", color: "red" });
+      const props = recipe({ size: "lg", color: "red" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg red") });
     });
 
     test("boolean variant true", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: { true: "disabled", false: "enabled" } } }),
       );
-      const props = component({ disabled: true });
+      const props = recipe({ disabled: true });
       expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
     });
 
     test("boolean variant false", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: { true: "disabled", false: "enabled" } } }),
       );
-      const props = component({ disabled: false });
+      const props = recipe({ disabled: false });
       expect(getStyleClass(props)).toEqual({ class: cls("enabled") });
     });
 
     test("boolean variant true only false", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: { true: "disabled" } } }),
       );
-      const props = component({ disabled: false });
+      const props = recipe({ disabled: false });
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("boolean variant true only true", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: { true: "disabled" } } }),
       );
-      const props = component({ disabled: true });
+      const props = recipe({ disabled: true });
       expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
     });
 
     test("boolean variant no value applies false", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: { true: "disabled", false: "enabled" } } }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("enabled") });
     });
 
     test("boolean variant false only", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: { false: "enabled" } } }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("enabled") });
     });
 
     test("boolean variant false only false", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: { false: "enabled" } } }),
       );
-      const props = component({ disabled: false });
+      const props = recipe({ disabled: false });
       expect(getStyleClass(props)).toEqual({ class: cls("enabled") });
     });
 
     test("boolean variant false only true", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: { false: "enabled" } } }),
       );
-      const props = component({ disabled: true });
+      const props = recipe({ disabled: true });
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("boolean variant shorthand true", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: "disabled" } }),
       );
-      const props = component({ disabled: true });
+      const props = recipe({ disabled: true });
       expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
     });
 
     test("boolean variant shorthand false", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { disabled: "disabled" } }),
       );
-      const props = component({ disabled: false });
+      const props = recipe({ disabled: false });
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("array variant shorthand", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -221,16 +221,16 @@ for (const config of Object.values(CONFIGS)) {
           defaultVariants: { interactive: true },
         }),
       );
-      expectTypeOf(component.getVariants()).branded.toEqualTypeOf<{
+      expectTypeOf(recipe.getVariants()).branded.toEqualTypeOf<{
         interactive?: boolean;
       }>();
-      expect(getStyleClass(component())).toEqual({
+      expect(getStyleClass(recipe())).toEqual({
         class: cls("interactive focusable"),
       });
-      expect(getStyleClass(component({ interactive: false }))).toEqual({
+      expect(getStyleClass(recipe({ interactive: false }))).toEqual({
         class: "",
       });
-      const props = component({
+      const props = recipe({
         // @ts-expect-error array shorthand variants are boolean
         interactive:
           // no error
@@ -240,7 +240,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("variant style does not accept numbers", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: {
@@ -255,7 +255,7 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component({ size: "sm" });
+      const props = recipe({ size: "sm" });
       expect(getStyleClass(props)).toEqual({
         class: cls("sm"),
         fontSize: expect.toBeOneOf(["12", "12px"]),
@@ -263,11 +263,11 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("variant props do not accept invalid values", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const props = component({
+      const props = recipe({
         // @ts-expect-error invalid value
         size:
           // no error
@@ -277,11 +277,11 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("variant props do not accept invalid keys", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const props = component({
+      const props = recipe({
         // @ts-expect-error
         invalidKey: "value",
       });
@@ -289,67 +289,67 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("defaultVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
     test("defaultVariants overridden by props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
         }),
       );
-      const props = component({ size: "lg" });
+      const props = recipe({ size: "lg" });
       expect(getStyleClass(props)).toEqual({ class: cls("lg") });
     });
 
     test("defaultVariants boolean false", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { disabled: { true: "disabled", false: "enabled" } },
           defaultVariants: { disabled: false },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("enabled") });
     });
 
     test("defaultVariants boolean true", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { disabled: { true: "disabled", false: "enabled" } },
           defaultVariants: { disabled: true },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
     });
 
     test("defaultVariants boolean shorthand", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { disabled: "disabled" },
           defaultVariants: { disabled: true },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
     });
 
     test("defaultVariants does not accept invalid keys", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -360,12 +360,12 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
     test("defaultVariants does not accept invalid values", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
@@ -377,31 +377,31 @@ for (const config of Object.values(CONFIGS)) {
           },
         }),
       );
-      const props = component();
+      const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: "" });
     });
 
     test("defaultVariants when explicitly passing undefined", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
         }),
       );
-      const props = component({ size: undefined });
+      const props = recipe({ size: undefined });
       expect(getStyleClass(props)).toEqual({ class: cls("sm") });
     });
 
     test("defaultVariants boolean when explicitly passing undefined", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { disabled: { true: "disabled", false: "enabled" } },
           defaultVariants: { disabled: true },
         }),
       );
-      const props = component({ disabled: undefined });
+      const props = recipe({ disabled: undefined });
       expect(getStyleClass(props)).toEqual({ class: cls("disabled") });
     });
   });

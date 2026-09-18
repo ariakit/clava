@@ -137,7 +137,7 @@ test("vite removes warning logic from the production bundle", async () => {
     expect(code).not.toContain("Clava: Maximum refine iterations exceeded");
     expect(code).not.toContain("Variant(s) that did not stabilize");
     expect(code).not.toContain("Latest variant changes before warning");
-    expect(code).not.toContain("Component created at");
+    expect(code).not.toContain("Recipe created at");
     expect(code).not.toContain("captureStackTrace");
     expect(code).not.toMatch(/\.warned\b|["']warned["']/);
   });

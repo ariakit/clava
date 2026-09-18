@@ -177,7 +177,7 @@ describe("variants type inference", () => {
     });
   });
 
-  test("modal components preserve inherited variants when extended", () => {
+  test("modal recipes preserve inherited variants when extended", () => {
     const base = cv({
       variants: { size: { sm: "sm", lg: "lg" } },
     });

@@ -7,7 +7,7 @@ import {
   getClassPropertyName,
   getConfigDescription,
   getConfigMode,
-  getModeComponent,
+  getModeRecipe,
 } from "./_utils.ts";
 
 for (const config of Object.values(CONFIGS)) {
@@ -16,18 +16,18 @@ for (const config of Object.values(CONFIGS)) {
 
   describe(getConfigDescription(config), () => {
     test("splitProps separates variant props", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component> = {
+      const props: HTMLProperties<typeof recipe> = {
         id: "test",
         size: "lg",
         style: { color: "red" },
         [classNameProp]: "extra",
       };
-      const [variantProps, otherProps] = splitProps(props, component);
+      const [variantProps, otherProps] = splitProps(props, recipe);
       expectTypeOf(variantProps).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
       >();
@@ -41,21 +41,18 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("variantKeys splitProps", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component> = {
+      const props: HTMLProperties<typeof recipe> = {
         size: "lg",
         id: "test",
         style: "color: red;",
         [classNameProp]: "extra",
       };
-      const [variantProps, otherProps] = splitProps(
-        props,
-        component.variantKeys,
-      );
+      const [variantProps, otherProps] = splitProps(props, recipe.variantKeys);
       expectTypeOf(variantProps).branded.toEqualTypeOf<{
         size?: "sm" | "lg";
       }>();
@@ -71,18 +68,18 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("splitProps does not include defaultVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" }, color: { red: "red" } },
           defaultVariants: { size: "sm", color: "red" },
         }),
       );
-      const props: HTMLProperties<typeof component> = {
+      const props: HTMLProperties<typeof recipe> = {
         id: "test",
         size: "lg",
       };
-      const [variantProps, otherProps] = splitProps(props, component);
+      const [variantProps, otherProps] = splitProps(props, recipe);
       expectTypeOf(variantProps).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "color" | "style" | "class" | "className">
       >();
@@ -94,23 +91,21 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("splitProps with key array as second parameter", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component> & { disabled?: boolean } = {
+      const props: HTMLProperties<typeof recipe> & { disabled?: boolean } = {
         id: "test",
         size: "lg",
         style: { color: "red" },
         [classNameProp]: "extra",
         disabled: true,
       };
-      const [variantProps, extraProps, otherProps] = splitProps(
-        props,
-        component,
-        ["disabled"],
-      );
+      const [variantProps, extraProps, otherProps] = splitProps(props, recipe, [
+        "disabled",
+      ]);
       expectTypeOf(variantProps).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
       >();
@@ -125,12 +120,12 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps with another component as parameter", () => {
-      const component1 = getModeComponent(
+    test("splitProps with another recipe as parameter", () => {
+      const recipe1 = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const component2 = getModeComponent(
+      const recipe2 = getModeRecipe(
         mode,
         cv({
           variants: { color: { red: "red", blue: "blue" } },
@@ -138,8 +133,8 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component1> &
-        HTMLProperties<typeof component2> = {
+      const props: HTMLProperties<typeof recipe1> &
+        HTMLProperties<typeof recipe2> = {
         id: "test",
         size: "lg",
         color: "blue",
@@ -147,18 +142,18 @@ for (const config of Object.values(CONFIGS)) {
       };
       const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
-        component1,
-        component2,
+        recipe1,
+        recipe2,
       );
       expectTypeOf(comp1Props).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
       >();
-      // First component gets class/style props
+      // First recipe gets class/style props
       expect(comp1Props).toEqual({
         size: "lg",
         [classNameProp]: "extra",
       });
-      // Second component only gets variant props (no class/style)
+      // Second recipe only gets variant props (no class/style)
       expectTypeOf(comp2Props).branded.toEqualTypeOf<
         Pick<typeof props, "color">
       >();
@@ -169,47 +164,47 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps with component parameter does not include component defaults", () => {
-      const component1 = getModeComponent(
+    test("splitProps with recipe parameter does not include recipe defaults", () => {
+      const recipe1 = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const component2 = getModeComponent(
+      const recipe2 = getModeRecipe(
         mode,
         cv({
           variants: { color: { red: "red", blue: "blue" } },
           defaultVariants: { color: "red" },
         }),
       );
-      const props: HTMLProperties<typeof component1> &
-        HTMLProperties<typeof component2> = {
+      const props: HTMLProperties<typeof recipe1> &
+        HTMLProperties<typeof recipe2> = {
         id: "test",
         size: "lg",
       };
       const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
-        component1,
-        component2,
+        recipe1,
+        recipe2,
       );
-      // First component gets variant props
+      // First recipe gets variant props
       expect(comp1Props).toEqual({ size: "lg" });
-      // Second component gets empty object (no defaults applied)
+      // Second recipe gets empty object (no defaults applied)
       expect(comp2Props).toEqual({});
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps second component excludes class and style", () => {
-      const component1 = getModeComponent(
+    test("splitProps second recipe excludes class and style", () => {
+      const recipe1 = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const component2 = getModeComponent(
+      const recipe2 = getModeRecipe(
         mode,
         cv({ variants: { color: { red: "red", blue: "blue" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component1> &
-        HTMLProperties<typeof component2> = {
+      const props: HTMLProperties<typeof recipe1> &
+        HTMLProperties<typeof recipe2> = {
         id: "test",
         size: "lg",
         color: "blue",
@@ -218,19 +213,19 @@ for (const config of Object.values(CONFIGS)) {
       };
       const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
-        component1,
-        component2,
+        recipe1,
+        recipe2,
       );
       expectTypeOf(comp1Props).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
       >();
-      // First component gets class/style
+      // First recipe gets class/style
       expect(comp1Props).toEqual({
         size: "lg",
         style: { backgroundColor: "yellow" },
         [classNameProp]: "extra",
       });
-      // Second component only gets variant props
+      // Second recipe only gets variant props
       expectTypeOf(comp2Props).branded.toEqualTypeOf<{
         color?: "red" | "blue";
       }>();
@@ -240,16 +235,16 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("splitProps with multiple parameters", () => {
-      const component1 = getModeComponent(
+      const recipe1 = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const component2 = getModeComponent(
+      const recipe2 = getModeRecipe(
         mode,
         cv({ variants: { color: { red: "red", blue: "blue" } } }),
       );
-      const props: HTMLProperties<typeof component1> &
-        HTMLProperties<typeof component2> & { disabled?: boolean } = {
+      const props: HTMLProperties<typeof recipe1> &
+        HTMLProperties<typeof recipe2> & { disabled?: boolean } = {
         id: "test",
         size: "lg",
         color: "blue",
@@ -257,9 +252,9 @@ for (const config of Object.values(CONFIGS)) {
       };
       const [comp1Props, extraProps, comp2Props, otherProps] = splitProps(
         props,
-        component1,
+        recipe1,
         ["disabled"],
-        component2,
+        recipe2,
       );
       expectTypeOf(comp1Props).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
@@ -275,31 +270,31 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps with shared keys between components", () => {
-      const component1 = getModeComponent(
+    test("splitProps with shared keys between recipes", () => {
+      const recipe1 = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const component2 = getModeComponent(
+      const recipe2 = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const props: HTMLProperties<typeof component1> &
-        HTMLProperties<typeof component2> = {
+      const props: HTMLProperties<typeof recipe1> &
+        HTMLProperties<typeof recipe2> = {
         id: "test",
         size: "lg",
       };
       const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
-        component1,
-        component2,
+        recipe1,
+        recipe2,
       );
       expectTypeOf(comp1Props).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
       >();
-      // First component gets class/style + size
+      // First recipe gets class/style + size
       expect(comp1Props).toEqual({ size: "lg" });
-      // Second component only gets variant props (size appears in both)
+      // Second recipe only gets variant props (size appears in both)
       expectTypeOf(comp2Props).branded.toEqualTypeOf<{
         size?: "sm" | "lg";
       }>();
@@ -307,15 +302,15 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps with defaultVariants from multiple components does not include defaults", () => {
-      const component1 = getModeComponent(
+    test("splitProps with defaultVariants from multiple recipes does not include defaults", () => {
+      const recipe1 = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
         }),
       );
-      const component2 = getModeComponent(
+      const recipe2 = getModeRecipe(
         mode,
         cv({
           variants: { color: { red: "red", blue: "blue" } },
@@ -324,8 +319,8 @@ for (const config of Object.values(CONFIGS)) {
       );
       const [comp1Props, comp2Props, otherProps] = splitProps(
         { id: "test" },
-        component1,
-        component2,
+        recipe1,
+        recipe2,
       );
       // Neither gets defaults - only props that are actually in the input
       expectTypeOf(comp1Props).branded.toEqualTypeOf<{ size?: "sm" | "lg" }>();
@@ -339,7 +334,7 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("variantKeys splitProps does not include defaultVariants", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" }, color: { red: "red" } },
@@ -347,15 +342,12 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component> = {
+      const props: HTMLProperties<typeof recipe> = {
         id: "test",
         size: "lg",
         [classNameProp]: "extra",
       };
-      const [variantProps, otherProps] = splitProps(
-        props,
-        component.variantKeys,
-      );
+      const [variantProps, otherProps] = splitProps(props, recipe.variantKeys);
       // variantKeys is just an array, so no defaults are applied
       expect(variantProps).toEqual({
         size: "lg",
@@ -365,12 +357,12 @@ for (const config of Object.values(CONFIGS)) {
     });
 
     test("variantKeys splitProps with key array", () => {
-      const component = getModeComponent(
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component> & { disabled?: boolean } = {
+      const props: HTMLProperties<typeof recipe> & { disabled?: boolean } = {
         id: "test",
         size: "lg",
         [classNameProp]: "extra",
@@ -378,7 +370,7 @@ for (const config of Object.values(CONFIGS)) {
       };
       const [variantProps, extraProps, otherProps] = splitProps(
         props,
-        component.variantKeys,
+        recipe.variantKeys,
         ["disabled"],
       );
       expectTypeOf(variantProps).branded.toEqualTypeOf<{
@@ -393,15 +385,15 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
     });
 
-    test("variantKeys splitProps with component", () => {
-      const component1 = getModeComponent(
+    test("variantKeys splitProps with recipe", () => {
+      const recipe1 = getModeRecipe(
         mode,
         cv({
           variants: { size: { sm: "sm", lg: "lg" } },
           defaultVariants: { size: "sm" },
         }),
       );
-      const component2 = getModeComponent(
+      const recipe2 = getModeRecipe(
         mode,
         cv({
           variants: { color: { red: "red", blue: "blue" } },
@@ -409,8 +401,8 @@ for (const config of Object.values(CONFIGS)) {
         }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component1> &
-        HTMLProperties<typeof component2> = {
+      const props: HTMLProperties<typeof recipe1> &
+        HTMLProperties<typeof recipe2> = {
         id: "test",
         size: "lg",
         color: "blue",
@@ -418,8 +410,8 @@ for (const config of Object.values(CONFIGS)) {
       };
       const [comp1Props, comp2Props, otherProps] = splitProps(
         props,
-        component1.variantKeys,
-        component2.variantKeys,
+        recipe1.variantKeys,
+        recipe2.variantKeys,
       );
       expectTypeOf(comp1Props).branded.toEqualTypeOf<{ size?: "sm" | "lg" }>();
       expect(comp1Props).toEqual({ size: "lg" });
@@ -433,29 +425,29 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test", [classNameProp]: "extra" });
     });
 
-    test("splitProps with array containing class before component", () => {
-      const component = getModeComponent(
+    test("splitProps with array containing class before recipe", () => {
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component> = {
+      const props: HTMLProperties<typeof recipe> = {
         id: "test",
         size: "lg",
         style: { backgroundColor: "yellow" },
         [classNameProp]: "extra",
       };
-      // Array gets class, component still gets class/style (arrays don't claim styling)
+      // Array gets class, recipe still gets class/style (arrays don't claim styling)
       const [arrayProps, compProps, otherProps] = splitProps(
         props,
         [classNameProp],
-        component,
+        recipe,
       );
       expectTypeOf(arrayProps).branded.toEqualTypeOf<
         Pick<typeof props, "class" | "className">
       >();
       expect(arrayProps).toEqual({ [classNameProp]: "extra" });
-      // Component still gets class/style since arrays don't claim them
+      // Recipe still gets class/style since arrays don't claim them
       expectTypeOf(compProps).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
       >();
@@ -467,23 +459,23 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps with array containing class and style before component", () => {
-      const component = getModeComponent(
+    test("splitProps with array containing class and style before recipe", () => {
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component> = {
+      const props: HTMLProperties<typeof recipe> = {
         id: "test",
         size: "lg",
         style: { backgroundColor: "yellow" },
         [classNameProp]: "extra",
       };
-      // Array gets class and style, component still gets class/style (arrays don't claim styling)
+      // Array gets class and style, recipe still gets class/style (arrays don't claim styling)
       const [arrayProps, compProps, otherProps] = splitProps(
         props,
         [classNameProp, "style"],
-        component,
+        recipe,
       );
       expectTypeOf(arrayProps).branded.toEqualTypeOf<
         Pick<typeof props, "class" | "className" | "style">
@@ -492,7 +484,7 @@ for (const config of Object.values(CONFIGS)) {
         [classNameProp]: "extra",
         style: { backgroundColor: "yellow" },
       });
-      // Component still gets class/style since arrays don't claim them
+      // Recipe still gets class/style since arrays don't claim them
       expectTypeOf(compProps).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
       >();
@@ -504,20 +496,20 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps with array after component", () => {
-      const component = getModeComponent(
+    test("splitProps with array after recipe", () => {
+      const recipe = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component> = {
+      const props: HTMLProperties<typeof recipe> = {
         id: "test",
         size: "lg",
         style: { backgroundColor: "yellow" },
         [classNameProp]: "extra",
       };
-      // Component gets class/style first, array also gets them
-      const [compProps, arrayProps, otherProps] = splitProps(props, component, [
+      // Recipe gets class/style first, array also gets them
+      const [compProps, arrayProps, otherProps] = splitProps(props, recipe, [
         classNameProp,
         "style",
       ]);
@@ -540,18 +532,18 @@ for (const config of Object.values(CONFIGS)) {
       expect(otherProps).toEqual({ id: "test" });
     });
 
-    test("splitProps array before multiple components", () => {
-      const component1 = getModeComponent(
+    test("splitProps array before multiple recipes", () => {
+      const recipe1 = getModeRecipe(
         mode,
         cv({ variants: { size: { sm: "sm", lg: "lg" } } }),
       );
-      const component2 = getModeComponent(
+      const recipe2 = getModeRecipe(
         mode,
         cv({ variants: { color: { red: "red", blue: "blue" } } }),
       );
       const classNameProp = getClassPropertyName(config);
-      const props: HTMLProperties<typeof component1> &
-        HTMLProperties<typeof component2> & { disabled?: boolean } = {
+      const props: HTMLProperties<typeof recipe1> &
+        HTMLProperties<typeof recipe2> & { disabled?: boolean } = {
         id: "test",
         size: "lg",
         color: "blue",
@@ -559,12 +551,12 @@ for (const config of Object.values(CONFIGS)) {
         style: { backgroundColor: "yellow" },
         [classNameProp]: "extra",
       };
-      // Array doesn't claim styling, so first component (comp1) gets styling
+      // Array doesn't claim styling, so first recipe (comp1) gets styling
       const [disabledProps, comp1Props, comp2Props, otherProps] = splitProps(
         props,
         ["disabled"],
-        component1,
-        component2,
+        recipe1,
+        recipe2,
       );
       expectTypeOf(disabledProps).branded.toEqualTypeOf<{
         disabled?: boolean;
@@ -573,13 +565,13 @@ for (const config of Object.values(CONFIGS)) {
       expectTypeOf(comp1Props).branded.toEqualTypeOf<
         Pick<typeof props, "size" | "style" | "class" | "className">
       >();
-      // First component gets class/style
+      // First recipe gets class/style
       expect(comp1Props).toEqual({
         size: "lg",
         style: { backgroundColor: "yellow" },
         [classNameProp]: "extra",
       });
-      // Second component only gets variant props
+      // Second recipe only gets variant props
       expectTypeOf(comp2Props).branded.toEqualTypeOf<
         Pick<typeof props, "color">
       >();
@@ -589,11 +581,11 @@ for (const config of Object.values(CONFIGS)) {
   });
 }
 
-test("splitProps ignores inherited props from component sources", () => {
-  const component = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
+test("splitProps ignores inherited props from recipe sources", () => {
+  const recipe = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
   const props = Object.setPrototypeOf({ id: "test" }, { size: "lg" });
 
-  const [variantProps, otherProps] = splitProps(props, component);
+  const [variantProps, otherProps] = splitProps(props, recipe);
   expect(variantProps).toEqual({});
   expect(otherProps).toEqual({ id: "test" });
 });
@@ -636,7 +628,7 @@ test.each([
     },
   ],
 ] as const)(
-  "splitProps ignores malformed component-like sources: %s",
+  "splitProps ignores malformed recipe-like sources: %s",
   (_, malformedSource) => {
     const props = { id: "test", size: "lg" };
 
@@ -651,7 +643,7 @@ test.each([
 );
 
 test("splitProps ignores sources with malformed variantKeys", () => {
-  const component = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
+  const recipe = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
   const props = { id: "test", size: "lg", color: "red" };
   const malformedSource = {
     getVariants: () => ({}),
@@ -661,22 +653,22 @@ test("splitProps ignores sources with malformed variantKeys", () => {
 
   const result = splitProps(
     props,
-    component,
+    recipe,
     // @ts-expect-error malformed source
     malformedSource,
   ) as unknown[];
   expect(result).toEqual([{ size: "lg" }, {}, { id: "test", color: "red" }]);
 });
 
-test("splitProps type rejects non-string component source keys", () => {
+test("splitProps type rejects non-string recipe source keys", () => {
   const props = { size: "lg" };
   const symbolKey = Symbol("size");
 
   const [sourceProps, otherProps] = splitProps(props, {
     getVariants: () => ({}),
-    // @ts-expect-error component source keys must be strings
+    // @ts-expect-error recipe source keys must be strings
     propKeys: [symbolKey],
-    // @ts-expect-error component source keys must be strings
+    // @ts-expect-error recipe source keys must be strings
     variantKeys: [1],
   });
   expect(sourceProps).toEqual({});

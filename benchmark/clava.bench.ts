@@ -88,7 +88,7 @@ const fieldConfig = {
 
 const button = cv(buttonConfig);
 // Same config as `button` plus cross-variant conditions, so the delta against
-// "resolve component props" is the cost of a refine chain that does work.
+// "resolve recipe props" is the cost of a refine chain that does work.
 const refinedButton = cv({
   ...buttonConfig,
   refine: ({ variants, addClass, addStyle }) => {
@@ -139,11 +139,11 @@ const toolbarButton = cv({
 });
 
 // `refinedButton` and `inertRefinedButton` above measure the refine chain on a
-// component that extends nothing. These add the extends dimension, where the
+// recipe that extends nothing. These add the extends dimension, where the
 // chain also threads protected variants through each layer and filters
 // `ctx.variants` per layer. `toolbarButton` cannot stand in for them, because
 // it bundles a refine callback, a function variant value, and a computed
-// default into one component.
+// default into one recipe.
 const plainExtend = cv({ extend: [button], class: "plain-extend" });
 
 const inertRefineExtend = cv({
@@ -171,11 +171,11 @@ const computedDefaultExtend = cv({
   },
 });
 
-// The refine sits on the extended component instead of the outer one. That
-// reaches code the cases above do not: the outer component owns no refine yet
+// The refine sits on the extended recipe instead of the outer one. That
+// reaches code the cases above do not: the outer recipe owns no refine yet
 // still runs the refine loop and allocates the protection holder, and the
 // extend filters `ctx.variants` from a record that carries the outer
-// component's own `active` key. The added key and the extra chain level cost
+// recipe's own `active` key. The added key and the extra chain level cost
 // something by themselves, so compare this row against itself over time rather
 // than against `plainExtend`.
 const inheritedRefineExtend = cv({
@@ -206,14 +206,14 @@ const splitPropsInput = {
 };
 
 describe("cv", () => {
-  test("create component with variants", async ({ bench }) => {
-    await bench("create component with variants", () => {
+  test("create recipe with variants", async ({ bench }) => {
+    await bench("create recipe with variants", () => {
       consume(cv(buttonConfig));
     }).run(options);
   });
 
-  test("resolve component props", async ({ bench }) => {
-    await bench("resolve component props", () => {
+  test("resolve recipe props", async ({ bench }) => {
+    await bench("resolve recipe props", () => {
       consume(
         button({
           size: "lg",
@@ -226,8 +226,8 @@ describe("cv", () => {
     }).run(options);
   });
 
-  test("resolve refined component props", async ({ bench }) => {
-    await bench("resolve refined component props", () => {
+  test("resolve refined recipe props", async ({ bench }) => {
+    await bench("resolve refined recipe props", () => {
       consume(
         refinedButton({
           size: "lg",
@@ -240,8 +240,8 @@ describe("cv", () => {
     }).run(options);
   });
 
-  test("resolve component props with inert refine", async ({ bench }) => {
-    await bench("resolve component props with inert refine", () => {
+  test("resolve recipe props with inert refine", async ({ bench }) => {
+    await bench("resolve recipe props with inert refine", () => {
       consume(
         inertRefinedButton({
           size: "lg",
@@ -323,14 +323,14 @@ describe("cv", () => {
 });
 
 describe("splitProps", () => {
-  test("split props across components", async ({ bench }) => {
-    await bench("split props across components", () => {
+  test("split props across recipes", async ({ bench }) => {
+    await bench("split props across recipes", () => {
       consume(splitProps(splitPropsInput, toolbarButton, field));
     }).run(options);
   });
 
-  test("split props across arrays and components", async ({ bench }) => {
-    await bench("split props across arrays and components", () => {
+  test("split props across arrays and recipes", async ({ bench }) => {
+    await bench("split props across arrays and recipes", () => {
       consume(
         splitProps(
           splitPropsInput,

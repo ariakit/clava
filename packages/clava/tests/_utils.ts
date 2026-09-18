@@ -1,12 +1,16 @@
 import { expect } from "vitest";
-import { type VariantProps, create, cv as cvBase } from "../src/index.ts";
+import {
+  type Recipe,
+  type VariantProps,
+  create,
+  cv as cvBase,
+} from "../src/index.ts";
 import type {
-  AnyComponent,
-  CVComponent,
-  ComponentResult,
+  AnyRecipe,
   HTMLObjProps,
   HTMLProps,
   JSXProps,
+  RecipeResult,
   StyleClassProps,
   StyleProperty,
   Variants,
@@ -19,7 +23,7 @@ import {
 const MODES = ["jsx", "html", "htmlObj"] as const;
 type Mode = (typeof MODES)[number] | null;
 
-export type HTMLProperties<T extends AnyComponent> = VariantProps<T> & {
+export type HTMLProperties<T extends AnyRecipe> = VariantProps<T> & {
   id?: string;
   class?: string;
   className?: string;
@@ -80,18 +84,18 @@ export function createCVFromConfig(
   return cv;
 }
 
-export function getModeComponent<
+export function getModeRecipe<
   M extends Mode,
   V extends Variants = {},
-  const E extends AnyComponent[] = [],
->(mode: M, component: CVComponent<V, E>) {
+  const E extends AnyRecipe[] = [],
+>(mode: M, recipe: Recipe<V, E>) {
   if (!mode) {
-    return component;
+    return recipe;
   }
-  return component[mode];
+  return recipe[mode];
 }
 
-function getClass(props: ComponentResult) {
+function getClass(props: RecipeResult) {
   if ("class" in props) {
     return props.class;
   }
@@ -112,7 +116,7 @@ export function getExpectedPropsKeys(config: Config, ...variantKeys: string[]) {
 }
 
 export function assertDefaultProps(
-  props: ComponentResult,
+  props: RecipeResult,
 ): asserts props is StyleClassProps {
   if (!("class" in props)) {
     expect.fail("Expected default props to have class");
@@ -122,9 +126,7 @@ export function assertDefaultProps(
   }
 }
 
-export function assertJSXProps(
-  props: ComponentResult,
-): asserts props is JSXProps {
+export function assertJSXProps(props: RecipeResult): asserts props is JSXProps {
   if (!("className" in props)) {
     expect.fail("Expected jsx props to have className");
   }
@@ -134,7 +136,7 @@ export function assertJSXProps(
 }
 
 export function assertHTMLProps(
-  props: ComponentResult,
+  props: RecipeResult,
 ): asserts props is HTMLProps {
   if (!("class" in props)) {
     expect.fail("Expected html props to have class");
@@ -145,7 +147,7 @@ export function assertHTMLProps(
 }
 
 export function assertHTMLObjProps(
-  props: ComponentResult,
+  props: RecipeResult,
 ): asserts props is HTMLObjProps {
   if (!("class" in props)) {
     expect.fail("Expected htmlObj props to have class");
@@ -155,7 +157,7 @@ export function assertHTMLObjProps(
   }
 }
 
-export function getStyle(props: Pick<ComponentResult, "style">) {
+export function getStyle(props: Pick<RecipeResult, "style">) {
   if (typeof props.style === "string") {
     return htmlStyleToStyleValue(props.style);
   }
@@ -165,7 +167,7 @@ export function getStyle(props: Pick<ComponentResult, "style">) {
   return {};
 }
 
-export function getStyleClass(props: ComponentResult): Record<string, unknown> {
+export function getStyleClass(props: RecipeResult): Record<string, unknown> {
   return {
     ...getStyle(props),
     class: getClass(props),
