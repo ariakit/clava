@@ -99,6 +99,55 @@ test("accepts recipes with added metadata and their extensions", () => {
   >();
 });
 
+test("ignores base metadata added after an extension was created", () => {
+  const namedBase = Object.assign(disclosure, {
+    displayName: "Disclosure" as const,
+  });
+  const namedChild = Object.assign(navDisclosure, {
+    displayName: "NavDisclosure" as const,
+  });
+  const renamedBase = Object.assign(disclosure, {
+    displayName: "RenamedDisclosure" as const,
+  });
+  expectTypeOf(disclosure).toExtend<
+    ExtensionOf<typeof namedBase, typeof disclosure>
+  >();
+  expectTypeOf(navDisclosure).toExtend<
+    ExtensionOf<typeof namedBase, typeof navDisclosure>
+  >();
+  expectTypeOf(namedChild).toExtend<
+    ExtensionOf<typeof namedBase, typeof namedChild>
+  >();
+  expectTypeOf(renamedBase).toExtend<
+    ExtensionOf<typeof namedBase, typeof renamedBase>
+  >();
+
+  const nested = cv({
+    extend: [navDisclosure],
+    variants: { $nested: "nested" },
+  });
+  expectTypeOf(nested).toExtend<ExtensionOf<typeof namedBase, typeof nested>>();
+
+  const unrelated = cv({ variants: { $other: "other" } });
+  const partial = cv({ variants: { $open: "open" } });
+  const sibling = cv({ extend: [frame], variants: { $disabled: "disabled" } });
+  expectTypeOf<
+    ExtensionOf<typeof namedBase, typeof unrelated>
+  >().toEqualTypeOf<never>();
+  expectTypeOf<
+    ExtensionOf<typeof namedBase, typeof partial>
+  >().toEqualTypeOf<never>();
+  expectTypeOf<
+    ExtensionOf<typeof namedBase, typeof sibling>
+  >().toEqualTypeOf<never>();
+  expectTypeOf<
+    ExtensionOf<typeof namedBase, typeof frame>
+  >().toEqualTypeOf<never>();
+  expectTypeOf({ ...navDisclosure }).not.toExtend<
+    ExtensionOf<typeof namedBase, typeof navDisclosure>
+  >();
+});
+
 test("keeps exact key types through a generic recipe constraint", () => {
   const keys = readKeys(navDisclosure);
   expectTypeOf(keys.variantKeys).toEqualTypeOf<

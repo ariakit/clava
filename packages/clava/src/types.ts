@@ -285,9 +285,11 @@ export interface Recipe<
 
 export type AnyRecipe = Recipe<any, any, any> | ModalRecipe<any, any>;
 
-// Extra metadata on a recipe does not change its recipe contract.
-type SameRecipe<T, Base> = [T] extends [Base]
-  ? [Base] extends [Pick<T, keyof Base & keyof T>]
+// Ignore metadata on either recipe, even when both use the same metadata key.
+type RecipeMembers<T> = Pick<T, keyof T & keyof Recipe<any, any, any>>;
+
+type SameRecipe<T, Base> = [RecipeMembers<T>] extends [RecipeMembers<Base>]
+  ? [RecipeMembers<Base>] extends [RecipeMembers<T>]
     ? true
     : false
   : false;
