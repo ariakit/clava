@@ -351,7 +351,8 @@ interface RecipeExtensionMode<Base extends AnyRecipe, Candidate> {
  *
  * type DisclosureProps<
  *   R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
- * > = VariantProps<R> & { recipe?: R };
+ * > = VariantProps<R> &
+ *   ([R] extends [typeof disclosure] ? { recipe?: R } : { recipe: R });
  * ```
  */
 export type ExtensionOf<Base extends Recipe<any, any, any>, Candidate> =

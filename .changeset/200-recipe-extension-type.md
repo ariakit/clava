@@ -13,7 +13,8 @@ const disclosure = cv({ variants: { $open: "open" } });
 
 type DisclosureProps<
   R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
-> = VariantProps<R> & { recipe?: R };
+> = VariantProps<R> &
+  ([R] extends [typeof disclosure] ? { recipe?: R } : { recipe: R });
 ```
 
 The check follows full recipes in extension tuples. Mode helpers do not retain their ancestry type. Existing variants must preserve the base recipe's input and output types, and structurally identical recipes cannot be distinguished.

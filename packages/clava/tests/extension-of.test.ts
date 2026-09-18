@@ -20,7 +20,9 @@ const navDisclosure = cv({
 
 type DisclosureProps<
   R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
-> = ComponentProps<"div"> & VariantProps<R> & { recipe?: R };
+> = ComponentProps<"div"> &
+  VariantProps<R> &
+  ([R] extends [typeof disclosure] ? { recipe?: R } : { recipe: R });
 
 function Disclosure<
   R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
@@ -208,6 +210,21 @@ test("supports React wrapper props and rejects unknown variant values", () => {
   NavDisclosure({ $placement: "left" });
   // @ts-expect-error The default recipe does not define placement.
   Disclosure({ $placement: "top" });
+});
+
+test("requires the recipe when component props select an extension", () => {
+  // @ts-expect-error A type argument cannot supply the child recipe at runtime.
+  Disclosure<typeof navDisclosure>({ $placement: "top" });
+  // @ts-expect-error Specialized props must include their recipe.
+  const detached: DisclosureProps<typeof navDisclosure> = { $placement: "top" };
+  Disclosure(detached);
+
+  const props: DisclosureProps<typeof navDisclosure> = {
+    recipe: navDisclosure,
+    $placement: "top",
+  };
+  Disclosure(props);
+  Disclosure({ $open: true });
 });
 
 test("rejects unrelated recipes, partial matches, siblings, and ancestors", () => {

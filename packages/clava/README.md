@@ -340,7 +340,9 @@ const disclosure = cv({ variants: { $open: "open" } });
 
 type DisclosureProps<
   R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
-> = ComponentProps<"div"> & VariantProps<R> & { recipe?: R };
+> = ComponentProps<"div"> &
+  VariantProps<R> &
+  ([R] extends [typeof disclosure] ? { recipe?: R } : { recipe: R });
 
 function Disclosure<
   R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
@@ -359,6 +361,8 @@ const navDisclosure = cv({
 
 type NavDisclosureProps = Omit<DisclosureProps<typeof navDisclosure>, "recipe">;
 ```
+
+The `recipe` prop is optional for the base type. Selecting a child type that adds variants requires its recipe, so those variants are processed at runtime. A wrapper can omit this prop from its public props if it supplies the child recipe itself.
 
 Inside generic code, the key arrays stay tied to `R`. You can read `recipe.variantKeys` and `recipe.propKeys` and use variant keys to index `VariantProps<R>` without a cast. The arrays remain properties, and an extending recipe is still not assignable to the base recipe's exact key-array type.
 
