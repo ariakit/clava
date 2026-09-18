@@ -556,6 +556,8 @@ When a recipe created by one factory extends a recipe created by another factory
 
 ## Type Helpers
 
+Use `ExtensionOf<typeof recipe, R>` to constrain a generic component's recipe prop to a recipe or one of its compatible extensions. See [Constraining Recipe Props](#constraining-recipe-props).
+
 Use `VariantProps<typeof recipe>` to add a Clava recipe's variant props to framework component props.
 
 ```ts
