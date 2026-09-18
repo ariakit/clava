@@ -1,6 +1,6 @@
 import { cva as cva0 } from "class-variance-authority";
 import { cv } from "clava";
-import { compose, cva as cva1 } from "cva";
+import { cva as cva1 } from "cva";
 import { tv } from "tailwind-variants";
 import { tv as tvLite } from "tailwind-variants/lite";
 import { describe, test } from "vitest";
@@ -226,7 +226,7 @@ function createCvaProduct(crossVariant: boolean) {
     defaultVariants: productDefaultVariants,
   });
 
-  return compose(cvaSurface, cvaInteraction, cvaProductOnly);
+  return cva1({ composes: [cvaSurface, cvaInteraction, cvaProductOnly] });
 }
 
 function createCva0Product(crossVariant: boolean) {

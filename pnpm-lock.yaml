@@ -234,8 +234,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/clava
       cva:
-        specifier: 1.0.0-beta.10
-        version: 1.0.0-beta.10(@typescript/typescript6@6.0.2)
+        specifier: 1.0.0-beta.11
+        version: 1.0.0-beta.11(@typescript/typescript6@6.0.2)
       tailwind-variants:
         specifier: 3.3.1
         version: 3.3.1(tailwind-merge@3.6.0)(tailwindcss@4.3.3)
@@ -1092,8 +1092,8 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
-  cva@1.0.0-beta.10:
-    resolution: {integrity: sha512-A2kkl9zsfu1NRhHYOM2SwDhC89ZO97wb7qO2/+Amj/rbRbZDj+bM0yi1CV+YN2fAP/oPi4oip7jcIdb+cZtv0A==}
+  cva@1.0.0-beta.11:
+    resolution: {integrity: sha512-UqjHhjuziR0StvDr7iSS/Rq0+aayUFhUV9P8UMpxWO7sbBIfuriCjAC0U/eRmuo1HYYfFmFHWpTnkQgfmgOULQ==}
     peerDependencies:
       typescript: '>= 6.0.0'
     peerDependenciesMeta:
@@ -2197,7 +2197,7 @@ snapshots:
 
   csstype@3.2.3: {}
 
-  cva@1.0.0-beta.10(@typescript/typescript6@6.0.2):
+  cva@1.0.0-beta.11(@typescript/typescript6@6.0.2):
     dependencies:
       clsx: 2.1.1
     optionalDependencies:
