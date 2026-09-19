@@ -247,6 +247,10 @@ export type VariantProps<T extends Pick<AnyRecipe, "getVariants">> = ReturnType<
  * and required when the selected recipe adds variants. Pass a third type
  * argument to use another prop name.
  *
+ * When inferring `R`, passing `undefined` or forwarding an optional recipe
+ * can fail the recipe constraint. Resolve the optional value before passing
+ * it, for example with `recipe: override ?? disclosure`.
+ *
  * @example
  * ```ts
  * import { type RecipeLike, type VariantPropsWithRecipe, cv } from "clava";

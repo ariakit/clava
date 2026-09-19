@@ -68,6 +68,37 @@ test("infers added variant props from the selected recipe", () => {
   Disclosure({ $placement: "top" });
 });
 
+test("resolves optional recipes before forwarding them", () => {
+  // @ts-expect-error Inference cannot use undefined as a recipe.
+  Disclosure({ recipe: undefined });
+  // @ts-expect-error The custom prop has the same inference constraint.
+  StyledDisclosure({ styles: undefined });
+
+  const Panel = (props: { recipe?: typeof disclosure | undefined }) => {
+    // @ts-expect-error An optional recipe can infer undefined into R.
+    Disclosure({ recipe: props.recipe });
+    // @ts-expect-error Spreading optional props has the same constraint.
+    Disclosure({ ...props });
+    return Disclosure({ ...props, recipe: props.recipe ?? disclosure });
+  };
+  const Navigation = (
+    props: VariantProps<typeof navigation> & {
+      styles?: typeof navigation | undefined;
+    },
+  ) => {
+    // @ts-expect-error Added variants require a defined recipe.
+    StyledDisclosure({ ...props });
+    return StyledDisclosure({ ...props, styles: props.styles ?? navigation });
+  };
+
+  Panel({});
+  Panel({ recipe: disclosure });
+  Navigation({ $open: true, $placement: "top" });
+  Navigation({ styles: navigation, $placement: "bottom" });
+  // @ts-expect-error The wrapper preserves the selected variant values.
+  Navigation({ $placement: "left" });
+});
+
 test("requires a recipe when the selected type adds variants", () => {
   expectTypeOf<
     VariantPropsWithRecipe<typeof disclosure, typeof navigation>

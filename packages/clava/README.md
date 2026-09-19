@@ -369,6 +369,16 @@ type NavDisclosureProps = Omit<DisclosureProps<typeof navDisclosure>, "recipe">;
 
 `VariantPropsWithRecipe` combines variant props with a `recipe` prop. The prop is optional when the selected type is assignable to the base type. Selecting a type that adds variants requires its recipe, so those variants can be processed at runtime. A wrapper can omit this prop from its public props if it supplies the selected recipe itself.
 
+You can omit the optional prop. When `R` is inferred, passing `undefined` or forwarding an optional recipe can infer `undefined` as part of `R` and fail the recipe constraint. Resolve the optional value before forwarding it:
+
+```tsx
+function Panel({ recipe, ...props }: DisclosureProps) {
+  return <Disclosure {...props} recipe={recipe ?? disclosure} />;
+}
+```
+
+If a wrapper exposes added variants, use a fallback recipe that defines those variants.
+
 The third type argument changes the prop name and defaults to `"recipe"`:
 
 ```ts
