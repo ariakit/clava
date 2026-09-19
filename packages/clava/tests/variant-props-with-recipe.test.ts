@@ -86,7 +86,7 @@ test("resolves optional recipes before forwarding them", () => {
       styles?: typeof navigation | undefined;
     },
   ) => {
-    // @ts-expect-error Added variants require a defined recipe.
+    // @ts-expect-error An optional styles prop can infer undefined into R.
     StyledDisclosure({ ...props });
     return StyledDisclosure({ ...props, styles: props.styles ?? navigation });
   };
