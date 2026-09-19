@@ -1,5 +1,61 @@
 # clava
 
+## 0.7.0
+
+### Renamed Clava components to recipes
+
+**BREAKING** if you import the [`CVComponent`](https://clava.style/docs/reference/cv) type. Replace it with [`Recipe`](https://clava.style/docs/reference/cv). The type parameters and generated class and style props stay the same.
+
+Before:
+
+```ts
+import type { CVComponent } from "clava";
+
+type Button = CVComponent<{ size: { sm: string; lg: string } }>;
+```
+
+After:
+
+```ts
+import type { Recipe } from "clava";
+
+type Button = Recipe<{ size: { sm: string; lg: string } }>;
+```
+
+Use [`cv()`](https://clava.style/docs/reference/cv) to create a recipe. Documentation and development warnings now use the recipe name.
+
+### Structural recipe compatibility
+
+The new [`RecipeLike`](https://clava.style/docs/reference/recipe-like) type lets a generic component accept structurally compatible recipes. Each recipe must supply every base variant with compatible input and output types. Added variants preserve their exact prop and key types.
+
+```ts
+import { type RecipeLike, type VariantPropsWithRecipe, cv } from "clava";
+
+const disclosure = cv({ variants: { $open: "open" } });
+
+type DisclosureProps<
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+> = VariantPropsWithRecipe<typeof disclosure, R>;
+```
+
+Recipes can be defined independently or through extension. Extra metadata and extension ancestry do not affect compatibility.
+
+### Variant props with a configurable recipe prop
+
+Use [`VariantPropsWithRecipe`](https://clava.style/docs/reference/variant-props-with-recipe) to combine a recipe's variant props with a recipe prop. The prop is optional when the selected recipe type is assignable to the base type and required when it adds variants. The third type argument selects the prop name and defaults to `"recipe"`.
+
+```ts
+type DisclosureProps<
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+> = VariantPropsWithRecipe<typeof disclosure, R>;
+
+type StyledDisclosureProps<
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+> = VariantPropsWithRecipe<typeof disclosure, R, "styles">;
+```
+
+Pass the selected recipe at runtime to apply its classes and styles. Choosing its type alone does not provide the recipe to the component.
+
 ## 0.6.4
 
 - Fixed shared components in [`cv`](https://clava.style/docs/reference/cv) extension chains to apply only at their first occurrence, preventing repeated base classes and variant output when several components extend the same base.
