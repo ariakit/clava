@@ -11,7 +11,6 @@ import type {
   ClassValue,
   DefaultVariants,
   ExtendableVariants,
-  ExtensionOf,
   HTMLObjProps,
   HTMLProps,
   JSXProps,
@@ -19,6 +18,7 @@ import type {
   MergeVariants,
   ModalRecipe,
   Recipe,
+  RecipeLike,
   RecipeProps,
   RecipeResult,
   Refine,
@@ -208,7 +208,7 @@ export type {
   HTMLProps,
   HTMLObjProps,
   Recipe,
-  ExtensionOf,
+  RecipeLike,
 };
 
 /**
@@ -240,6 +240,38 @@ export type {
 export type VariantProps<T extends Pick<AnyRecipe, "getVariants">> = ReturnType<
   T["getVariants"]
 >;
+
+/**
+ * Combines variant props with a recipe prop named `recipe` by default. The
+ * prop is optional when the selected recipe is assignable to the base type,
+ * and required when the selected recipe adds variants. Pass a third type
+ * argument to use another prop name.
+ *
+ * When inferring `R`, passing `undefined` or forwarding an optional recipe
+ * can fail the recipe constraint. Resolve the optional value before passing
+ * it, for example with `recipe: override ?? disclosure`.
+ *
+ * @example
+ * ```ts
+ * import { type RecipeLike, type VariantPropsWithRecipe, cv } from "clava";
+ *
+ * const disclosure = cv({ variants: { $open: "open" } });
+ *
+ * type DisclosureProps<
+ *   R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+ * > = VariantPropsWithRecipe<typeof disclosure, R>;
+ *
+ * type StyledDisclosureProps<
+ *   R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+ * > = VariantPropsWithRecipe<typeof disclosure, R, "styles">;
+ * ```
+ */
+export type VariantPropsWithRecipe<
+  Base extends Recipe<any, any, any>,
+  R extends RecipeLike<Base, R>,
+  Name extends string = "recipe",
+> = VariantProps<R> &
+  ([R] extends [Base] ? { [Key in Name]?: R } : { [Key in Name]: R });
 
 // Variant props expose booleans, but variant object keys are always strings.
 type VariantKey<T> = T extends boolean ? "true" | "false" : Extract<T, string>;

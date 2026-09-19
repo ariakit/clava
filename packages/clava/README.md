@@ -330,22 +330,25 @@ You can extend any recipe mode, including `baseButton.jsx`, `baseButton.html`, a
 
 ### Constraining Recipe Props
 
-Use `ExtensionOf<Base, R>` to accept a base recipe or a recipe that extends it directly or indirectly. The constraint keeps the base variants readable inside a generic component. It also preserves the extending recipe's variant props, `variantKeys`, and `propKeys`, including the mode-specific key lists.
+Use `RecipeLike<Base, R>` to accept recipes that supply every base variant with compatible input and output types. A recipe can be defined independently, extend another recipe, or compose mode helpers. The constraint keeps the base variants readable inside a generic component and preserves the selected recipe's variant props, `variantKeys`, and `propKeys`, including the mode-specific key lists.
 
 ```tsx
 import type { ComponentProps } from "react";
-import { type ExtensionOf, type VariantProps, cv, splitProps } from "clava";
+import {
+  type RecipeLike,
+  type VariantPropsWithRecipe,
+  cv,
+  splitProps,
+} from "clava";
 
 const disclosure = cv({ variants: { $open: "open" } });
 
 type DisclosureProps<
-  R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
-> = ComponentProps<"div"> &
-  VariantProps<R> &
-  ([R] extends [typeof disclosure] ? { recipe?: R } : { recipe: R });
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+> = ComponentProps<"div"> & VariantPropsWithRecipe<typeof disclosure, R>;
 
 function Disclosure<
-  R extends ExtensionOf<typeof disclosure, R> = typeof disclosure,
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
 >(props: DisclosureProps<R>) {
   const { recipe = disclosure, ...rest } = props;
   const [variantProps, elementProps] = splitProps(rest, recipe);
@@ -353,8 +356,10 @@ function Disclosure<
 }
 
 const navDisclosure = cv({
-  extend: [disclosure],
-  variants: { $placement: { top: "top-0", bottom: "bottom-0" } },
+  variants: {
+    $open: "nav-open",
+    $placement: { top: "top-0", bottom: "bottom-0" },
+  },
 });
 
 <Disclosure recipe={navDisclosure} $placement="top" />;
@@ -362,13 +367,34 @@ const navDisclosure = cv({
 type NavDisclosureProps = Omit<DisclosureProps<typeof navDisclosure>, "recipe">;
 ```
 
-The `recipe` prop is optional for the base type. Selecting a child type that adds variants requires its recipe, so those variants are processed at runtime. A wrapper can omit this prop from its public props if it supplies the child recipe itself.
+`VariantPropsWithRecipe` combines variant props with a `recipe` prop. The prop is optional when the selected type is assignable to the base type. Selecting a type that adds variants requires its recipe, so those variants can be processed at runtime. A wrapper can omit this prop from its public props if it supplies the selected recipe itself.
 
-Inside generic code, the key arrays stay tied to `R`. You can read `recipe.variantKeys` and `recipe.propKeys` and use variant keys to index `VariantProps<R>` without a cast. The arrays remain properties, and an extending recipe is still not assignable to the base recipe's exact key-array type.
+You can omit the optional prop. When `R` is inferred, passing `undefined` or forwarding an optional recipe can infer `undefined` as part of `R` and fail the recipe constraint. Resolve the optional value before forwarding it:
+
+```tsx
+function Panel({ recipe, ...props }: DisclosureProps) {
+  return <Disclosure {...props} recipe={recipe ?? disclosure} />;
+}
+```
+
+If a wrapper exposes added variants, use a fallback recipe that defines those variants.
+
+The third type argument changes the prop name and defaults to `"recipe"`:
+
+```ts
+type StyledDisclosureProps<
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+> = ComponentProps<"div"> &
+  VariantPropsWithRecipe<typeof disclosure, R, "styles">;
+```
+
+The component must read `props.styles` when it uses this type. A type argument does not provide a runtime recipe. To apply different classes or styles, pass the desired recipe even if its variant types match the base. Recipe values are checked by structural assignability, so these helpers do not enforce recipe identity.
+
+Inside generic code, the key arrays stay tied to `R`. You can read `recipe.variantKeys` and `recipe.propKeys` and use variant keys to index `VariantProps<R>` without a cast. The arrays remain properties, and a recipe with added variants is still not assignable to the base recipe's exact key-array type.
 
 Existing variants must remain compatible with the base's inputs and resolved values. Adding a new value to an existing variant, disabling a base value, or changing its value type can fail this constraint. These recipes can still be created with `cv`; they cannot be passed where the base variant contract is required.
 
-The ancestry check follows full recipes in `extend` tuples. Extend `disclosure` rather than `disclosure.jsx` when you need this check: mode helpers do not retain their ancestry type. Structurally identical recipes are accepted because TypeScript cannot distinguish individual `cv()` calls.
+Compatibility depends on the recipe's shape, not its `extend` list or extra metadata. Each member of a recipe union must supply every base variant. Both the base and selected recipe must be full recipes with `jsx`, `html`, and `htmlObj` helpers, even when the component calls only one mode. A mode helper such as `disclosure.jsx` is rejected, but a recipe that extends a mode helper is accepted.
 
 ## Refine
 
@@ -556,7 +582,7 @@ When a recipe created by one factory extends a recipe created by another factory
 
 ## Type Helpers
 
-Use `ExtensionOf<typeof recipe, R>` to constrain a generic component's recipe prop to a recipe or one of its compatible extensions. See [Constraining Recipe Props](#constraining-recipe-props).
+Use `RecipeLike<typeof recipe, R>` to constrain a generic component's recipe prop to a structurally compatible recipe. Use `VariantPropsWithRecipe<typeof recipe, R>` to combine the selected recipe's variant props with its `recipe` prop, or pass a third type argument for a custom prop name. See [Constraining Recipe Props](#constraining-recipe-props).
 
 Use `VariantProps<typeof recipe>` to add a Clava recipe's variant props to framework component props.
 
@@ -675,7 +701,9 @@ Both groups resolve one fixed prop set on every iteration, so every package with
 
 `recipe.variantKeys` lists only variant prop keys.
 
-`ExtensionOf<Base, R>` constrains `R` to a compatible extension of a base recipe while preserving variant props and key arrays in generic components. See [Constraining Recipe Props](#constraining-recipe-props).
+`RecipeLike<Base, R>` constrains `R` to a structurally compatible recipe while preserving variant props and key arrays in generic components. See [Constraining Recipe Props](#constraining-recipe-props).
+
+`VariantPropsWithRecipe<Base, R, Name = "recipe">` combines the selected recipe's variant props with a recipe prop. The prop is optional when `R` is assignable to `Base` and required otherwise. `Name` selects the prop name.
 
 `splitProps(props, source1, ...sources)` returns one object per source plus a final rest object.
 
