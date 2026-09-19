@@ -394,7 +394,7 @@ Inside generic code, the key arrays stay tied to `R`. You can read `recipe.varia
 
 Existing variants must remain compatible with the base's inputs and resolved values. Adding a new value to an existing variant, disabling a base value, or changing its value type can fail this constraint. These recipes can still be created with `cv`; they cannot be passed where the base variant contract is required.
 
-Compatibility depends on the recipe's shape, not its `extend` list or extra metadata. Each member of a recipe union must supply every base variant. A component that calls all recipe modes requires a full recipe; a mode helper alone does not provide those methods.
+Compatibility depends on the recipe's shape, not its `extend` list or extra metadata. Each member of a recipe union must supply every base variant. Both the base and selected recipe must be full recipes with `jsx`, `html`, and `htmlObj` helpers, even when the component calls only one mode. A mode helper such as `disclosure.jsx` is rejected, but a recipe that extends a mode helper is accepted.
 
 ## Refine
 
