@@ -43,6 +43,10 @@ function StyledDisclosure<
   return { ...elementProps, ...styles.jsx(variantProps) };
 }
 
+function chooseRecipe(expanded: boolean) {
+  return expanded ? navigation : disclosure;
+}
+
 test("defaults to an optional recipe prop for the base type", () => {
   expectTypeOf<
     VariantPropsWithRecipe<typeof disclosure, typeof disclosure>
@@ -152,8 +156,6 @@ test("supports wrappers that supply the selected recipe", () => {
 });
 
 test("requires a recipe for unions that include added variants", () => {
-  const chooseRecipe = (expanded: boolean) =>
-    expanded ? navigation : disclosure;
   const recipe = chooseRecipe(true);
   Disclosure({ recipe });
   StyledDisclosure({ styles: recipe });

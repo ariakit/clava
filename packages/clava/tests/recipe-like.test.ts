@@ -54,6 +54,35 @@ function readVariants<R extends RecipeLike<typeof disclosure, R>>(
   return recipe.variantKeys.map((key) => props[key]);
 }
 
+function checkRecipeModes<R extends RecipeLike<typeof disclosure, R>>(
+  recipe: R,
+) {
+  expectTypeOf(recipe({ $open: true }).class).toEqualTypeOf<string>();
+  expectTypeOf(recipe.class({ $padding: "sm" })).toEqualTypeOf<string>();
+  expectTypeOf(recipe.style()).toEqualTypeOf<
+    ReturnType<typeof disclosure.style>
+  >();
+  expectTypeOf(recipe.jsx({ $open: true })).toEqualTypeOf<JSXProps>();
+  expectTypeOf(recipe.html({ $open: true })).toEqualTypeOf<HTMLProps>();
+  expectTypeOf(recipe.htmlObj({ $open: true })).toEqualTypeOf<HTMLObjProps>();
+  expectTypeOf(recipe.getVariants().$open).toEqualTypeOf<boolean | undefined>();
+}
+
+function chooseRecipe(child: boolean) {
+  return child ? navDisclosure : disclosure;
+}
+
+function chooseUnrelated(child: boolean) {
+  return child ? navDisclosure : frame;
+}
+
+function readDefaultedKeys<
+  R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
+>(props: DisclosureProps<R>) {
+  const { recipe = disclosure } = props;
+  return { variantKeys: recipe.variantKeys, propKeys: recipe.propKeys };
+}
+
 test("accepts the base recipe and extensions with additional variants", () => {
   const sameVariants = cv({ extend: [disclosure], class: "custom" });
   expectTypeOf(acceptRecipe(disclosure)).toEqualTypeOf<typeof disclosure>();
@@ -194,20 +223,7 @@ test("indexes variant props with their keys without casts", () => {
 });
 
 test("preserves mode calls and base variants inside a generic function", () => {
-  const useRecipe = <R extends RecipeLike<typeof disclosure, R>>(recipe: R) => {
-    expectTypeOf(recipe({ $open: true }).class).toEqualTypeOf<string>();
-    expectTypeOf(recipe.class({ $padding: "sm" })).toEqualTypeOf<string>();
-    expectTypeOf(recipe.style()).toEqualTypeOf<
-      ReturnType<typeof disclosure.style>
-    >();
-    expectTypeOf(recipe.jsx({ $open: true })).toEqualTypeOf<JSXProps>();
-    expectTypeOf(recipe.html({ $open: true })).toEqualTypeOf<HTMLProps>();
-    expectTypeOf(recipe.htmlObj({ $open: true })).toEqualTypeOf<HTMLObjProps>();
-    expectTypeOf(recipe.getVariants().$open).toEqualTypeOf<
-      boolean | undefined
-    >();
-  };
-  useRecipe(navDisclosure);
+  checkRecipeModes(navDisclosure);
 });
 
 test("supports React wrapper props and rejects unknown variant values", () => {
@@ -335,14 +351,12 @@ test("handles nested extension trees and empty bases", () => {
 });
 
 test("accepts a union only when all its members satisfy the constraint", () => {
-  const chooseRecipe = (child: boolean) => (child ? navDisclosure : disclosure);
   const recipe = chooseRecipe(true);
   acceptRecipe(recipe);
   expectTypeOf(readKeys(recipe).variantKeys).toEqualTypeOf<
     ("$open" | "$padding" | "$placement")[]
   >();
 
-  const chooseUnrelated = (child: boolean) => (child ? navDisclosure : frame);
   // @ts-expect-error One union member does not define open.
   acceptRecipe(chooseUnrelated(true));
 
@@ -369,15 +383,7 @@ test("accepts a union only when all its members satisfy the constraint", () => {
 });
 
 test("retains exact keys when a component defaults to its base recipe", () => {
-  const getKeys = <
-    R extends RecipeLike<typeof disclosure, R> = typeof disclosure,
-  >(
-    props: DisclosureProps<R>,
-  ) => {
-    const { recipe = disclosure } = props;
-    return { variantKeys: recipe.variantKeys, propKeys: recipe.propKeys };
-  };
-  const keys = getKeys({ recipe: navDisclosure });
+  const keys = readDefaultedKeys({ recipe: navDisclosure });
   expectTypeOf<(typeof keys.variantKeys)[number]>().toEqualTypeOf<
     "$padding" | "$open" | "$placement"
   >();
