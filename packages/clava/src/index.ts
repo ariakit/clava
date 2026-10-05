@@ -247,6 +247,9 @@ export type VariantProps<T extends Pick<AnyRecipe, "getVariants">> = ReturnType<
  * and required when the selected recipe adds variants. Pass a third type
  * argument to use another prop name.
  *
+ * When `R` is a union of recipes, the variant props include only the
+ * variants that every member defines.
+ *
  * When inferring `R`, passing `undefined` or forwarding an optional recipe
  * can fail the recipe constraint. Resolve the optional value before passing
  * it, for example with `recipe: override ?? disclosure`.
@@ -271,7 +274,21 @@ export type VariantPropsWithRecipe<
   R extends RecipeLike<Base, R>,
   Name extends string = "recipe",
 > = VariantProps<R> &
+  PartialVariantKeys<R> &
   ([R] extends [Base] ? { [Key in Name]?: R } : { [Key in Name]: R });
+
+// Blocks variants that only some union members define, because the selected
+// member may not process them. With no such keys, this is `unknown` so props
+// keep their exact shape instead of gaining an empty `{}` intersection member.
+type PartialVariantKeys<
+  R extends Pick<AnyRecipe, "getVariants">,
+  Key extends PropertyKey = Exclude<
+    UnionKeys<VariantProps<R>>,
+    keyof VariantProps<R>
+  >,
+> = [Key] extends [never] ? unknown : { [K in Key]?: never };
+
+type UnionKeys<T> = T extends unknown ? keyof T : never;
 
 // Variant props expose booleans, but variant object keys are always strings.
 type VariantKey<T> = T extends boolean ? "true" | "false" : Extract<T, string>;

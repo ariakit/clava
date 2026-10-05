@@ -165,6 +165,51 @@ test("requires a recipe for unions that include added variants", () => {
   StyledDisclosure<typeof recipe>({});
 });
 
+test("accepts only variants that every union member defines", () => {
+  const recipe = chooseRecipe(true);
+  Disclosure({ recipe, $open: true });
+  StyledDisclosure({ styles: recipe, $open: true });
+  Disclosure({
+    recipe,
+    // @ts-expect-error The disclosure member does not define placement.
+    $placement:
+      // no error
+      "top",
+  });
+  StyledDisclosure({
+    styles: recipe,
+    // @ts-expect-error The custom prop has the same union constraint.
+    $placement:
+      // no error
+      "top",
+  });
+  expectTypeOf<
+    VariantPropsWithRecipe<typeof disclosure, typeof recipe>
+  >().branded.toEqualTypeOf<
+    { $open?: boolean | undefined } & { $placement?: never } & {
+      recipe: typeof recipe;
+    }
+  >();
+});
+
+test("accepts added variants that every union member defines", () => {
+  const spaced = cv({
+    extend: [disclosure],
+    variants: { $placement: { top: "mt-2", left: "ml-2" } },
+  });
+  const choose = (expanded: boolean) => (expanded ? navigation : spaced);
+  const recipe = choose(true);
+  Disclosure({ recipe, $open: true, $placement: "top" });
+  StyledDisclosure({ styles: recipe, $placement: "top" });
+  Disclosure({
+    recipe,
+    // @ts-expect-error The placement variant is not a number.
+    $placement:
+      // no error
+      1,
+  });
+});
+
 test("rejects incompatible recipes with default and custom prop names", () => {
   const incompatible = cv({ variants: { $other: "other" } });
   expectTypeOf<
