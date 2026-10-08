@@ -31,7 +31,7 @@
     "@changesets/config": "4.0.1",
     "@changesets/types": "7.0.0",
     "@types/node": "25.9.9",
-    "lefthook": "2.1.16",
+    "lefthook": "2.1.17",
     "oxfmt": "0.71.0",
     "oxlint": "1.86.0",
     "oxlint-tsgolint": "7.0.2003",
