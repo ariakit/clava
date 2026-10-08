@@ -333,13 +333,13 @@ You can extend any recipe mode, including `baseButton.jsx`, `baseButton.html`, a
 Use `RecipeLike<Base, R>` to accept recipes that supply every base variant with compatible input and output types. A recipe can be defined independently, extend another recipe, or compose mode helpers. The constraint keeps the base variants readable inside a generic component and preserves the selected recipe's variant props, `variantKeys`, and `propKeys`, including the mode-specific key lists.
 
 ```tsx
-import type { ComponentProps } from "react";
 import {
   type RecipeLike,
   type VariantPropsWithRecipe,
   cv,
   splitProps,
 } from "clava";
+import type { ComponentProps } from "react";
 
 const disclosure = cv({ variants: { $open: "open" } });
 
@@ -467,8 +467,8 @@ When a computed default or `refine` callback changes variants, Clava re-runs the
 Use `splitProps()` to separate variant/style props from DOM or framework props without manually maintaining prop-name lists.
 
 ```tsx
-import type { ComponentProps } from "react";
 import { type VariantProps, cv, splitProps } from "clava";
+import type { ComponentProps } from "react";
 
 const button = cv({
   class: "button",
@@ -514,8 +514,8 @@ const [dataProps, variantProps, otherProps] = splitProps(
 Use `.jsx` for React components because it returns `className` and a camelCase style object.
 
 ```tsx
-import type { ComponentProps } from "react";
 import { type VariantProps, cv, splitProps } from "clava";
+import type { ComponentProps } from "react";
 
 const button = cv({
   class: "button",
@@ -542,8 +542,8 @@ function Button(props: ButtonProps) {
 Use `.htmlObj` for Solid components when you want `class` and hyphenated style object output.
 
 ```tsx
-import type { ComponentProps } from "solid-js";
 import { type VariantProps, cv, splitProps } from "clava";
+import type { ComponentProps } from "solid-js";
 
 const button = cv({
   class: "button",
@@ -599,8 +599,8 @@ Use `RecipeLike<typeof recipe, R>` to constrain a generic component's recipe pro
 Use `VariantProps<typeof recipe>` to add a Clava recipe's variant props to framework component props.
 
 ```ts
-import type { ComponentProps } from "react";
 import type { VariantProps } from "clava";
+import type { ComponentProps } from "react";
 
 interface ButtonProps
   extends ComponentProps<"button">, VariantProps<typeof button> {}
