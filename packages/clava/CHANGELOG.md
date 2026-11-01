@@ -1,5 +1,23 @@
 # clava
 
+## 0.7.2
+
+### Computed defaults read settled values in extension chains
+
+A computed `defaultVariants` entry that returns `defaultValue` in a base recipe no longer hides the value that an extending [`cv`](https://clava.style/docs/reference/cv) recipe computes for the same variant. Other computed defaults and [`refine`](https://clava.style/docs/reference/refine) callbacks in the chain used to read the base value, so a recipe could settle on output that contradicted its own variants. They now read the value that the chain settles on.
+
+As a result, some chains now reach the re-run limit and log its warning in development. This happens when computed defaults contradict each other, which used to settle without a warning. It also happens when two computed defaults in one recipe change each other's input on every run, as they already did when the base default was static.
+
+### Other updates
+
+- Fixed declaration emit errors (TS4023, TS4058, and TS2883) when a project with `declaration: true` exports the [`cv`](https://clava.style/docs/reference/cv) or [`cx`](https://clava.style/docs/reference/cx) that [`create`](https://clava.style/docs/reference/create) returns, [`splitProps`](https://clava.style/docs/reference/split-props), a recipe's `.jsx`, `.html`, `.htmlObj`, `.class`, or `.style` helper, or the result of `.jsx.style()` or `.htmlObj.style()`. The package now exports the [`ModalRecipe`](https://clava.style/docs/reference/modal-recipe), [`RecipeProps`](https://clava.style/docs/reference/recipe-props), [`SplitPropsFunction`](https://clava.style/docs/reference/split-props-function), [`JSXCSSProperties`](https://clava.style/docs/reference/jsx-css-properties), and [`HTMLCSSProperties`](https://clava.style/docs/reference/html-css-properties) types.
+- Fixed [`getVariants`](https://clava.style/docs/reference/getVariants) returning a value that an extended recipe disables with `null` when a computed default or [`refine`](https://clava.style/docs/reference/refine) callback sets that value after the extended recipe runs.
+- Fixed [`getVariants`](https://clava.style/docs/reference/getVariants) returning variants that render doesn't apply when a recipe disables a value and has an extend without callbacks, in a chain with computed defaults or [`refine`](https://clava.style/docs/reference/refine).
+- Fixed [`getVariants`](https://clava.style/docs/reference/getVariants) returning values that an extended recipe disables with `null` when the chain has no computed defaults or [`refine`](https://clava.style/docs/reference/refine).
+- Fixed a type error when calling [`cv`](https://clava.style/docs/reference/cv) inline inside `extend`, such as `cv({ extend: [cv({ variants })] })`.
+- Fixed [`cv`](https://clava.style/docs/reference/cv) dropping a variant or value that a recipe defines again after a recipe it extends disabled it with `null`. The new definition now applies, and [`getVariants`](https://clava.style/docs/reference/getVariants) reports the value.
+- Fixed [`cv`](https://clava.style/docs/reference/cv) types to keep the other values and variants when a recipe in `extend` disables a value or variant that another recipe in `extend` shares.
+
 ## 0.7.1
 
 ### Union recipes accept only shared variants
