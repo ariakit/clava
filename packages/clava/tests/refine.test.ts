@@ -2334,37 +2334,54 @@ for (const config of Object.values(CONFIGS)) {
           expect(baseLast.class()).toBe("");
         });
 
-        // A value that an extend disables stays removed, even when a later
-        // recipe declares it again. Explicit and static values already do.
+        // A value that an extend disables stays removed, unless the recipe
+        // defines it again. Both getVariants and render follow this rule.
         describe("value set after the extend that disables it", () => {
           const redeclared = {
             tone: { loud: "top-loud", calm: "top-calm" },
           };
 
-          test("removes an explicit value", () => {
+          test("keeps an explicit value the recipe defines again", () => {
             const recipe = cv({
               extend: [createDisabledValue()],
               variants: redeclared,
             });
-            expect(recipe.getVariants({ tone: "loud" })).toEqual({});
-            expect(recipe.class({ tone: "loud" })).toBe("");
+            expect(recipe.getVariants({ tone: "loud" })).toEqual({
+              tone: "loud",
+            });
+            expect(recipe.class({ tone: "loud" })).toBe(cls("top-loud"));
           });
 
-          test("removes a static default", () => {
+          test("keeps a static default the recipe defines again", () => {
             const recipe = cv({
               extend: [createDisabledValue()],
               variants: redeclared,
               defaultVariants: { tone: "loud" },
             });
-            expect(recipe.getVariants()).toEqual({});
-            expect(recipe.class()).toBe("");
+            expect(recipe.getVariants()).toEqual({ tone: "loud" });
+            expect(recipe.class()).toBe(cls("top-loud"));
           });
 
-          test("removes a computed default", () => {
+          test("keeps a computed default the recipe defines again", () => {
             const recipe = cv({
               extend: [createDisabledValue()],
               variants: redeclared,
               defaultVariants: { tone: () => "loud" as const },
+            });
+            expect(recipe.getVariants()).toEqual({ tone: "loud" });
+            expect(recipe.class()).toBe(cls("top-loud"));
+          });
+
+          test("removes a computed default the recipe doesn't define", () => {
+            const recipe = cv({
+              extend: [createDisabledValue()],
+              variants: { tone: { calm: "top-calm" } },
+              defaultVariants: {
+                // @ts-expect-error loud stays disabled for this recipe
+                tone:
+                  // no error
+                  () => "loud",
+              },
             });
             expect(recipe.getVariants()).toEqual({});
             expect(recipe.class()).toBe("");
@@ -2380,11 +2397,27 @@ for (const config of Object.values(CONFIGS)) {
             expect(recipe.class()).toBe(cls("leaf-calm top-calm"));
           });
 
-          test("removes a value from the recipe's own refine", () => {
+          test("keeps a value from the recipe's own refine", () => {
             const recipe = cv({
               extend: [createDisabledValue()],
               variants: redeclared,
               refine: ({ setVariants }) => setVariants({ tone: "loud" }),
+            });
+            expect(recipe.getVariants()).toEqual({ tone: "loud" });
+            expect(recipe.class()).toBe(cls("top-loud"));
+          });
+
+          test("removes a value from a refine that doesn't define it", () => {
+            const recipe = cv({
+              extend: [createDisabledValue()],
+              variants: { tone: { calm: "top-calm" } },
+              refine: ({ setVariants }) =>
+                setVariants({
+                  // @ts-expect-error loud stays disabled for this recipe
+                  tone:
+                    // no error
+                    "loud",
+                }),
             });
             expect(recipe.getVariants()).toEqual({});
             expect(recipe.class()).toBe("");
@@ -2400,11 +2433,27 @@ for (const config of Object.values(CONFIGS)) {
             expect(recipe.class()).toBe("");
           });
 
-          test("removes a value through a nested extend", () => {
+          test("keeps a value through a nested extend", () => {
             const inner = cv({
               extend: [createDisabledValue()],
               variants: redeclared,
               defaultVariants: { tone: () => "loud" as const },
+            });
+            const recipe = cv({ extend: [inner] });
+            expect(recipe.getVariants()).toEqual({ tone: "loud" });
+            expect(recipe.class()).toBe(cls("top-loud"));
+          });
+
+          test("removes a value through a nested extend", () => {
+            const inner = cv({
+              extend: [createDisabledValue()],
+              variants: { tone: { calm: "top-calm" } },
+              defaultVariants: {
+                // @ts-expect-error loud stays disabled for this recipe
+                tone:
+                  // no error
+                  () => "loud",
+              },
             });
             const recipe = cv({ extend: [inner] });
             expect(recipe.getVariants()).toEqual({});
@@ -2431,7 +2480,7 @@ for (const config of Object.values(CONFIGS)) {
             });
             const recipe = cv({
               extend: [first, second],
-              variants: { r: { a: "t-a", c: "t-c" } },
+              variants: { r: { a: "t-a" } },
             });
             expect(recipe.getVariants()).toEqual({ r: "a" });
             expect(recipe.class()).toBe(cls("i-a s-a t-a"));
