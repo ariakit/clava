@@ -460,7 +460,9 @@ const input = cv({
 
 `setVariants()` overrides explicit props. `addClass()` and `addStyle()` append output without changing resolved variant values. `getVariants()` includes values changed by computed `defaultVariants` and `setVariants()`.
 
-When a computed default or `refine` callback changes variants, Clava re-runs the refine chain so later reads see the latest values. Re-runs are capped at 50 iterations, after which Clava stops and logs a warning in development.
+When a computed default or `refine` callback changes variants, Clava re-runs the refine chain so later reads see the latest values. When a computed default changes a variant that another computed default computes later in the same run, only those later computed defaults receive the new value. Other callbacks keep the value from the previous run, so returning `defaultValue` from a base recipe doesn't hide the value that an extending recipe computes. A value that a recipe extending the first computed default's recipe disables is still written to the variants that all callbacks read, so that recipe removes it as before.
+
+Re-runs are capped at 50 iterations, after which Clava stops and logs a warning in development. This happens when callbacks keep changing the variants that other callbacks read, such as computed defaults that contradict each other.
 
 ## Splitting Props
 

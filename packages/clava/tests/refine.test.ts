@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import { create } from "../src/index.ts";
 import type { AnyRecipe } from "../src/types.ts";
 import {
   CONFIGS,
@@ -691,6 +692,553 @@ for (const config of Object.values(CONFIGS)) {
       const props = recipe();
       expect(getStyleClass(props)).toEqual({ class: cls("two b-false") });
       expect(recipe.getVariants()).toEqual({ a: "two", b: false });
+    });
+
+    // https://github.com/ariakit/clava/issues/613
+    test("computed defaultVariants read their own recipe's result after a base returns defaultValue", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          layer: { transparent: "transparent", on: "on" },
+          border: { true: "border" },
+        },
+        defaultVariants: {
+          layer: (defaultValue) => defaultValue,
+        },
+      });
+      const field = cv({
+        extend: [base],
+        defaultVariants: { layer: "transparent" },
+      });
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [field],
+          defaultVariants: {
+            layer: () => "on" as const,
+            border: (defaultValue, variants) =>
+              variants.layer === "on" ? true : defaultValue,
+          },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({ class: cls("on border") });
+      expect(recipe.getVariants()).toEqual({ layer: "on", border: true });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("extended computed defaultVariants read a later recipe's result after a base returns defaultValue", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          layer: { transparent: "transparent", on: "on" },
+        },
+        defaultVariants: {
+          layer: (defaultValue) => defaultValue,
+        },
+      });
+      const field = cv({
+        extend: [base],
+        variants: { border: { true: "border" } },
+        defaultVariants: {
+          layer: "transparent",
+          border: (defaultValue, variants) =>
+            variants.layer === "on" ? true : defaultValue,
+        },
+      });
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [field],
+          defaultVariants: { layer: () => "on" as const },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({ class: cls("on border") });
+      expect(recipe.getVariants()).toEqual({ layer: "on", border: true });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("extended refine reads a later recipe's computed defaultVariants after a base returns defaultValue", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          layer: { transparent: "transparent", on: "on" },
+        },
+        defaultVariants: {
+          layer: (defaultValue) => defaultValue,
+        },
+      });
+      const field = cv({
+        extend: [base],
+        variants: { border: { true: "border" } },
+        defaultVariants: { layer: "transparent" },
+        refine: ({ variants, setVariants }) => {
+          if (variants.layer === "on") {
+            setVariants({ border: true });
+          }
+        },
+      });
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [field],
+          defaultVariants: { layer: () => "on" as const },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({ class: cls("on border") });
+      expect(recipe.getVariants()).toEqual({ layer: "on", border: true });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("extended computed defaultVariants read a later extend's result after a base returns defaultValue", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          layer: { transparent: "transparent", on: "on" },
+          border: { true: "border" },
+        },
+        defaultVariants: {
+          layer: (defaultValue) => defaultValue,
+        },
+      });
+      const field = cv({
+        extend: [base],
+        defaultVariants: {
+          layer: "transparent",
+          border: (defaultValue, variants) =>
+            variants.layer === "on" ? true : defaultValue,
+        },
+      });
+      const raised = cv({
+        variants: { layer: { on: "raised" } },
+        defaultVariants: { layer: () => "on" as const },
+      });
+      const recipe = getModeRecipe(mode, cv({ extend: [field, raised] }));
+
+      expect(getStyleClass(recipe())).toEqual({
+        class: cls("on border raised"),
+      });
+      expect(recipe.getVariants()).toEqual({ layer: "on", border: true });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("isolated extended computed defaultVariants read a later recipe's result after a base returns defaultValue", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          layer: { transparent: "transparent", on: "on" },
+          border: { true: "border" },
+        },
+        defaultVariants: {
+          layer: (defaultValue) => defaultValue,
+        },
+      });
+      const field = cv({
+        extend: [base],
+        defaultVariants: {
+          layer: "transparent",
+          border: (defaultValue, variants) =>
+            variants.layer === "on" ? true : defaultValue,
+        },
+      });
+      // A recipe from another factory runs `field` as an isolated extend.
+      const { cv: isolatedCv } = create({
+        transformClass: (className) => className,
+      });
+      const recipe = getModeRecipe(
+        mode,
+        isolatedCv({
+          extend: [field],
+          defaultVariants: { layer: () => "on" as const },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({ class: cls("on border") });
+      expect(recipe.getVariants()).toEqual({ layer: "on", border: true });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("extended computed defaultVariants keep reading a variant that an extending recipe disables", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const tone = cv({
+        variants: {
+          tone: { brand: "brand", muted: "muted" },
+          accent: { true: "accent" },
+        },
+        defaultVariants: { tone: () => "brand" as const },
+      });
+      const first = cv({
+        extend: [tone],
+        defaultVariants: {
+          accent: (defaultValue, variants) =>
+            variants.tone === "brand" ? true : defaultValue,
+        },
+      });
+      // `second` computes the tone after `first` runs, but every recipe below
+      // removes the tone after each extend, so `first` never reads it.
+      const second = cv({
+        variants: { tone: { brand: "second-brand" } },
+        defaultVariants: { tone: () => "brand" as const },
+      });
+      const mid = cv({ extend: [first, second] });
+      const withoutTone = getModeRecipe(
+        mode,
+        cv({ extend: [first, second], variants: { tone: null } }),
+      );
+      const withoutBrand = getModeRecipe(
+        mode,
+        cv({ extend: [first, second], variants: { tone: { brand: null } } }),
+      );
+      const nested = getModeRecipe(
+        mode,
+        cv({ extend: [mid], variants: { tone: null } }),
+      );
+
+      expect(getStyleClass(withoutTone())).toEqual({ class: cls("accent") });
+      expect(withoutTone.getVariants()).toEqual({ accent: true });
+      expect(getStyleClass(withoutBrand())).toEqual({ class: cls("accent") });
+      expect(withoutBrand.getVariants()).toEqual({ accent: true });
+      expect(getStyleClass(nested())).toEqual({ class: cls("accent") });
+      expect(nested.getVariants()).toEqual({ accent: true });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("extended computed defaultVariants read a later recipe's result through a recipe that disables another value", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          layer: { transparent: "transparent", on: "on", off: "off" },
+          border: { true: "border" },
+        },
+        defaultVariants: {
+          layer: (defaultValue) => defaultValue,
+        },
+      });
+      const field = cv({
+        extend: [base],
+        defaultVariants: {
+          layer: "transparent",
+          border: (defaultValue, variants) =>
+            variants.layer === "on" ? true : defaultValue,
+        },
+      });
+      const restricted = cv({
+        extend: [field],
+        variants: { layer: { off: null } },
+      });
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [restricted],
+          defaultVariants: { layer: () => "on" as const },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({ class: cls("on border") });
+      expect(recipe.getVariants()).toEqual({ layer: "on", border: true });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("extended computed defaultVariants preserve an inherited value that changes in a later pass", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const frame = cv({
+        variants: {
+          border: { inherit: "border-inherit" },
+          weight: { unset: "weight-unset" },
+        },
+        defaultVariants: {
+          weight: (defaultValue, variants) =>
+            variants.border === "inherit" ? "unset" : defaultValue,
+        },
+      });
+      const segment = cv({
+        extend: [frame],
+        defaultVariants: {
+          weight: (defaultValue) => defaultValue,
+        },
+      });
+      // `frame` reads the border only from the second pass, so it changes the
+      // weight after `segment` already returned the first one.
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [segment],
+          defaultVariants: { border: () => "inherit" as const },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({
+        class: cls("border-inherit weight-unset"),
+      });
+      expect(recipe.getVariants()).toEqual({
+        border: "inherit",
+        weight: "unset",
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("extended computed defaultVariants keep a value when a later one returns a value its recipe disables", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          size: { sm: "sm", md: "md", lg: "lg" },
+          large: { true: "large" },
+        },
+        defaultVariants: {
+          size: (_defaultValue, variants) => (variants.large ? "lg" : "sm"),
+        },
+      });
+      // The size depends on `large`, which this recipe computes after it. This
+      // recipe disables `md`, so its own size default never applies.
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [base],
+          variants: { size: { md: null } },
+          defaultVariants: {
+            large: () => true,
+            // @ts-expect-error this recipe disables `md`
+            size:
+              // no error
+              () => "md" as const,
+          },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({ class: cls("lg large") });
+      expect(recipe.getVariants()).toEqual({ size: "lg", large: true });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("computed defaultVariants read their own key after an extending recipe removes the value written before it", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const tone = cv({
+        variants: { tone: { loud: "loud", calm: "calm", quiet: "quiet" } },
+        defaultVariants: {
+          tone: (defaultValue, variants) =>
+            variants.tone === "calm" ? "loud" : defaultValue,
+        },
+      });
+      const first = cv({ extend: [tone] });
+      // Only extends with a callback resolve variants in `getVariants`.
+      const spacer = cv({
+        variants: { gap: { true: "gap" } },
+        refine: () => {},
+      });
+      const last = cv({
+        variants: {
+          tone: { loud: "last-loud", calm: "last-calm", quiet: "last-quiet" },
+        },
+        defaultVariants: {
+          tone: (_defaultValue, variants) =>
+            variants.tone === "loud" ? "quiet" : "calm",
+        },
+      });
+      // `filtered` removes `loud` after `spacer`, before `last` reads its own
+      // key, so `last` never sees the value that `tone` wrote.
+      const filtered = cv({
+        extend: [spacer, last],
+        variants: { tone: { loud: null } },
+      });
+      const recipe = getModeRecipe(mode, cv({ extend: [first, filtered] }));
+
+      expect(getStyleClass(recipe())).toEqual({
+        class: cls("calm last-calm"),
+      });
+      expect(recipe.getVariants()).toEqual({ tone: "calm" });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("computed defaultVariants read their own key after an extending recipe removes a later value", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const tones = { a: "a", b: "b", x: "x", y: "y" };
+      const first = cv({
+        variants: { tone: tones },
+        defaultVariants: { tone: () => "a" as const },
+      });
+      const second = cv({
+        variants: { tone: tones },
+        defaultVariants: { tone: () => "b" as const },
+      });
+      // `filtered` removes the value that `second` writes after `first`, so
+      // `last` reads neither of them.
+      const filtered = cv({
+        extend: [second],
+        variants: { tone: { b: null } },
+      });
+      const last = cv({
+        variants: { tone: tones },
+        defaultVariants: {
+          tone: (_defaultValue, variants) =>
+            variants.tone === "a" ? "x" : "y",
+        },
+      });
+      const recipe = getModeRecipe(
+        mode,
+        cv({ extend: [first, filtered, last] }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({ class: cls("y y y") });
+      expect(recipe.getVariants()).toEqual({ tone: "y" });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("a pruned shared extend does not change computed defaultVariants", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const frame = cv({
+        variants: {
+          a: { x: "a-x", y: "a-y", z: "a-z" },
+          b: { x: "b-x", y: "b-y", z: "b-z" },
+        },
+        defaultVariants: {
+          b: (_defaultValue, variants) =>
+            variants.a === "x" ? "x" : variants.b,
+        },
+      });
+      const inner = cv({
+        extend: [frame],
+        defaultVariants: {
+          a: (defaultValue, variants) =>
+            variants.b === "z" ? defaultValue : variants.a,
+        },
+      });
+      // These defaults keep the values they read, so the chain can settle on
+      // more than one result. The second `frame` is pruned and computes
+      // nothing, so the chain settles where it does without it.
+      const sibling = cv({
+        extend: [frame],
+        defaultVariants: { a: "z", b: "z" },
+      });
+      const mid = cv({ extend: [inner, sibling] });
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [mid],
+          defaultVariants: {
+            a: (defaultValue, variants) =>
+              variants.b === "z" ? "x" : defaultValue,
+          },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({ class: cls("a-x b-x") });
+      expect(recipe.getVariants()).toEqual({ a: "x", b: "x" });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("computed defaultVariants warn when a later recipe contradicts them", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          layer: { transparent: "transparent", on: "on" },
+        },
+        defaultVariants: {
+          layer: (defaultValue) => defaultValue,
+        },
+      });
+      const field = cv({
+        extend: [base],
+        variants: { border: { true: "border" } },
+        defaultVariants: {
+          layer: "transparent",
+          border: (defaultValue, variants) =>
+            variants.layer === "on" ? true : defaultValue,
+        },
+      });
+      // A border turns the layer off, and the layer turns the border on, so no
+      // pair of values satisfies both recipes.
+      const recipe = cv({
+        extend: [field],
+        defaultVariants: {
+          layer: (_defaultValue, variants) =>
+            variants.border ? ("transparent" as const) : ("on" as const),
+        },
+      });
+
+      recipe.getVariants();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Maximum refine iterations exceeded"),
+      );
+    });
+
+    test("computed defaultVariants read their own key as the value they replace", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const frame = cv({
+        variants: {
+          border: { inherit: "border-inherit" },
+          weight: { unset: "weight-unset" },
+        },
+        defaultVariants: {
+          weight: (defaultValue, variants) =>
+            variants.border === "inherit" ? "unset" : defaultValue,
+        },
+      });
+      const segment = cv({
+        extend: [frame],
+        defaultVariants: {
+          weight: (_defaultValue, variants) => variants.weight,
+        },
+      });
+      // `frame` reads the border only from the second pass, after `segment`
+      // already kept the first value of `weight` once.
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [segment],
+          defaultVariants: { border: () => "inherit" as const },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({
+        class: cls("border-inherit weight-unset"),
+      });
+      expect(recipe.getVariants()).toEqual({
+        border: "inherit",
+        weight: "unset",
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test("extended computed defaultVariants read a value that a later recipe restores in the first pass", () => {
+      using warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const base = cv({
+        variants: {
+          layer: { transparent: "transparent", on: "on" },
+        },
+        defaultVariants: {
+          layer: () => "on" as const,
+        },
+      });
+      const field = cv({
+        extend: [base],
+        variants: { border: { true: "border" } },
+        defaultVariants: {
+          layer: "transparent",
+          border: (defaultValue, variants) =>
+            variants.layer === "transparent" ? true : defaultValue,
+        },
+      });
+      // The first pass ends where it started, but `field` read the value that
+      // `base` wrote before this recipe restored the static default.
+      const recipe = getModeRecipe(
+        mode,
+        cv({
+          extend: [field],
+          defaultVariants: { layer: () => "transparent" as const },
+        }),
+      );
+
+      expect(getStyleClass(recipe())).toEqual({
+        class: cls("transparent border"),
+      });
+      expect(recipe.getVariants()).toEqual({
+        layer: "transparent",
+        border: true,
+      });
+      expect(warn).not.toHaveBeenCalled();
     });
 
     test("setVariants from earlier extends overrides computed defaultVariants from later extends", () => {
