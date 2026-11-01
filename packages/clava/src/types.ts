@@ -343,9 +343,35 @@ export type RecipeLike<Base extends Recipe<any, any, any>, Candidate> = [
     }
   : never;
 
-type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
-  ? ExtractVariants<First> & MergeExtendedVariants<Rest>
+// Intersecting siblings reduces the whole object type to never when a shared
+// key has disjoint types and one of them is a unit type, such as string and
+// null. Props read only whether a value is disabled, so erase the rest. An
+// explicit never still disables the key for every sibling without reducing the
+// object type.
+type NormalizeSiblingValue<T> = T extends null ? never : VariantValue;
+
+type NormalizeSiblingDefinition<T> = T extends null
+  ? never
+  : T extends undefined | ((...args: any[]) => any) | readonly unknown[]
+    ? T
+    : T extends Record<string, any>
+      ? { [K in keyof T]: NormalizeSiblingValue<T[K]> }
+      : string;
+
+type NormalizeSiblingVariants<T> = {
+  [K in keyof T]: NormalizeSiblingDefinition<T[K]>;
+};
+
+type MergeSiblingVariants<T> = T extends readonly [infer First, ...infer Rest]
+  ? NormalizeSiblingVariants<ExtractVariants<First>> &
+      MergeSiblingVariants<Rest>
   : {};
+
+// A single extend can't conflict. Skipping normalization also keeps long chains
+// of single extends within the instantiation depth limit.
+type MergeExtendedVariants<T> = T extends readonly [infer Only]
+  ? ExtractVariants<Only>
+  : MergeSiblingVariants<T>;
 
 // Returns a recipe's effective variants so an intermediate recipe's
 // static variant hides a grandparent's function variant from descendants.
@@ -360,13 +386,15 @@ type MergeVariantDefinition<Child, Parent> = Child extends (
   ...args: any[]
 ) => any
   ? Child
-  : Parent extends (...args: any[]) => any
+  : [Parent] extends [never]
     ? Child
-    : Child extends Record<string, any>
-      ? Parent extends Record<string, any>
-        ? Omit<Parent, keyof Child> & Child
-        : Child
-      : Child;
+    : Parent extends (...args: any[]) => any
+      ? Child
+      : Child extends Record<string, any>
+        ? Parent extends Record<string, any>
+          ? Omit<Parent, keyof Child> & Child
+          : Child
+        : Child;
 
 type MergeVariantMaps<Child, Parent> = Omit<Parent, keyof Child> &
   Child & {
