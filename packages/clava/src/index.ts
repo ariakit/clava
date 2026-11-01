@@ -121,6 +121,12 @@ interface RecipeMeta {
   // Unlike `computedDefaultKeys`, a pruned shared ancestor doesn't add keys.
   // Older Clava copies don't expose it.
   activeComputedDefaultKeys?: Set<string>;
+  // Variant keys that this recipe's chain disables entirely or partly. Older
+  // Clava copies don't expose it or `isDisabledValue`.
+  disabledKeys?: Set<string>;
+  // Whether this recipe's chain removes the value for the key from the variants
+  // it returns. A recipe that defines a value again stops its removal.
+  isDisabledValue?: (key: string, value: unknown) => boolean;
 }
 
 const META_KEY = "__meta";
@@ -736,6 +742,8 @@ export function create(params: CreateParams = {}) {
     const variantEntryDefs: PrebuiltVariant[] = [];
     const functionVariantNames: string[] = [];
     const functionVariantFns: Array<(value: unknown) => unknown> = [];
+    // Own variant definitions by name. `null` stands for a function variant.
+    const ownVariantDefs = new Map<string, PrebuiltVariant | null>();
     if (variants) {
       for (const name in variants) {
         if (!hasOwn(variants, name)) continue;
@@ -749,9 +757,11 @@ export function create(params: CreateParams = {}) {
         if (typeof variant === "function") {
           functionVariantNames.push(name);
           functionVariantFns.push(variant as (value: unknown) => unknown);
+          ownVariantDefs.set(name, null);
           continue;
         }
         const prebuiltVariant = buildPrebuiltVariant(variant);
+        ownVariantDefs.set(name, prebuiltVariant);
         variantEntryNames.push(name);
         variantEntryDefs.push(prebuiltVariant);
         if (prebuiltVariant.disabledValues) {
@@ -767,6 +777,17 @@ export function create(params: CreateParams = {}) {
         }
       }
     }
+    const definesOwnValue = (key: string, value: unknown): boolean => {
+      const variant = ownVariantDefs.get(key);
+      if (variant === undefined) return false;
+      if (variant === null) return true;
+      if (!variant.values) return typeof value === "boolean";
+      // `false` is a valid value for a variant that only defines `true`.
+      if (value === false && variant.values.has("true")) return true;
+      const valueKey = getVariantValueKey(value);
+      return valueKey != null && variant.values.has(valueKey);
+    };
+
     const variantKeys = Array.from(variantKeySet);
     const variantKeysLength = variantKeys.length;
     const variantEntryCount = variantEntryNames.length;
@@ -993,6 +1014,77 @@ export function create(params: CreateParams = {}) {
           }
         }
         return false;
+      };
+
+      const isDisabledValue = (key: string, value: unknown): boolean => {
+        if (isOwnDisabledValue(key, value)) return true;
+        if (definesOwnValue(key, value)) return false;
+        return extMetas.some((meta) =>
+          getOwn(meta, "isDisabledValue")?.(key, value),
+        );
+      };
+
+      const disabledKeys = new Set(disabledVariantKeys);
+      for (const key in disabledVariantValues) {
+        if (!hasOwn(disabledVariantValues, key)) continue;
+        disabledKeys.add(key);
+      }
+      // Own keys that an extend may disable, so an extend that doesn't disable
+      // anything this recipe defines adds no work to each compute pass.
+      const restorableKeys: string[] = [];
+      for (const meta of extMetas) {
+        const extDisabledKeys = getOwn(meta, "disabledKeys");
+        if (!extDisabledKeys) continue;
+        for (const key of extDisabledKeys) {
+          disabledKeys.add(key);
+          if (ownVariantDefs.has(key) && !restorableKeys.includes(key)) {
+            restorableKeys.push(key);
+          }
+        }
+      }
+
+      // An extend removes the values that its chain disables, but this recipe
+      // defines some of them again. Its value comes back after the extend runs,
+      // so the extend's own callbacks still read the variants that it declares.
+      const restoreOwnValues = (
+        before: Record<string, unknown>,
+        after: Record<string, unknown>,
+        extMeta: RecipeMeta,
+        fallback: Record<string, unknown>,
+        protection: RefineProtection | null | undefined,
+      ): Record<string, unknown> => {
+        let restored = after;
+        for (const key of restorableKeys) {
+          const value = getOwn(before, key);
+          if (value === undefined) continue;
+          if (!definesOwnValue(key, value)) continue;
+          if (!getOwn(extMeta, "isDisabledValue")?.(key, value)) continue;
+          const current = getOwn(after, key);
+          // A disabling recipe without extends removes nothing.
+          if (Object.is(current, value)) continue;
+          // A different protected value comes from a callback, even a clear.
+          const protectedVariants = protection?.variants;
+          if (
+            protectedVariants &&
+            hasOwn(protectedVariants, key) &&
+            !Object.is(protectedVariants[key], value)
+          ) {
+            continue;
+          }
+          // The extend replaces a disabled value with the fallback. Any other
+          // value comes from its callbacks.
+          if (
+            current !== undefined &&
+            !Object.is(current, getOwn(fallback, key))
+          ) {
+            continue;
+          }
+          if (restored === after) {
+            restored = Object.assign({}, after);
+          }
+          restored[key] = value;
+        }
+        return restored;
       };
 
       // The frame for each extend lists the keys that computed defaults
@@ -1399,6 +1491,7 @@ export function create(params: CreateParams = {}) {
             if (pass && pendingFrame) {
               pass.frames.push(pendingFrame);
             }
+            const beforeExtend = workingResolved;
             if (hasIsolatedExt && extIsolated[i]) {
               // Isolated extend (different factory): gather its variant classes
               // into a scratch array, then push the joined string after applying
@@ -1438,6 +1531,15 @@ export function create(params: CreateParams = {}) {
             }
             if (pass && pendingFrame) {
               pass.frames.pop();
+            }
+            if (restorableKeys.length > 0) {
+              workingResolved = restoreOwnValues(
+                beforeExtend,
+                workingResolved,
+                extMetas[i],
+                defaultResolved,
+                protection,
+              );
             }
             workingResolved = filterOwnDisabledVariants(
               workingResolved,
@@ -1719,6 +1821,7 @@ export function create(params: CreateParams = {}) {
         // removed at the same points. A later extend's callbacks can read them.
         for (let i = 0; i < extCount; i++) {
           const resolveExtend = extResolvers[i];
+          const beforeExtend = workingResolved;
           if (resolveExtend) {
             const pendingFrame = pass ? extPendingFrames[i] : null;
             if (pass && pendingFrame) {
@@ -1734,6 +1837,15 @@ export function create(params: CreateParams = {}) {
             );
             if (pass && pendingFrame) {
               pass.frames.pop();
+            }
+            if (restorableKeys.length > 0) {
+              workingResolved = restoreOwnValues(
+                beforeExtend,
+                workingResolved,
+                extMetas[i],
+                defaultResolved,
+                protection,
+              );
             }
           }
           workingResolved = filterOwnDisabledVariants(
@@ -1977,6 +2089,8 @@ export function create(params: CreateParams = {}) {
         functionVariantKeys,
         computedDefaultKeys,
         activeComputedDefaultKeys,
+        disabledKeys,
+        isDisabledValue,
       };
 
       const initRecipe = <

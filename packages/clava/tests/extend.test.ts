@@ -355,6 +355,236 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(enabledProps)).toEqual({ class: cls("base-lg") });
     });
 
+    describe("extend restores a value disabled in the chain", () => {
+      const leaf = cv({
+        variants: { tone: { loud: "leaf-loud", calm: "leaf-calm" } },
+      });
+      const inner = cv({ extend: [leaf], variants: { tone: { loud: null } } });
+
+      test("value from props and defaultVariants", () => {
+        const base = cv({
+          extend: [inner],
+          variants: { tone: { loud: "outer-loud" } },
+          defaultVariants: { tone: "loud" },
+        });
+        const recipe = getModeRecipe(mode, base);
+        expect(getStyleClass(recipe())).toEqual({ class: cls("outer-loud") });
+        expect(getStyleClass(recipe({ tone: "loud" }))).toEqual({
+          class: cls("outer-loud"),
+        });
+        expect(getStyleClass(recipe({ tone: "calm" }))).toEqual({
+          class: cls("leaf-calm"),
+        });
+        expect(base.getVariants()).toEqual({ tone: "loud" });
+        expect(base.getVariants({ tone: "calm" })).toEqual({ tone: "calm" });
+      });
+
+      test("value that stays disabled for the extended recipe", () => {
+        const recipe = cv({
+          extend: [inner],
+          variants: { tone: { quiet: "outer-quiet" } },
+        });
+        const props = recipe({
+          // @ts-expect-error loud stays disabled because this recipe omits it
+          tone:
+            // no error
+            "loud",
+        });
+        expect(getStyleClass(props)).toEqual({ class: "" });
+        expect(
+          recipe.getVariants({
+            // @ts-expect-error loud stays disabled because this recipe omits it
+            tone:
+              // no error
+              "loud",
+          }),
+        ).toEqual({});
+      });
+
+      test("whole variant with object, shorthand, and function variants", () => {
+        const noTone = cv({ extend: [leaf], variants: { tone: null } });
+        const objectRecipe = cv({
+          extend: [noTone],
+          variants: { tone: { loud: "outer-loud" } },
+        });
+        const shorthandRecipe = cv({
+          extend: [noTone],
+          variants: { tone: "outer-tone" },
+        });
+        const functionRecipe = cv({
+          extend: [noTone],
+          variants: { tone: (value: string) => `outer-${value}` },
+        });
+        expect(getStyleClass(objectRecipe({ tone: "loud" }))).toEqual({
+          class: cls("outer-loud"),
+        });
+        expect(getStyleClass(shorthandRecipe({ tone: true }))).toEqual({
+          class: cls("outer-tone"),
+        });
+        expect(getStyleClass(functionRecipe({ tone: "any" }))).toEqual({
+          class: cls("outer-any"),
+        });
+        expect(objectRecipe.getVariants({ tone: "loud" })).toEqual({
+          tone: "loud",
+        });
+        expect(functionRecipe.getVariants({ tone: "any" })).toEqual({
+          tone: "any",
+        });
+      });
+
+      test("through further extending recipes", () => {
+        const outer = cv({
+          extend: [inner],
+          variants: { tone: { loud: "outer-loud" } },
+        });
+        const child = cv({ extend: [outer], class: "child" });
+        const blocked = cv({
+          extend: [outer],
+          variants: { tone: { loud: null } },
+        });
+        expect(getStyleClass(child({ tone: "loud" }))).toEqual({
+          class: cls("child outer-loud"),
+        });
+        expect(child.getVariants({ tone: "loud" })).toEqual({ tone: "loud" });
+        const blockedProps = blocked({
+          // @ts-expect-error the extending recipe disables loud again
+          tone:
+            // no error
+            "loud",
+        });
+        expect(getStyleClass(blockedProps)).toEqual({ class: "" });
+      });
+
+      test("callbacks in the disabling recipe don't read the value", () => {
+        const seen: unknown[] = [];
+        const refined = cv({
+          extend: [leaf],
+          variants: { tone: { loud: null } },
+          refine: ({ variants }) => {
+            seen.push(variants.tone);
+            return null;
+          },
+        });
+        const recipe = cv({
+          extend: [refined],
+          variants: { tone: { loud: "outer-loud" } },
+        });
+        expect(getStyleClass(recipe({ tone: "loud" }))).toEqual({
+          class: cls("outer-loud"),
+        });
+        expect(seen).not.toContain("loud");
+        expect(recipe.getVariants({ tone: "loud" })).toEqual({ tone: "loud" });
+      });
+
+      test("value from computed default and refine", () => {
+        const withStaticDefault = cv({
+          extend: [inner],
+          variants: { tone: { loud: "outer-loud" } },
+          defaultVariants: { tone: "calm" },
+        });
+        const computed = cv({
+          extend: [withStaticDefault],
+          defaultVariants: { tone: () => "loud" as const },
+        });
+        const computedOwn = cv({
+          extend: [inner],
+          variants: { tone: { loud: "outer-loud" } },
+          defaultVariants: { tone: () => "loud" as const },
+        });
+        const refined = cv({
+          extend: [inner],
+          variants: { tone: { loud: "outer-loud" } },
+          refine: ({ setVariants }) => {
+            setVariants({ tone: "loud" });
+          },
+        });
+        for (const base of [computed, computedOwn, refined]) {
+          const recipe = getModeRecipe(mode, base);
+          expect(getStyleClass(recipe())).toEqual({ class: cls("outer-loud") });
+          expect(base.getVariants()).toEqual({ tone: "loud" });
+        }
+      });
+
+      test("explicit clear from an extended refine stays", () => {
+        const refined = cv({
+          extend: [leaf],
+          variants: { tone: { loud: null } },
+          refine: ({ setVariants }) => {
+            setVariants({ tone: undefined });
+          },
+        });
+        const recipe = cv({
+          extend: [refined],
+          variants: { tone: { loud: "outer-loud" } },
+        });
+        expect(getStyleClass(recipe({ tone: "loud" }))).toEqual({ class: "" });
+        expect(recipe.getVariants({ tone: "loud" })).toEqual({});
+      });
+
+      test("disabling recipe without extends adds no refine pass", () => {
+        const disabling = cv({
+          variants: { tone: { loud: null, calm: "calm" } },
+        });
+        let calls = 0;
+        const recipe = cv({
+          extend: [disabling],
+          variants: { tone: { loud: "outer-loud" } },
+          refine: () => {
+            calls += 1;
+            return null;
+          },
+        });
+        expect(getStyleClass(recipe({ tone: "loud" }))).toEqual({
+          class: cls("outer-loud"),
+        });
+        expect(calls).toBe(1);
+      });
+
+      test("false stays for a whole variant defined again", () => {
+        const noTone = cv({ extend: [leaf], variants: { tone: null } });
+        const shorthand = cv({
+          extend: [noTone],
+          variants: { tone: "outer-tone" },
+        });
+        const trueOnly = cv({
+          extend: [noTone],
+          variants: { tone: { true: "outer-tone" } },
+        });
+        expect(shorthand.getVariants({ tone: false })).toEqual({ tone: false });
+        expect(trueOnly.getVariants({ tone: false })).toEqual({ tone: false });
+      });
+
+      test("later extends read the value", () => {
+        const other = cv({ variants: { tone: { loud: "other-loud" } } });
+        const recipe = cv({
+          extend: [inner, other],
+          variants: { tone: { loud: "outer-loud" } },
+        });
+        expect(getStyleClass(recipe({ tone: "loud" }))).toEqual({
+          class: cls("other-loud outer-loud"),
+        });
+      });
+
+      test("explicit change from an extended refine stays", () => {
+        const refined = cv({
+          extend: [leaf],
+          variants: { tone: { loud: null } },
+          refine: ({ setVariants }) => {
+            setVariants({ tone: "calm" });
+          },
+        });
+        const recipe = cv({
+          extend: [refined],
+          variants: { tone: { loud: "outer-loud" } },
+          defaultVariants: { tone: "calm" },
+        });
+        expect(getStyleClass(recipe({ tone: "loud" }))).toEqual({
+          class: cls("leaf-calm"),
+        });
+        expect(recipe.getVariants({ tone: "loud" })).toEqual({ tone: "calm" });
+      });
+    });
+
     test("extend disabled variant value accepts valid defaultVariants", () => {
       const base = cv({
         variants: {
