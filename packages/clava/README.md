@@ -326,6 +326,8 @@ const plainButton = cv({
 });
 ```
 
+Extends run in order, so a recipe listed before this one in `extend` can still add a class for the removed value.
+
 You can extend any recipe mode, including `baseButton.jsx`, `baseButton.html`, and `baseButton.htmlObj`.
 
 ### Constraining Recipe Props

@@ -49,6 +49,17 @@ for (const config of Object.values(CONFIGS)) {
           variants.tone === "loud" ? true : defaultValue,
       },
     });
+  const createLeaf = () =>
+    cv({ variants: { tone: { loud: "leaf-loud", calm: "leaf-calm" } } });
+  const createDisabledValue = () =>
+    cv({ extend: [createLeaf()], variants: { tone: { loud: null } } });
+  const createDisabledKey = () =>
+    cv({ extend: [createLeaf()], variants: { tone: null } });
+  const createSibling = (tone: "loud" | "calm") =>
+    cv({
+      variants: { tone: { loud: "sib-loud", calm: "sib-calm" } },
+      defaultVariants: { tone },
+    });
 
   describe(getConfigDescription(config), () => {
     test("refine", () => {
@@ -2235,6 +2246,93 @@ for (const config of Object.values(CONFIGS)) {
         const recipe = cv({ extend: [plain, tone, createReader()] });
         expect(recipe.getVariants()).toEqual({ tone: "calm" });
         expect(recipe.class()).toBe(cls("calm reader-calm"));
+      });
+
+      describe("in a chain without callbacks", () => {
+        test("removes a sibling default disabled before the sibling", () => {
+          const recipe = cv({
+            extend: [createDisabledValue(), createSibling("loud")],
+          });
+          expect(recipe.getVariants()).toEqual({});
+          expect(recipe.class()).toBe("");
+        });
+
+        // The sibling renders before the value is removed, and render makes
+        // one pass here, so its class stays. See
+        // https://github.com/ariakit/clava/issues/618#issuecomment-6554922099
+        test("removes a sibling default disabled after the sibling", () => {
+          const recipe = cv({
+            extend: [createSibling("loud"), createDisabledValue()],
+          });
+          expect(recipe.getVariants()).toEqual({});
+          expect(recipe.class()).toBe(cls("sib-loud"));
+        });
+
+        test("removes a sibling default of a disabled variant", () => {
+          const first = cv({
+            extend: [createDisabledKey(), createSibling("loud")],
+          });
+          expect(first.getVariants()).toEqual({});
+          expect(first.class()).toBe("");
+          const last = cv({
+            extend: [createSibling("loud"), createDisabledKey()],
+          });
+          expect(last.getVariants()).toEqual({});
+          expect(last.class()).toBe(cls("sib-loud"));
+        });
+
+        test("removes a disabled value through nested extends", () => {
+          const wrapper = cv({ extend: [createDisabledValue()] });
+          const recipe = cv({ extend: [wrapper] });
+          const variants = recipe.getVariants({
+            // @ts-expect-error JavaScript callers can pass a disabled value
+            tone:
+              // no error
+              "loud",
+          });
+          expect(variants).toEqual({});
+        });
+
+        test("removes a disabled value passed as a prop", () => {
+          const recipe = cv({ extend: [createDisabledValue()] });
+          const variants = recipe.getVariants({
+            // @ts-expect-error JavaScript callers can pass a disabled value
+            tone:
+              // no error
+              "loud",
+          });
+          expect(variants).toEqual({});
+        });
+
+        test("keeps values that aren't disabled", () => {
+          const recipe = cv({
+            extend: [createDisabledValue(), createSibling("calm")],
+          });
+          expect(recipe.getVariants()).toEqual({ tone: "calm" });
+          expect(recipe.class()).toBe(cls("leaf-calm sib-calm"));
+        });
+
+        // A recipe filters only after its own extends, so render keeps the
+        // value when the recipe that disables it has none.
+        test("keeps a value disabled by a recipe without extends", () => {
+          const disabled = cv({ variants: { tone: { loud: null } } });
+          const recipe = cv({ extend: [disabled, createSibling("loud")] });
+          expect(recipe.getVariants()).toEqual({ tone: "loud" });
+          expect(recipe.class()).toBe(cls("sib-loud"));
+        });
+
+        // A shared base runs once, at its first position. Listed first, it
+        // leaves the recipe that disables the variant with no extends.
+        test("keeps a variant disabled after a shared base", () => {
+          const base = createSibling("loud");
+          const disabled = cv({ extend: [base], variants: { tone: null } });
+          const baseFirst = cv({ extend: [base, disabled] });
+          expect(baseFirst.getVariants()).toEqual({ tone: "loud" });
+          expect(baseFirst.class()).toBe(cls("sib-loud"));
+          const baseLast = cv({ extend: [disabled, base] });
+          expect(baseLast.getVariants()).toEqual({});
+          expect(baseLast.class()).toBe("");
+        });
       });
     });
   });
