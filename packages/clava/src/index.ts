@@ -62,6 +62,7 @@ type ComputeOnceFn = (
   protection?: RefineProtection | null,
   defaultResolved?: Record<string, unknown>,
   renderOnly?: boolean,
+  pass?: RefinePass | null,
 ) => Record<string, unknown>;
 
 type ResolveRefineFn = (
@@ -76,6 +77,7 @@ type ResolveRefineOnceFn = (
   filterOwnVariants?: boolean,
   protection?: RefineProtection | null,
   defaultResolved?: Record<string, unknown>,
+  pass?: RefinePass | null,
 ) => Record<string, unknown>;
 
 type ComputedDefaultVariantFn = (
@@ -109,6 +111,10 @@ interface RecipeMeta {
   // Child recipes use this to preserve inherited computed defaults through
   // `defaultValue` without preserving their own prior computed result.
   computedDefaultKeys: Set<string>;
+  // Variant keys whose computed defaults run in this recipe's pruned chain.
+  // Unlike `computedDefaultKeys`, a pruned shared ancestor doesn't add keys.
+  // Older Clava copies don't expose it.
+  activeComputedDefaultKeys?: Set<string>;
 }
 
 const META_KEY = "__meta";
@@ -197,6 +203,72 @@ function mergeProtectedIntoBase(
   const protectedVariants = protection?.variants;
   if (!protectedVariants) return baseResolved;
   return Object.assign({}, baseResolved, protectedVariants);
+}
+
+// A pass after the first one of a resolution loop. A computed default that
+// writes a key that a later computed default computes again, such as a base that
+// resets it to its static default, writes it to `chainValues` instead of the
+// working variants. Only the later computed defaults for that key read it, so
+// other callbacks keep the value that the previous pass settled on.
+// See https://github.com/ariakit/clava/issues/613
+interface RefinePass {
+  // One frame for each recipe on the current extend path.
+  frames: PendingFrame[];
+  // Values for keys that a later computed default still computes. The working
+  // variants hold `undefined` the same way as a missing key, so it marks a
+  // cleared key here too.
+  chainValues: Map<string, unknown> | null;
+}
+
+interface PendingFrame {
+  // Keys that computed defaults compute after the current extend.
+  keys: ReadonlySet<string> | null;
+  // Whether the recipe removes a value after each extend. A computed default
+  // below it writes such a value to the working variants, as before, so the
+  // removal applies.
+  isDisabled: ((key: string, value: unknown) => boolean) | null;
+}
+
+function isPendingKey(frames: PendingFrame[], key: string): boolean {
+  for (let i = 0; i < frames.length; i++) {
+    if (frames[i]?.keys?.has(key)) return true;
+  }
+  return false;
+}
+
+function isDisabledOnPath(
+  frames: PendingFrame[],
+  key: string,
+  value: unknown,
+): boolean {
+  for (let i = 0; i < frames.length; i++) {
+    if (frames[i]?.isDisabled?.(key, value)) return true;
+  }
+  return false;
+}
+
+// Chains that mix in recipes from an older Clava copy aren't supported. Their
+// metadata lacks these keys, which then count as none instead of throwing.
+const NO_KEYS: ReadonlySet<string> = new Set();
+
+function getActiveComputedDefaultKeys(meta: RecipeMeta): ReadonlySet<string> {
+  return getOwn(meta, "activeComputedDefaultKeys") ?? NO_KEYS;
+}
+
+// Returns a copy of `variants` where `key` holds `value`, or is missing when
+// `value` is `undefined`.
+function withVariant(
+  variants: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): Record<string, unknown> {
+  const copy = Object.assign({}, variants);
+  if (value === undefined) {
+    delete copy[key];
+  } else {
+    copy[key] = value;
+  }
+  return copy;
 }
 
 export type {
@@ -908,6 +980,31 @@ export function create(params: CreateParams = {}) {
         return false;
       };
 
+      // The frame for each extend lists the keys that computed defaults
+      // compute after it runs: those of later extends and this recipe's own.
+      const extPendingFrames: Array<PendingFrame | null> = [];
+      const laterComputedDefaultKeys = new Set(computedDefaultNames);
+      for (let i = extCount - 1; i >= 0; i--) {
+        const keys =
+          laterComputedDefaultKeys.size > 0
+            ? new Set(laterComputedDefaultKeys)
+            : null;
+        extPendingFrames.unshift(
+          keys || hasAnyDisabled
+            ? { keys, isDisabled: hasAnyDisabled ? isOwnDisabledValue : null }
+            : null,
+        );
+        for (const key of getActiveComputedDefaultKeys(extMetas[i])) {
+          laterComputedDefaultKeys.add(key);
+        }
+      }
+      const activeComputedDefaultKeys = laterComputedDefaultKeys;
+      const refineExtPendingFrames: Array<PendingFrame | null> = [];
+      for (let i = 0; i < extCount; i++) {
+        if (!extMetas[i].resolveRefine) continue;
+        refineExtPendingFrames.push(extPendingFrames[i] ?? null);
+      }
+
       const filterOwnDisabledVariants = (
         input: Record<string, unknown>,
         fallback: Record<string, unknown>,
@@ -949,6 +1046,26 @@ export function create(params: CreateParams = {}) {
         return filtered;
       };
 
+      // Applies `filterOwnDisabledVariants` to the values that computed defaults
+      // keep out of the working variants, so later ones read the same value.
+      const filterOwnDisabledChainValues = (
+        chainValues: Map<string, unknown>,
+        fallback: Record<string, unknown>,
+      ): void => {
+        if (!hasAnyDisabled) return;
+        for (const [key, value] of chainValues) {
+          if (!isOwnDisabledValue(key, value)) continue;
+          const fallbackValue = getOwn(fallback, key);
+          chainValues.set(
+            key,
+            fallbackValue !== undefined &&
+              !isOwnDisabledValue(key, fallbackValue)
+              ? fallbackValue
+              : undefined,
+          );
+        }
+      };
+
       // Hot path: resolve variants by merging static defaults + extends'
       // static defaults + user-provided props.
       function resolveVariantsHot(
@@ -982,6 +1099,7 @@ export function create(params: CreateParams = {}) {
         userVariantProps: Record<string, unknown>,
         filterOwnVariants: boolean,
         protection: RefineProtection | null | undefined,
+        pass: RefinePass | null | undefined,
       ): Record<string, unknown> => {
         const protectedVariants = protection?.variants;
         let ownVariants = filterOwnVariants ? null : resolved;
@@ -1018,29 +1136,54 @@ export function create(params: CreateParams = {}) {
           if (protectedVariants && hasOwn(protectedVariants, key)) continue;
 
           const variantSnapshot = getOwnVariants();
+          const currentValue = getOwn(variantSnapshot, key);
+          // An earlier computed default may have kept its value for this key
+          // out of the working variants. This one still reads that value as the
+          // one it replaces, through `defaultValue` and through its own key.
+          const chainValues = pass?.chainValues;
+          const latestValue =
+            chainValues && chainValues.has(key)
+              ? chainValues.get(key)
+              : currentValue;
           const defaultValue = inheritedComputedDefaultKeys.has(key)
-            ? getOwn(variantSnapshot, key)
+            ? latestValue
             : getOwn(defaultResolved, key);
-          const value = computedDefaultFns[i](defaultValue, variantSnapshot);
-          if (hasAnyDisabled) {
-            if (disabledVariantKeys.has(key)) continue;
-            if (disabledVariantValues) {
-              const valueKey = getVariantValueKey(value);
-              if (
-                valueKey != null &&
-                getOwn(disabledVariantValues, key)?.has(valueKey)
-              ) {
-                continue;
-              }
+          let value = computedDefaultFns[i](
+            defaultValue,
+            Object.is(latestValue, currentValue)
+              ? variantSnapshot
+              : withVariant(variantSnapshot, key, latestValue),
+          );
+          if (hasAnyDisabled && isOwnDisabledValue(key, value)) {
+            // The latest value stays, as if this computed default didn't run.
+            // When no later one computes the key, it becomes the final value.
+            if (Object.is(latestValue, currentValue)) continue;
+            if (pass && isPendingKey(pass.frames, key)) continue;
+            value = latestValue;
+          } else if (pass) {
+            if (Object.is(value, currentValue)) {
+              chainValues?.delete(key);
+              continue;
+            }
+            if (
+              isPendingKey(pass.frames, key) &&
+              !isDisabledOnPath(pass.frames, key, value)
+            ) {
+              pass.chainValues ??= new Map();
+              pass.chainValues.set(key, value);
+              continue;
             }
           }
+          // The working variants receive this value, so a value that an
+          // earlier computed default kept out of them no longer applies.
+          chainValues?.delete(key);
 
           if (value === undefined) {
             if (!hasOwn(variantSnapshot, key)) continue;
             delete ensureUpdated()[key];
             continue;
           }
-          if (Object.is(getOwn(variantSnapshot, key), value)) continue;
+          if (Object.is(currentValue, value)) continue;
           ensureUpdated()[key] = value;
         }
 
@@ -1190,6 +1333,7 @@ export function create(params: CreateParams = {}) {
         protection,
         defaultResolved = resolved,
         renderOnly = false,
+        pass,
       ) => {
         let workingResolved = resolved;
         let cClasses: ClassValue[] | null = null;
@@ -1241,6 +1385,10 @@ export function create(params: CreateParams = {}) {
           }
 
           for (let i = 0; i < extCount; i++) {
+            const pendingFrame = pass ? extPendingFrames[i] : null;
+            if (pass && pendingFrame) {
+              pass.frames.push(pendingFrame);
+            }
             if (hasIsolatedExt && extIsolated[i]) {
               // Isolated extend (different factory): gather its variant classes
               // into a scratch array, then push the joined string after applying
@@ -1256,6 +1404,7 @@ export function create(params: CreateParams = {}) {
                 protection,
                 defaultResolved,
                 renderOnly,
+                pass,
               );
               if (extClasses.length > 0) {
                 const joined = clsx(extClasses);
@@ -1274,12 +1423,19 @@ export function create(params: CreateParams = {}) {
                 protection,
                 defaultResolved,
                 renderOnly,
+                pass,
               );
+            }
+            if (pass && pendingFrame) {
+              pass.frames.pop();
             }
             workingResolved = filterOwnDisabledVariants(
               workingResolved,
               defaultResolved,
             );
+            if (pass?.chainValues) {
+              filterOwnDisabledChainValues(pass.chainValues, defaultResolved);
+            }
           }
         }
 
@@ -1292,6 +1448,7 @@ export function create(params: CreateParams = {}) {
             userVariantProps,
             true,
             protection,
+            pass,
           );
         }
 
@@ -1430,6 +1587,7 @@ export function create(params: CreateParams = {}) {
               let lastClasses: ClsxClassValue[] = [];
               let lastStyle: StyleValue = {};
               let isFirstRun = true;
+              let pass: RefinePass | null = null;
 
               while (remaining > 0) {
                 remaining -= 1;
@@ -1443,6 +1601,10 @@ export function create(params: CreateParams = {}) {
                   incomingDefaultResolved,
                   protection,
                 );
+                if (!isFirstRun) {
+                  pass ??= { frames: [], chainValues: null };
+                  pass.chainValues?.clear();
+                }
                 const nextResolved = computeOnce(
                   workingResolved,
                   userVariantProps,
@@ -1452,21 +1614,19 @@ export function create(params: CreateParams = {}) {
                   nextStyle,
                   protection,
                   defaultResolved,
+                  false,
+                  pass,
                 );
 
+                // No pass has settled before the first one, so it reads the
+                // latest values. It settles only when it changed nothing,
+                // because a later computed default may replace a value it read.
                 if (
                   nextResolved === workingResolved ||
-                  areVariantsEqual(workingResolved, nextResolved)
+                  (!isFirstRun &&
+                    areVariantsEqual(workingResolved, nextResolved))
                 ) {
                   if (nextResolved !== workingResolved) {
-                    if (useDirectOutput) {
-                      classesOut.length = classCount;
-                      for (const key in styleOut) {
-                        if (hasOwn(styleOut, key)) {
-                          Reflect.deleteProperty(styleOut, key);
-                        }
-                      }
-                    }
                     computeOnce(
                       nextResolved,
                       userVariantProps,
@@ -1541,6 +1701,7 @@ export function create(params: CreateParams = {}) {
         filterOwnVariants = true,
         protection,
         defaultResolved = resolved,
+        pass,
       ) => {
         let workingResolved = resolved;
 
@@ -1548,17 +1709,28 @@ export function create(params: CreateParams = {}) {
           const meta = extMetasWithRefine[i];
           const resolveRefine = meta.resolveRefine;
           if (!resolveRefine) continue;
+          const pendingFrame = pass ? refineExtPendingFrames[i] : null;
+          if (pass && pendingFrame) {
+            pass.frames.push(pendingFrame);
+          }
           workingResolved = resolveRefine(
             workingResolved,
             userVariantProps,
             true,
             protection,
             defaultResolved,
+            pass,
           );
+          if (pass && pendingFrame) {
+            pass.frames.pop();
+          }
           workingResolved = filterOwnDisabledVariants(
             workingResolved,
             defaultResolved,
           );
+          if (pass?.chainValues) {
+            filterOwnDisabledChainValues(pass.chainValues, defaultResolved);
+          }
         }
 
         if (computedDefaultCount > 0) {
@@ -1568,6 +1740,7 @@ export function create(params: CreateParams = {}) {
             userVariantProps,
             filterOwnVariants,
             protection,
+            pass,
           );
         }
         if (refine) {
@@ -1597,6 +1770,7 @@ export function create(params: CreateParams = {}) {
               // tracking window. See the compute loop above for the shared
               // rationale.
               let unstableChanges: Map<string, VariantChange> | null = null;
+              let pass: RefinePass | null = null;
 
               while (remaining > 0) {
                 remaining -= 1;
@@ -1610,11 +1784,14 @@ export function create(params: CreateParams = {}) {
                   filterOwnVariants,
                   protection,
                   defaultResolved,
+                  pass,
                 );
 
+                // The first pass settles only when it changed nothing, for the
+                // reason given in the compute loop above.
                 if (
                   nextResolved === workingResolved ||
-                  areVariantsEqual(workingResolved, nextResolved)
+                  (pass && areVariantsEqual(workingResolved, nextResolved))
                 ) {
                   return nextResolved;
                 }
@@ -1635,6 +1812,8 @@ export function create(params: CreateParams = {}) {
                   );
                 }
                 workingResolved = nextResolved;
+                pass ??= { frames: [], chainValues: null };
+                pass.chainValues?.clear();
               }
 
               if (process.env.NODE_ENV !== "production") {
@@ -1780,6 +1959,7 @@ export function create(params: CreateParams = {}) {
         transformClass,
         functionVariantKeys,
         computedDefaultKeys,
+        activeComputedDefaultKeys,
       };
 
       const initRecipe = <
