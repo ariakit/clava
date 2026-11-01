@@ -95,7 +95,13 @@ interface RecipeMeta {
   // Performs a single compute pass for extending recipes, returning the
   // resolved variants while pushing classes and styles into the output values.
   compute: ComputeOnceFn;
+  // Set only when this recipe's chain has computed defaults or `refine`.
   resolveRefine: ResolveRefineOnceFn | null;
+  // Mirrors the variant changes of `compute` without rendering. A recipe with
+  // no callbacks in its chain can still have it, because it can filter disabled
+  // values that a later extend's callbacks would otherwise read. Missing when
+  // the chain can't change variants, and in older Clava copies.
+  resolveVariants?: ResolveRefineOnceFn;
   // Reference identity is used to detect mixed-factory `extend`. When a
   // recipe is extended by a parent from a different `create()` call, the
   // parent applies this transform to the extend's contribution before joining,
@@ -853,17 +859,26 @@ export function create(params: CreateParams = {}) {
         }
       }
 
-      // Filter to only extends with computed default or refine work in their
-      // chain. Those are the recipes that can change resolved variants across
+      // Count only extends with computed default or refine work in their chain.
+      // Those are the recipes that can change resolved variants across
       // fixed-point iterations.
-      const extMetasWithRefine: RecipeMeta[] = [];
+      let extMetasWithRefineCount = 0;
       for (let i = 0; i < extCount; i++) {
-        const meta = extMetas[i];
-        if (meta.resolveRefine) {
-          extMetasWithRefine.push(meta);
+        if (extMetas[i].resolveRefine) {
+          extMetasWithRefineCount += 1;
         }
       }
-      const extMetasWithRefineCount = extMetasWithRefine.length;
+
+      // The extends that can change variants for `getVariants`. Built once so
+      // that each pass skips the others without reading their metadata.
+      const extResolvers = extMetas.map(
+        (meta) => getOwn(meta, "resolveVariants") ?? meta.resolveRefine,
+      );
+      const canResolveVariants =
+        (hasExtend && hasAnyDisabled) ||
+        !!refine ||
+        computedDefaultCount > 0 ||
+        extResolvers.some(Boolean);
 
       // Only a `refine` callback protects variants, through `setVariants`. This
       // over-approximates: `extMetasWithRefineCount` also counts extends that
@@ -999,11 +1014,6 @@ export function create(params: CreateParams = {}) {
         }
       }
       const activeComputedDefaultKeys = laterComputedDefaultKeys;
-      const refineExtPendingFrames: Array<PendingFrame | null> = [];
-      for (let i = 0; i < extCount; i++) {
-        if (!extMetas[i].resolveRefine) continue;
-        refineExtPendingFrames.push(extPendingFrames[i] ?? null);
-      }
 
       const filterOwnDisabledVariants = (
         input: Record<string, unknown>,
@@ -1705,24 +1715,26 @@ export function create(params: CreateParams = {}) {
       ) => {
         let workingResolved = resolved;
 
-        for (let i = 0; i < extMetasWithRefineCount; i++) {
-          const meta = extMetasWithRefine[i];
-          const resolveRefine = meta.resolveRefine;
-          if (!resolveRefine) continue;
-          const pendingFrame = pass ? refineExtPendingFrames[i] : null;
-          if (pass && pendingFrame) {
-            pass.frames.push(pendingFrame);
-          }
-          workingResolved = resolveRefine(
-            workingResolved,
-            userVariantProps,
-            true,
-            protection,
-            defaultResolved,
-            pass,
-          );
-          if (pass && pendingFrame) {
-            pass.frames.pop();
+        // Visit every extend, as `computeOnce` does, so that disabled values are
+        // removed at the same points. A later extend's callbacks can read them.
+        for (let i = 0; i < extCount; i++) {
+          const resolveExtend = extResolvers[i];
+          if (resolveExtend) {
+            const pendingFrame = pass ? extPendingFrames[i] : null;
+            if (pass && pendingFrame) {
+              pass.frames.push(pendingFrame);
+            }
+            workingResolved = resolveExtend(
+              workingResolved,
+              userVariantProps,
+              true,
+              protection,
+              defaultResolved,
+              pass,
+            );
+            if (pass && pendingFrame) {
+              pass.frames.pop();
+            }
           }
           workingResolved = filterOwnDisabledVariants(
             workingResolved,
@@ -1956,6 +1968,7 @@ export function create(params: CreateParams = {}) {
         staticDefaults,
         compute: computeOnce,
         resolveRefine: resolveRefine ? resolveRefineOnce : null,
+        resolveVariants: canResolveVariants ? resolveRefineOnce : undefined,
         transformClass,
         functionVariantKeys,
         computedDefaultKeys,
