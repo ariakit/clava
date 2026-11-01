@@ -293,6 +293,7 @@ export type {
   JSXProps,
   HTMLProps,
   HTMLObjProps,
+  ModalRecipe,
   Recipe,
   RecipeLike,
 };
@@ -691,7 +692,11 @@ export function create(params: CreateParams = {}) {
   // produces, including those of the package-level `cv`.
   const transformClass = getOwn(params, "transformClass") ?? identityClass;
 
-  const cx = (...classes: ClsxClassValue[]) => transformClass(clsx(classes));
+  // The root `cx` type lets consumers emit `typeof cx` for an exported result.
+  // Otherwise, emit must name clsx's `ClassValue`, which pnpm installs hide.
+  const transformedCx: typeof cx = (...classes) => {
+    return transformClass(clsx(classes));
+  };
 
   const buildRecipe = <
     V extends Variants = {},
@@ -2180,7 +2185,7 @@ export function create(params: CreateParams = {}) {
     config: CVConfig<V, E> = {},
   ): InferredRecipe<V, E> => buildRecipe(config).recipe;
 
-  return { cv, cx };
+  return { cv, cx: transformedCx };
 }
 
 export const cv = /* @__PURE__ */ (() => create().cv)();

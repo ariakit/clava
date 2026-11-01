@@ -245,6 +245,24 @@ type SplitPropsFunctionResult<
   ...BuildSourceResults<T, Sources, IsRecipe<S1>, SourceKeys<S1>>,
 ];
 
+/**
+ * A callable Clava recipe with one output mode, such as the `.jsx`, `.html`,
+ * and `.htmlObj` helpers of a recipe returned by `cv()`.
+ *
+ * @example
+ * ```ts
+ * import { type JSXProps, type ModalRecipe, cv } from "clava";
+ *
+ * const button = cv({
+ *   variants: {
+ *     size: { sm: "button-sm", lg: "button-lg" },
+ *   },
+ * });
+ *
+ * const jsxButton: ModalRecipe<{ size: { sm: string; lg: string } }, JSXProps> =
+ *   button.jsx;
+ * ```
+ */
 export interface ModalRecipe<V, R extends RecipeResult> {
   (props?: RecipeProps<V>): R;
   class: (props?: RecipeProps<V>) => string;

@@ -735,6 +735,8 @@ Both groups resolve one fixed prop set on every iteration, so every package with
 
 `RecipeLike<Base, R>` constrains `R` to a structurally compatible recipe while preserving variant props and key arrays in generic components. See [Constraining Recipe Props](#constraining-recipe-props).
 
+`ModalRecipe<V, R>` is the type of `recipe.jsx`, `recipe.html`, and `recipe.htmlObj`, where `V` is the resolved variant map and `R` is the output props.
+
 `VariantPropsWithRecipe<Base, R, Name = "recipe">` combines the selected recipe's variant props with a recipe prop. The prop is optional when `R` is assignable to `Base` and required otherwise. `Name` selects the prop name.
 
 `splitProps(props, source1, ...sources)` returns one object per source plus a final rest object.
