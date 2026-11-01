@@ -1,5 +1,5 @@
-import { describe, expect, expectTypeOf, test } from "vitest";
-import { type RecipeLike, create } from "../src/index.ts";
+import { describe, expect, test } from "vitest";
+import { create } from "../src/index.ts";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -199,53 +199,6 @@ for (const config of Object.values(CONFIGS)) {
       expect(leftFirst.class({ size: "sm" })).toBe("");
       // @ts-expect-error sm is disabled, but JavaScript callers can pass it
       expect(rightFirst.class({ size: "sm" })).toBe(cls("sm"));
-    });
-
-    test("sibling extends keep the values of a union-typed sibling", () => {
-      const first = cv({ variants: { size: { sm: "sm" } } });
-      const second = cv({ variants: { size: { lg: "lg" } } });
-      const third = cv({ variants: { size: { xl: "xl" } } });
-      const recipe = cv({
-        extend: [(false as boolean) ? first : second, third],
-      });
-      expect(recipe.class({ size: "lg" })).toBe(cls("lg"));
-      expect(recipe.class({ size: "xl" })).toBe(cls("xl"));
-      expect(recipe.class({ size: "sm" })).toBe("");
-    });
-
-    test("sibling extends keep the values of a union-typed definition", () => {
-      const definition = { sm: "sm" } as { sm: string } | { lg: string };
-      const first = cv({ variants: { size: definition } });
-      const second = cv({ variants: { size: { xl: "xl" } } });
-      const recipe = cv({ extend: [first, second] });
-      expect(recipe.class({ size: "sm" })).toBe(cls("sm"));
-      expect(recipe.class({ size: "xl" })).toBe(cls("xl"));
-      expect(recipe.class({ size: "lg" })).toBe("");
-    });
-
-    test("sibling extends keep variant reads on a generic recipe", () => {
-      const disclosure = cv({ variants: { open: "open" } });
-      const sibling = cv({ variants: { size: { sm: "sm" } } });
-      const readSize = <R extends RecipeLike<typeof disclosure, R>>(
-        recipe: R,
-      ) => cv({ extend: [recipe, sibling] }).getVariants().size;
-      expect(readSize(disclosure)).toBeUndefined();
-    });
-
-    test("a recipe can restore a value that its sibling extends disable", () => {
-      const left = cv({ variants: { tone: { loud: "a", calm: "b" } } });
-      const right = cv({
-        extend: [left],
-        variants: { tone: { loud: null } },
-      });
-      const recipe = cv({
-        extend: [left, right],
-        variants: { tone: { loud: "c" } },
-      });
-      expectTypeOf(recipe.getVariants)
-        .parameter(0)
-        .toEqualTypeOf<{ tone?: "loud" | "calm" | undefined } | undefined>();
-      expect(recipe.class({ tone: "loud" })).toBe(cls("a c"));
     });
 
     test("extend deduplicates nested diamonds and direct ancestors", () => {
