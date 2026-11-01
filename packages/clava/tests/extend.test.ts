@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { create } from "../src/index.ts";
+import { describe, expect, expectTypeOf, test } from "vitest";
+import { type RecipeLike, create } from "../src/index.ts";
 import {
   CONFIGS,
   createCVFromConfig,
@@ -199,6 +199,120 @@ for (const config of Object.values(CONFIGS)) {
       expect(leftFirst.class({ size: "sm" })).toBe("");
       // @ts-expect-error sm is disabled, but JavaScript callers can pass it
       expect(rightFirst.class({ size: "sm" })).toBe(cls("sm"));
+    });
+
+    test("sibling extends keep values that only one of them disables", () => {
+      const reader = cv({ variants: { tone: { loud: "a", calm: "b" } } });
+      const filtered = cv({
+        extend: [reader],
+        variants: { tone: { loud: null } },
+      });
+      const other = cv({ variants: { tone: { loud: "x", calm: "y" } } });
+      const filteredLast = cv({ extend: [other, filtered] });
+      const filteredFirst = cv({ extend: [filtered, other] });
+      expectTypeOf(filteredLast.getVariants)
+        .parameter(0)
+        .toEqualTypeOf<{ tone?: "calm" | undefined } | undefined>();
+      expectTypeOf(filteredFirst.getVariants)
+        .parameter(0)
+        .toEqualTypeOf<{ tone?: "calm" | undefined } | undefined>();
+      expect(filteredLast.class({ tone: "calm" })).toBe(cls("y b"));
+      expect(filteredFirst.class({ tone: "calm" })).toBe(cls("b y"));
+      filteredLast({
+        // @ts-expect-error a sibling disables loud
+        tone:
+          // no error
+          "loud",
+      });
+      filteredFirst({
+        // @ts-expect-error a sibling disables loud
+        tone:
+          // no error
+          "loud",
+      });
+    });
+
+    test("sibling extends keep other variants when one disables a variant", () => {
+      const on = cv({ variants: { flag: "on", size: { sm: "sm" } } });
+      const off = cv({ extend: [on], variants: { flag: null } });
+      const recipe = cv({ extend: [on, off] });
+      expect(recipe.class({ size: "sm" })).toBe(cls("sm"));
+      recipe({
+        // @ts-expect-error a sibling disables flag
+        flag:
+          // no error
+          true,
+      });
+    });
+
+    test("sibling extends keep conflicting boolean literal values", () => {
+      const yes = cv({ variants: { on: { x: true, y: "y" } } });
+      const no = cv({ variants: { on: { x: false, y: "z" } } });
+      const recipe = cv({ extend: [yes, no] });
+      expectTypeOf(recipe.getVariants)
+        .parameter(0)
+        .toEqualTypeOf<{ on?: "x" | "y" | undefined } | undefined>();
+      expect(recipe.class({ on: "y" })).toBe(cls("y z"));
+    });
+
+    test("sibling extends keep merging values across three recipes", () => {
+      const first = cv({ variants: { tone: { a: "1", b: "1", c: "1" } } });
+      const second = cv({
+        extend: [first],
+        variants: { tone: { a: null } },
+      });
+      const third = cv({ variants: { tone: { b: "3", c: "3", d: "3" } } });
+      const recipe = cv({ extend: [first, second, third] });
+      expectTypeOf(recipe.getVariants)
+        .parameter(0)
+        .toEqualTypeOf<{ tone?: "b" | "c" | "d" | undefined } | undefined>();
+    });
+
+    test("sibling extends keep the values of a union-typed sibling", () => {
+      const first = cv({ variants: { size: { sm: "sm" } } });
+      const second = cv({ variants: { size: { lg: "lg" } } });
+      const third = cv({ variants: { size: { xl: "xl" } } });
+      const recipe = cv({
+        extend: [(false as boolean) ? first : second, third],
+      });
+      expect(recipe.class({ size: "lg" })).toBe(cls("lg"));
+      expect(recipe.class({ size: "xl" })).toBe(cls("xl"));
+      expect(recipe.class({ size: "sm" })).toBe("");
+    });
+
+    test("sibling extends keep the values of a union-typed definition", () => {
+      const definition = { sm: "sm" } as { sm: string } | { lg: string };
+      const first = cv({ variants: { size: definition } });
+      const second = cv({ variants: { size: { xl: "xl" } } });
+      const recipe = cv({ extend: [first, second] });
+      expect(recipe.class({ size: "sm" })).toBe(cls("sm"));
+      expect(recipe.class({ size: "xl" })).toBe(cls("xl"));
+      expect(recipe.class({ size: "lg" })).toBe("");
+    });
+
+    test("sibling extends keep variant reads on a generic recipe", () => {
+      const disclosure = cv({ variants: { open: "open" } });
+      const sibling = cv({ variants: { size: { sm: "sm" } } });
+      const readSize = <R extends RecipeLike<typeof disclosure, R>>(
+        recipe: R,
+      ) => cv({ extend: [recipe, sibling] }).getVariants().size;
+      expect(readSize(disclosure)).toBeUndefined();
+    });
+
+    test("a recipe can restore a value that its sibling extends disable", () => {
+      const left = cv({ variants: { tone: { loud: "a", calm: "b" } } });
+      const right = cv({
+        extend: [left],
+        variants: { tone: { loud: null } },
+      });
+      const recipe = cv({
+        extend: [left, right],
+        variants: { tone: { loud: "c" } },
+      });
+      expectTypeOf(recipe.getVariants)
+        .parameter(0)
+        .toEqualTypeOf<{ tone?: "loud" | "calm" | undefined } | undefined>();
+      expect(recipe.class({ tone: "loud" })).toBe(cls("a c"));
     });
 
     test("extend deduplicates nested diamonds and direct ancestors", () => {

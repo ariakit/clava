@@ -344,8 +344,54 @@ export type RecipeLike<Base extends Recipe<any, any, any>, Candidate> = [
   : never;
 
 type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
-  ? ExtractVariants<First> & MergeExtendedVariants<Rest>
+  ? Rest extends readonly []
+    ? ExtractVariants<First>
+    : MergeSiblingVariantMaps<
+        ExtractVariants<First>,
+        MergeExtendedVariants<Rest>
+      >
   : {};
+
+// A plain `A & B` is not enough for siblings. TypeScript reduces an object type
+// to `never` when a shared property has disjoint types, which drops every other
+// value or variant in it, not only the one in conflict.
+type MergeSiblingValue<A, B> = [A & B] extends [never]
+  ? [A] extends [null]
+    ? null
+    : [B] extends [null]
+      ? null
+      : A | B
+  : A & B;
+
+type IsPlainRecord<T> = T extends readonly unknown[] | ((...args: any[]) => any)
+  ? false
+  : T extends Record<string, any>
+    ? true
+    : false;
+
+// Distributes over unions because `Omit` and `keyof` on a union only keep the
+// keys common to its members, which would drop values that `A & B` preserves.
+type MergeSiblingDefinition<A, B> = A extends unknown
+  ? B extends unknown
+    ? [IsPlainRecord<A>, IsPlainRecord<B>] extends [true, true]
+      ? Omit<A, keyof B> &
+          Omit<B, keyof A> & {
+            [K in keyof A & keyof B]: MergeSiblingValue<A[K], B[K]>;
+          }
+      : MergeSiblingValue<A, B>
+    : never
+  : never;
+
+// Distributes so that variant reads stay resolvable when a sibling is generic,
+// and so that each sibling adds less instantiation depth on long `extend` lists.
+type MergeSiblingVariantMaps<A, B> = A extends unknown
+  ? B extends unknown
+    ? Omit<A, keyof B> &
+        Omit<B, keyof A> & {
+          [K in keyof A & keyof B]: MergeSiblingDefinition<A[K], B[K]>;
+        }
+    : never
+  : never;
 
 // Returns a recipe's effective variants so an intermediate recipe's
 // static variant hides a grandparent's function variant from descendants.
