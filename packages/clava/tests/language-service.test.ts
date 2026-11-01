@@ -128,6 +128,18 @@ button({
 `;
 }
 
+function getSiblingFixtureSource() {
+  return `import { cv } from "./src/index.ts";
+
+const first = cv({ variants: { size: { sm: "a", lg: "b" } } });
+const second = cv({ variants: { size: { lg: "c", sm: "d" } } });
+
+cv({ extend: [first, second] })({
+  size: "sm",
+});
+`;
+}
+
 afterEach(() => {
   while (tempDirs.length) {
     const tempDir = tempDirs.pop();
@@ -188,5 +200,43 @@ describe("TypeScript language service", () => {
     expect(renameStarts).toHaveLength(2);
     expect(renameStarts).toContain(definitionStart);
     expect(renameStarts).toContain(usageStart);
+  });
+
+  test("goes to each sibling definition from a shared variant prop usage", () => {
+    const fixture = createLanguageServiceFixture(getSiblingFixtureSource());
+    const firstStart = getFixturePosition(fixture.consumerSource, "size: { sm");
+    const secondStart = getFixturePosition(
+      fixture.consumerSource,
+      "size: { lg",
+    );
+    const usageStart = getFixturePosition(fixture.consumerSource, 'size: "sm"');
+    const definitions =
+      fixture.service.getDefinitionAtPosition(
+        fixture.consumerFile,
+        usageStart + 1,
+      ) ?? [];
+
+    expect(definitions.map((definition) => definition.textSpan.start)).toEqual(
+      expect.arrayContaining([firstStart, secondStart]),
+    );
+  });
+
+  test("completes class and style in a value override over siblings", () => {
+    const fixture = createLanguageServiceFixture(
+      `${getSiblingFixtureSource()}
+cv({ extend: [first, second], variants: { size: { sm: {  } } } });
+`,
+    );
+    const position =
+      getFixturePosition(fixture.consumerSource, "sm: {  }") + "sm: { ".length;
+    const completions = fixture.service.getCompletionsAtPosition(
+      fixture.consumerFile,
+      position,
+      {},
+    );
+    const names = completions?.entries.map((entry) => entry.name);
+
+    expect(names).toEqual(expect.arrayContaining(["class", "style"]));
+    expect(names).toHaveLength(2);
   });
 });
