@@ -285,6 +285,15 @@ export interface Recipe<
 
 export type AnyRecipe = Recipe<any, any, any> | ModalRecipe<any, any>;
 
+// Resolves to `Recipe<V, E>`. TypeScript skips generic calls that return
+// callable objects in the first inference pass of the outer call, so an inline
+// `cv()` in `extend` left `E` at its `[]` default. An indexed access avoids
+// that skip and keeps a contextual `AnyRecipe` from inferring `any`.
+// https://github.com/ariakit/clava/issues/626
+export type InferredRecipe<V extends Variants, E extends AnyRecipe[]> = {
+  recipe: Recipe<V, E>;
+}[[V, E] extends [unknown, unknown] ? "recipe" : never];
+
 // Derive keys from the arrays, not getVariants: its base return constraint can
 // hide added keys when a generic recipe is combined with its default recipe.
 type RecipeVariantKeys<T> = T extends {
