@@ -343,55 +343,35 @@ export type RecipeLike<Base extends Recipe<any, any, any>, Candidate> = [
     }
   : never;
 
-type MergeExtendedVariants<T> = T extends readonly [infer First, ...infer Rest]
-  ? Rest extends readonly []
-    ? ExtractVariants<First>
-    : MergeSiblingVariantMaps<
-        ExtractVariants<First>,
-        MergeExtendedVariants<Rest>
-      >
+// Intersecting siblings reduces the whole object type to never when a shared
+// key has disjoint types and one of them is a unit type, such as string and
+// null. Props read only whether a value is disabled, so erase the rest. An
+// explicit never still disables the key for every sibling without reducing the
+// object type.
+type NormalizeSiblingValue<T> = T extends null ? never : VariantValue;
+
+type NormalizeSiblingDefinition<T> = T extends null
+  ? never
+  : T extends undefined | ((...args: any[]) => any) | readonly unknown[]
+    ? T
+    : T extends Record<string, any>
+      ? { [K in keyof T]: NormalizeSiblingValue<T[K]> }
+      : string;
+
+type NormalizeSiblingVariants<T> = {
+  [K in keyof T]: NormalizeSiblingDefinition<T[K]>;
+};
+
+type MergeSiblingVariants<T> = T extends readonly [infer First, ...infer Rest]
+  ? NormalizeSiblingVariants<ExtractVariants<First>> &
+      MergeSiblingVariants<Rest>
   : {};
 
-// A plain `A & B` is not enough for siblings. TypeScript reduces an object type
-// to `never` when a shared property has disjoint types, which drops every other
-// value or variant in it, not only the one in conflict.
-type MergeSiblingValue<A, B> = [A & B] extends [never]
-  ? [A] extends [null]
-    ? null
-    : [B] extends [null]
-      ? null
-      : A | B
-  : A & B;
-
-type IsPlainRecord<T> = T extends readonly unknown[] | ((...args: any[]) => any)
-  ? false
-  : T extends Record<string, any>
-    ? true
-    : false;
-
-// Distributes over unions because `Omit` and `keyof` on a union only keep the
-// keys common to its members, which would drop values that `A & B` preserves.
-type MergeSiblingDefinition<A, B> = A extends unknown
-  ? B extends unknown
-    ? [IsPlainRecord<A>, IsPlainRecord<B>] extends [true, true]
-      ? Omit<A, keyof B> &
-          Omit<B, keyof A> & {
-            [K in keyof A & keyof B]: MergeSiblingValue<A[K], B[K]>;
-          }
-      : MergeSiblingValue<A, B>
-    : never
-  : never;
-
-// Distributes so that variant reads stay resolvable when a sibling is generic,
-// and so that each sibling adds less instantiation depth on long `extend` lists.
-type MergeSiblingVariantMaps<A, B> = A extends unknown
-  ? B extends unknown
-    ? Omit<A, keyof B> &
-        Omit<B, keyof A> & {
-          [K in keyof A & keyof B]: MergeSiblingDefinition<A[K], B[K]>;
-        }
-    : never
-  : never;
+// A single extend can't conflict. Skipping normalization also keeps long chains
+// of single extends within the instantiation depth limit.
+type MergeExtendedVariants<T> = T extends readonly [infer Only]
+  ? ExtractVariants<Only>
+  : MergeSiblingVariants<T>;
 
 // Returns a recipe's effective variants so an intermediate recipe's
 // static variant hides a grandparent's function variant from descendants.
@@ -406,13 +386,15 @@ type MergeVariantDefinition<Child, Parent> = Child extends (
   ...args: any[]
 ) => any
   ? Child
-  : Parent extends (...args: any[]) => any
+  : [Parent] extends [never]
     ? Child
-    : Child extends Record<string, any>
-      ? Parent extends Record<string, any>
-        ? Omit<Parent, keyof Child> & Child
-        : Child
-      : Child;
+    : Parent extends (...args: any[]) => any
+      ? Child
+      : Child extends Record<string, any>
+        ? Parent extends Record<string, any>
+          ? Omit<Parent, keyof Child> & Child
+          : Child
+        : Child;
 
 type MergeVariantMaps<Child, Parent> = Omit<Parent, keyof Child> &
   Child & {

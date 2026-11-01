@@ -1,5 +1,6 @@
 import { describe, expectTypeOf, test } from "vitest";
 import { cv } from "../src/index.ts";
+import type { AnyRecipe } from "../src/types.ts";
 
 const callback = (value: string) => value.toUpperCase();
 
@@ -432,6 +433,183 @@ describe("variants type inference", () => {
     child({
       // @ts-expect-error size was disabled
       size: 1,
+    });
+  });
+
+  describe("sibling extends", () => {
+    const reader = cv({ variants: { tone: { loud: "a", calm: "b" } } });
+    const filtered = cv({
+      extend: [reader],
+      variants: { tone: { loud: null } },
+    });
+    const other = cv({ variants: { tone: { loud: "x", calm: "y" } } });
+
+    test("sibling that disables a value keeps the other values", () => {
+      const filteredLast = cv({ extend: [other, filtered] });
+      const filteredFirst = cv({ extend: [filtered, other] });
+      expectTypeOf(filteredLast.getVariants()).toEqualTypeOf<{
+        tone?: "calm";
+      }>();
+      expectTypeOf(filteredFirst.getVariants()).toEqualTypeOf<{
+        tone?: "calm";
+      }>();
+      filteredLast({ tone: "calm" });
+      filteredFirst({ tone: "calm" });
+      filteredLast({
+        // @ts-expect-error a sibling disabled loud
+        tone:
+          // no error
+          "loud",
+      });
+      filteredFirst({
+        // @ts-expect-error a sibling disabled loud
+        tone:
+          // no error
+          "loud",
+      });
+    });
+
+    test("nested recipe keeps the merged sibling values", () => {
+      const merged = cv({ extend: [other, filtered] });
+      const recipe = cv({
+        extend: [merged],
+        variants: { tone: { soft: "z" } },
+        defaultVariants: { tone: "calm" },
+      });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        tone?: "calm" | "soft";
+      }>();
+    });
+
+    test("sibling that disables a variant keeps the other variants", () => {
+      const enabled = cv({ variants: { flag: "on", size: { sm: "sm" } } });
+      const disabled = cv({ extend: [enabled], variants: { flag: null } });
+      const recipe = cv({ extend: [enabled, disabled] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        flag?: never;
+        size?: "sm";
+      }>();
+      recipe({ size: "sm" });
+      recipe({
+        // @ts-expect-error a sibling disabled flag
+        flag: true,
+      });
+    });
+
+    test("sibling boolean values keep their shared value", () => {
+      const yes = cv({ variants: { state: { on: true, off: "yes" } } });
+      const no = cv({ variants: { state: { on: false, off: "no" } } });
+      const recipe = cv({ extend: [yes, no] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        state?: "on" | "off";
+      }>();
+    });
+
+    test("recipe can enable a variant that a sibling disabled", () => {
+      const enabled = cv({ variants: { flag: "on", size: { sm: "sm" } } });
+      const disabled = cv({ extend: [enabled], variants: { flag: null } });
+      const merged = cv({ extend: [enabled, disabled] });
+      const recipe = cv({
+        extend: [merged],
+        variants: { flag: { yes: "yes" } },
+      });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        flag?: "yes";
+        size?: "sm";
+      }>();
+    });
+
+    test("any-typed sibling value stays enabled", () => {
+      const styles: any = { sm: "css-sm" };
+      const untyped = cv({ variants: { size: { sm: styles.sm, lg: "lg" } } });
+      const typed = cv({ variants: { size: { sm: "sm", lg: "lg" } } });
+      const recipe = cv({ extend: [untyped, typed] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        size?: "sm" | "lg";
+      }>();
+    });
+
+    test("nullable sibling variant keeps its declared values", () => {
+      const definition = { sm: "x" } as null | { sm: string };
+      const base = cv({ variants: { size: { sm: "a" } } });
+      const maybe = cv({ variants: { size: definition } });
+      const recipe = cv({ extend: [base, maybe] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        size?: "sm";
+      }>();
+      recipe({
+        // @ts-expect-error charAt isn't a declared value
+        size: "charAt",
+      });
+    });
+
+    test("disabled variant stays disabled in a nested sibling merge", () => {
+      const enabled = cv({ variants: { flag: "on", size: { sm: "sm" } } });
+      const disabled = cv({ extend: [enabled], variants: { flag: null } });
+      const merged = cv({ extend: [enabled, disabled] });
+      const unrelated = cv({ variants: { gap: { sm: "g" } } });
+      const recipe = cv({ extend: [merged, unrelated] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        flag?: never;
+        size?: "sm";
+        gap?: "sm";
+      }>();
+    });
+
+    test("any-typed sibling definition stays untyped", () => {
+      const sizes: any = { sm: "css-sm" };
+      const untyped = cv({ variants: { size: sizes } });
+      const unrelated = cv({ variants: { gap: { sm: "g" } } });
+      const recipe = cv({ extend: [untyped, unrelated] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        size?: unknown;
+        gap?: "sm";
+      }>();
+    });
+
+    test("any-typed sibling recipe keeps the shared values", () => {
+      const untyped: AnyRecipe = cv({ variants: { size: { sm: "a" } } });
+      const typed = cv({ variants: { size: { sm: "b" } } });
+      const recipe = cv({ extend: [untyped, typed] });
+      recipe({ size: "sm" });
+    });
+
+    test("sibling function variant keeps its parameter type", () => {
+      const scale = cv({ variants: { size: (value: number) => `s-${value}` } });
+      const unrelated = cv({ variants: { gap: { sm: "g" } } });
+      const recipe = cv({ extend: [scale, unrelated] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        size?: number;
+        gap?: "sm";
+      }>();
+    });
+
+    test("optional sibling variant keeps its declared values", () => {
+      const variants: { size?: { sm: string } } = { size: { sm: "a" } };
+      const optional = cv({ variants });
+      const required = cv({ variants: { size: { sm: "b" } } });
+      const recipe = cv({ extend: [optional, required] });
+      recipe({ size: "sm" });
+      recipe({
+        // @ts-expect-error charAt isn't a declared value
+        size: "charAt",
+      });
+    });
+
+    test("sibling scalar boolean variants stay enabled", () => {
+      const yes = cv({ variants: { flag: true } });
+      const no = cv({ variants: { flag: false } });
+      const recipe = cv({ extend: [yes, no] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{ flag?: boolean }>();
+    });
+
+    test("sibling values merge across three recipes", () => {
+      const third = cv({ variants: { tone: { soft: "z" }, gap: { sm: "g" } } });
+      const recipe = cv({ extend: [other, filtered, third] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        tone?: "calm" | "soft";
+        gap?: "sm";
+      }>();
     });
   });
 });
