@@ -297,3 +297,38 @@ export const jsxButton = customCv({
   },
   60_000,
 );
+
+test.each(["tsc", "tsc6"])(
+  "exported splitProps and recipe members emit declarations with %s",
+  async (compiler) => {
+    await withPackageBuildLock(async () => {
+      await buildPackage();
+
+      const diagnostics = await getDeclarationDiagnostics(
+        compiler,
+        `import { cv, splitProps } from "clava";
+
+const button = cv({ variants: { size: { sm: "s" } } });
+
+export const aliasSplit = splitProps;
+export const classFn = button.class;
+export const styleFn = button.style;
+export const getVariants = button.getVariants;
+export const jsxClassFn = button.jsx.class;
+export const jsxStyleFn = button.jsx.style;
+export const jsxGetVariants = button.jsx.getVariants;
+export const htmlClassFn = button.html.class;
+export const htmlStyleFn = button.html.style;
+export const htmlObjClassFn = button.htmlObj.class;
+export const htmlObjStyleFn = button.htmlObj.style;
+export const jsxStyle = button.jsx.style();
+export const htmlObjStyle = button.htmlObj.style();
+export const defaultStyle = button.style();
+`,
+      );
+
+      expect(diagnostics).toBe("");
+    });
+  },
+  60_000,
+);

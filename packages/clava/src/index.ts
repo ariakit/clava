@@ -11,9 +11,11 @@ import type {
   ClassValue,
   DefaultVariants,
   ExtendableVariants,
+  HTMLCSSProperties,
   HTMLObjProps,
   HTMLProps,
   InferredRecipe,
+  JSXCSSProperties,
   JSXProps,
   KeySourceRecipe,
   MergeVariants,
@@ -293,9 +295,13 @@ export type {
   JSXProps,
   HTMLProps,
   HTMLObjProps,
+  JSXCSSProperties,
+  HTMLCSSProperties,
   ModalRecipe,
   Recipe,
   RecipeLike,
+  RecipeProps,
+  SplitPropsFunction,
 };
 
 /**

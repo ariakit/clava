@@ -661,7 +661,7 @@ const button: Recipe<{ size: { sm: string; lg: string } }> = cv({
 });
 ```
 
-The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleClassValue`, `JSXProps`, `HTMLProps`, `HTMLObjProps`, and `CVConfig`.
+The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleClassValue`, `JSXProps`, `HTMLProps`, `HTMLObjProps`, `JSXCSSProperties`, `HTMLCSSProperties`, and `CVConfig`.
 
 ## Comparison
 
@@ -737,9 +737,11 @@ Both groups resolve one fixed prop set on every iteration, so every package with
 
 `ModalRecipe<V, R>` is the type of `recipe.jsx`, `recipe.html`, and `recipe.htmlObj`, where `V` is the resolved variant map and `R` is the output props.
 
+`RecipeProps<V>` is the type of the props that a recipe accepts, where `V` is the resolved variant map.
+
 `VariantPropsWithRecipe<Base, R, Name = "recipe">` combines the selected recipe's variant props with a recipe prop. The prop is optional when `R` is assignable to `Base` and required otherwise. `Name` selects the prop name.
 
-`splitProps(props, source1, ...sources)` returns one object per source plus a final rest object.
+`splitProps(props, source1, ...sources)` returns one object per source plus a final rest object. `SplitPropsFunction` is its type.
 
 `cx(...classes)` joins class values with `clsx` and applies the factory's `transformClass`.
 
