@@ -28,9 +28,33 @@ interface CustomProperties {
   [key: `--${string}`]: string | number;
 }
 
+/**
+ * The style object returned by a recipe's `.jsx()` mode. It uses camelCase CSS
+ * property names and supports CSS custom properties.
+ *
+ * @example
+ * ```ts
+ * import { type JSXCSSProperties, cv } from "clava";
+ *
+ * const button = cv({ style: { fontSize: "16px" } });
+ * const style: JSXCSSProperties = button.jsx.style();
+ * ```
+ */
 export interface JSXCSSProperties
   extends CSS.Properties<string | number>, CustomProperties {}
 
+/**
+ * The style object returned by a recipe's `.htmlObj()` mode. It uses hyphenated
+ * CSS property names and supports CSS custom properties.
+ *
+ * @example
+ * ```ts
+ * import { type HTMLCSSProperties, cv } from "clava";
+ *
+ * const button = cv({ style: { fontSize: "16px" } });
+ * const style: HTMLCSSProperties = button.htmlObj.style();
+ * ```
+ */
 export interface HTMLCSSProperties
   extends CSS.PropertiesHyphen<string | number>, CustomProperties {}
 
@@ -143,6 +167,19 @@ export type NullableRecipeResult = {
   [K in AllRecipeResultKeys]?: RecipeResultValue<K> | null;
 };
 
+/**
+ * The props that a recipe accepts for the variant map `V`: its variant values
+ * plus `class`, `className`, and `style`.
+ *
+ * @example
+ * ```ts
+ * import type { RecipeProps } from "clava";
+ *
+ * type Variants = { size: { sm: string; lg: string } };
+ *
+ * const props: RecipeProps<Variants> = { size: "sm", class: "button" };
+ * ```
+ */
 export type RecipeProps<V = {}> = VariantValues<V> & NullableRecipeResult;
 
 export type GetVariants<V> = (variants?: VariantValues<V>) => VariantValues<V>;
@@ -222,7 +259,16 @@ type BuildSourceResults<
     ]
   : [Omit<T, UsedKeys & (string | number | symbol)>];
 
-// Standalone splitProps function type - first source is required
+/**
+ * The type of `splitProps`. The first key source is required.
+ *
+ * @example
+ * ```ts
+ * import { type SplitPropsFunction, splitProps } from "clava";
+ *
+ * const split: SplitPropsFunction = splitProps;
+ * ```
+ */
 export type SplitPropsFunction = <
   T,
   const S1 extends KeySource,
