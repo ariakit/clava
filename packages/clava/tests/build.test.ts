@@ -9,6 +9,7 @@ import {
   stripBundleRegionComments,
 } from "scripts/src/bundle-size.ts";
 import { withPackageBuildLock } from "test-utils/build-lock";
+import ts from "typescript";
 import { build } from "vite";
 import { expect, test } from "vitest";
 
@@ -154,5 +155,46 @@ test("vite tree shakes independent exports", async () => {
 
     expect(Buffer.byteLength(cxCode)).toBeLessThan(600);
     expect(Buffer.byteLength(splitPropsCode)).toBeLessThan(1500);
+  });
+}, 60_000);
+
+test("generic wrappers with inferred return types emit declarations", async () => {
+  await withPackageBuildLock(async () => {
+    await buildPackage();
+
+    const tempDir = await mkdtemp(join(tmpdir(), "clava-declarations-"));
+    try {
+      const consumer = join(tempDir, "consumer.ts");
+      await writeFile(
+        consumer,
+        `import { cv } from "clava";
+
+export function wrap<V extends Record<string, string>>(variants: V) {
+  return cv({ variants });
+}
+`,
+      );
+      const program = ts.createProgram([consumer], {
+        declaration: true,
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        paths: { clava: [join(root, "dist/index.d.ts")] },
+        skipLibCheck: true,
+        strict: true,
+        target: ts.ScriptTarget.ES2020,
+        types: [],
+      });
+      const { diagnostics } = program.emit(
+        undefined,
+        () => {},
+        undefined,
+        true,
+      );
+
+      expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([]);
+      expect(ts.getPreEmitDiagnostics(program)).toEqual([]);
+    } finally {
+      await rm(tempDir, { force: true, recursive: true });
+    }
   });
 }, 60_000);

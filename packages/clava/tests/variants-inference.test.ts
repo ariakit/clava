@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, test } from "vitest";
-import { cv } from "../src/index.ts";
-import type { AnyRecipe, RecipeLike } from "../src/types.ts";
+import { type CVConfig, create, cv } from "../src/index.ts";
+import type { AnyRecipe, Recipe, RecipeLike, Variants } from "../src/types.ts";
 
 const callback = (value: string) => value.toUpperCase();
 
@@ -644,5 +644,140 @@ describe("variants type inference", () => {
       ) => cv({ extend: [recipe, sibling] }).getVariants().size;
       expectTypeOf(readSize(disclosure)).toEqualTypeOf<"sm" | undefined>();
     });
+  });
+});
+
+function wrap<V extends Variants = {}, const E extends AnyRecipe[] = []>(
+  config: CVConfig<V, E>,
+): Recipe<V, E> {
+  return cv(config);
+}
+
+function createFactory<V extends Variants>(variants: V) {
+  const recipe = cv({ variants });
+  return { keys: recipe.variantKeys, getVariants: recipe.getVariants };
+}
+
+function createExtended<const E extends AnyRecipe[]>(extend: E) {
+  return cv({ extend });
+}
+
+function dropExtend<V extends Variants, const E extends AnyRecipe[]>(
+  config: CVConfig<V, E>,
+): Recipe<V> {
+  // @ts-expect-error the return type omits E
+  return cv(config);
+}
+
+function dropVariants<V extends Variants, const E extends AnyRecipe[]>(
+  config: CVConfig<V, E>,
+): Recipe<{}, E> {
+  // @ts-expect-error the return type omits V
+  return cv(config);
+}
+
+describe("inline recipes in extend", () => {
+  test("infers a single inline recipe", () => {
+    const button = cv({
+      extend: [cv({ variants: { size: { sm: "sm" } } })],
+    });
+    expectTypeOf(button.getVariants()).toEqualTypeOf<{
+      size?: "sm";
+    }>();
+    expectTypeOf(button).toEqualTypeOf<
+      Recipe<{}, [Recipe<{ size: { sm: string } }>]>
+    >();
+  });
+
+  test("infers an inline recipe next to a stored recipe", () => {
+    const size = cv({ variants: { size: { sm: "sm" } } });
+    const button = cv({
+      extend: [size, cv({ variants: { other: "other" } })],
+      variants: { own: "own" },
+    });
+    expectTypeOf(button.getVariants()).toEqualTypeOf<{
+      size?: "sm";
+      other?: boolean;
+      own?: boolean;
+    }>();
+    button({
+      // @ts-expect-error invalid size
+      size:
+        // no error
+        "lg",
+    });
+  });
+
+  test("infers nested inline recipes", () => {
+    const button = cv({
+      extend: [cv({ extend: [cv({ variants: { size: { sm: "sm" } } })] })],
+    });
+    expectTypeOf(button.getVariants()).toEqualTypeOf<{
+      size?: "sm";
+    }>();
+  });
+
+  test("infers an inline call to a wrapper that is generic only in E", () => {
+    const size = cv({ variants: { size: { sm: "sm" } } });
+    const button = cv({ extend: [createExtended([size])] });
+    expectTypeOf(button.getVariants()).toEqualTypeOf<{ size?: "sm" }>();
+  });
+
+  test("infers inline recipes with create()", () => {
+    const { cv: customCV } = create();
+    const button = customCV({
+      extend: [customCV({ variants: { size: { sm: "sm" } } })],
+    });
+    expectTypeOf(button.getVariants()).toEqualTypeOf<{
+      size?: "sm";
+    }>();
+  });
+
+  test("types defaults and refine from an inline recipe", () => {
+    cv({
+      extend: [cv({ variants: { size: { sm: "sm" } } })],
+      defaultVariants: { size: "sm" },
+      refine: ({ variants }) => {
+        expectTypeOf(variants.size).toEqualTypeOf<"sm" | undefined>();
+      },
+    });
+  });
+
+  test("rejects an inline value that is not a recipe", () => {
+    // The call stays unexecuted because invalid extend values have no runtime
+    // contract.
+    expectTypeOf(() =>
+      cv({
+        extend: [
+          // @ts-expect-error not a recipe
+          "recipe",
+        ],
+      }),
+    ).toBeFunction();
+  });
+
+  test("keeps generic variants in cv() results", () => {
+    const factory = createFactory({ size: { sm: "sm" } });
+    expectTypeOf(factory.keys).toEqualTypeOf<"size"[]>();
+    factory.getVariants({
+      // @ts-expect-error invalid size
+      size:
+        // no error
+        "lg",
+    });
+    expectTypeOf(dropExtend).toBeFunction();
+    expectTypeOf(dropVariants).toBeFunction();
+  });
+
+  test("keeps annotated and generic recipes assignable", () => {
+    const button: Recipe<{ size: { sm: string } }> = cv({
+      variants: { size: { sm: "sm" } },
+    });
+    expectTypeOf(button.getVariants()).toEqualTypeOf<{
+      size?: "sm";
+    }>();
+    expectTypeOf(
+      wrap({ extend: [cv({ variants: { own: "own" } })] }).getVariants(),
+    ).toEqualTypeOf<{ own?: boolean }>();
   });
 });

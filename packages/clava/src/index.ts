@@ -13,6 +13,7 @@ import type {
   ExtendableVariants,
   HTMLObjProps,
   HTMLProps,
+  InferredRecipe,
   JSXProps,
   KeySourceRecipe,
   MergeVariants,
@@ -2177,7 +2178,7 @@ export function create(params: CreateParams = {}) {
 
   const cv = <V extends Variants = {}, const E extends AnyRecipe[] = []>(
     config: CVConfig<V, E> = {},
-  ): Recipe<V, E> => buildRecipe(config).recipe;
+  ): InferredRecipe<V, E> => buildRecipe(config).recipe;
 
   return { cv, cx };
 }

@@ -221,6 +221,25 @@ describe("TypeScript language service", () => {
     );
   });
 
+  test("shows plain recipe types for inline recipes in extend", () => {
+    const fixture = createLanguageServiceFixture(
+      `import { cv } from "./src/index.ts";
+
+const inline = cv({ extend: [cv({ variants: { size: { sm: "a" } } })] });
+`,
+    );
+    const quickInfo = fixture.service.getQuickInfoAtPosition(
+      fixture.consumerFile,
+      getFixturePosition(fixture.consumerSource, "inline"),
+    );
+    const display = ts.displayPartsToString(quickInfo?.displayParts);
+
+    expect(display).toContain("const inline: Recipe<{}, [Recipe<{");
+    expect(display).not.toContain("NoInfer");
+    expect(display).not.toContain("InferredRecipe");
+    expect(display).not.toContain("any");
+  });
+
   test("completes class and style in a value override over siblings", () => {
     const fixture = createLanguageServiceFixture(
       `${getSiblingFixtureSource()}
