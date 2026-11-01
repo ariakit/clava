@@ -326,7 +326,7 @@ const plainButton = cv({
 });
 ```
 
-Extends run in order, so a recipe listed before this one in `extend` can still add a class for the removed value.
+Extends run in order, so a recipe listed before this one in `extend` can still add a class for the removed value. A recipe that extends this one can't restore the value, even when it declares the value again.
 
 A recipe that extends a disabled variant or value can define it again. The new definition applies, and the disabled definitions from the recipes it extends stay removed:
 

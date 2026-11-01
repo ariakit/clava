@@ -2333,6 +2333,112 @@ for (const config of Object.values(CONFIGS)) {
           expect(baseLast.getVariants()).toEqual({});
           expect(baseLast.class()).toBe("");
         });
+
+        // A value that an extend disables stays removed, even when a later
+        // recipe declares it again. Explicit and static values already do.
+        describe("value set after the extend that disables it", () => {
+          const redeclared = {
+            tone: { loud: "top-loud", calm: "top-calm" },
+          };
+
+          test("removes an explicit value", () => {
+            const recipe = cv({
+              extend: [createDisabledValue()],
+              variants: redeclared,
+            });
+            expect(recipe.getVariants({ tone: "loud" })).toEqual({});
+            expect(recipe.class({ tone: "loud" })).toBe("");
+          });
+
+          test("removes a static default", () => {
+            const recipe = cv({
+              extend: [createDisabledValue()],
+              variants: redeclared,
+              defaultVariants: { tone: "loud" },
+            });
+            expect(recipe.getVariants()).toEqual({});
+            expect(recipe.class()).toBe("");
+          });
+
+          test("removes a computed default", () => {
+            const recipe = cv({
+              extend: [createDisabledValue()],
+              variants: redeclared,
+              defaultVariants: { tone: () => "loud" as const },
+            });
+            expect(recipe.getVariants()).toEqual({});
+            expect(recipe.class()).toBe("");
+          });
+
+          test("keeps a computed default that isn't disabled", () => {
+            const recipe = cv({
+              extend: [createDisabledValue()],
+              variants: redeclared,
+              defaultVariants: { tone: () => "calm" as const },
+            });
+            expect(recipe.getVariants()).toEqual({ tone: "calm" });
+            expect(recipe.class()).toBe(cls("leaf-calm top-calm"));
+          });
+
+          test("removes a value from the recipe's own refine", () => {
+            const recipe = cv({
+              extend: [createDisabledValue()],
+              variants: redeclared,
+              refine: ({ setVariants }) => setVariants({ tone: "loud" }),
+            });
+            expect(recipe.getVariants()).toEqual({});
+            expect(recipe.class()).toBe("");
+          });
+
+          test("removes a value from a sibling's refine", () => {
+            const refined = cv({
+              variants: { tone: { loud: "sib-loud", calm: "sib-calm" } },
+              refine: ({ setVariants }) => setVariants({ tone: "loud" }),
+            });
+            const recipe = cv({ extend: [createDisabledValue(), refined] });
+            expect(recipe.getVariants()).toEqual({});
+            expect(recipe.class()).toBe("");
+          });
+
+          test("removes a value through a nested extend", () => {
+            const inner = cv({
+              extend: [createDisabledValue()],
+              variants: redeclared,
+              defaultVariants: { tone: () => "loud" as const },
+            });
+            const recipe = cv({ extend: [inner] });
+            expect(recipe.getVariants()).toEqual({});
+            expect(recipe.class()).toBe("");
+          });
+
+          test("falls back to the default of a sibling's computed value", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const empty = cv({});
+            const inner = cv({
+              extend: [empty],
+              variants: { r: { a: "i-a", c: null } },
+            });
+            const first = cv({
+              extend: [inner],
+              defaultVariants: { r: "a" },
+            });
+            const second = cv({
+              variants: { r: { a: "s-a", c: "s-c" } },
+              defaultVariants: {
+                r: (defaultValue, variants) =>
+                  variants.r === "a" ? "c" : defaultValue,
+              },
+            });
+            const recipe = cv({
+              extend: [first, second],
+              variants: { r: { a: "t-a", c: "t-c" } },
+            });
+            expect(recipe.getVariants()).toEqual({ r: "a" });
+            expect(recipe.class()).toBe(cls("i-a s-a t-a"));
+            expect(warn).not.toHaveBeenCalled();
+            warn.mockRestore();
+          });
+        });
       });
     });
   });

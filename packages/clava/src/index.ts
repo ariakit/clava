@@ -78,6 +78,7 @@ type ResolveRefineOnceFn = (
   protection?: RefineProtection | null,
   defaultResolved?: Record<string, unknown>,
   pass?: RefinePass | null,
+  renderOnly?: boolean,
 ) => Record<string, unknown>;
 
 type ComputedDefaultVariantFn = (
@@ -1814,6 +1815,7 @@ export function create(params: CreateParams = {}) {
         protection,
         defaultResolved = resolved,
         pass,
+        renderOnly = false,
       ) => {
         let workingResolved = resolved;
 
@@ -1834,6 +1836,7 @@ export function create(params: CreateParams = {}) {
               protection,
               defaultResolved,
               pass,
+              renderOnly,
             );
             if (pass && pendingFrame) {
               pass.frames.pop();
@@ -1856,6 +1859,8 @@ export function create(params: CreateParams = {}) {
             filterOwnDisabledChainValues(pass.chainValues, defaultResolved);
           }
         }
+
+        if (renderOnly) return workingResolved;
 
         if (computedDefaultCount > 0) {
           workingResolved = runComputedDefaults(
@@ -1913,11 +1918,22 @@ export function create(params: CreateParams = {}) {
 
                 // The first pass settles only when it changed nothing, for the
                 // reason given in the compute loop above.
-                if (
-                  nextResolved === workingResolved ||
-                  (pass && areVariantsEqual(workingResolved, nextResolved))
-                ) {
+                if (nextResolved === workingResolved) {
                   return nextResolved;
+                }
+                if (pass && areVariantsEqual(workingResolved, nextResolved)) {
+                  // Match the final pass of the compute loop above, which
+                  // removes a disabled value that a callback set after the
+                  // extend that disables it.
+                  return resolveRefineOnce(
+                    nextResolved,
+                    userVariantProps,
+                    filterOwnVariants,
+                    protection,
+                    defaultResolved,
+                    null,
+                    true,
+                  );
                 }
 
                 // `remaining` is checked first for the reason given in the
