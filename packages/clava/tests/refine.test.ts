@@ -23,10 +23,32 @@ function extendRecipe(
   return extended;
 }
 
+// Older Clava copies expose metadata without `resolveVariants`.
+function removeResolveVariants(recipe: AnyRecipe) {
+  Reflect.deleteProperty(Reflect.get(recipe, "__meta"), "resolveVariants");
+  return recipe;
+}
+
 for (const config of Object.values(CONFIGS)) {
   const mode = getConfigMode(config);
   const cv = createCVFromConfig(config);
   const cls = getConfigTransformClass(config);
+  const createTone = (tone: "loud" | "calm") =>
+    cv({
+      variants: { tone: { loud: "loud", calm: "calm" } },
+      defaultVariants: { tone: () => tone },
+    });
+  const createReader = () =>
+    cv({
+      variants: {
+        tone: { loud: "reader-loud", calm: "reader-calm" },
+        accent: { true: "accent" },
+      },
+      defaultVariants: {
+        accent: (defaultValue, variants) =>
+          variants.tone === "loud" ? true : defaultValue,
+      },
+    });
 
   describe(getConfigDescription(config), () => {
     test("refine", () => {
@@ -2155,6 +2177,64 @@ for (const config of Object.values(CONFIGS)) {
       expect(getStyleClass(props)).toEqual({
         class: cls("lg"),
         fontSize: expect.toBeOneOf(["20", "20px"]),
+      });
+    });
+
+    describe("getVariants matches render with disabled values", () => {
+      test("filters after an extend without callbacks", () => {
+        const plain = cv({ variants: { gap: { true: "gap" } } });
+        const filtered = cv({
+          extend: [plain, createReader()],
+          variants: { tone: { loud: null } },
+        });
+        const loud = cv({ extend: [createTone("loud"), filtered] });
+        expect(loud.getVariants()).toEqual({});
+        expect(loud.class()).toBe("");
+        const calm = cv({ extend: [createTone("calm"), filtered] });
+        expect(calm.getVariants()).toEqual({ tone: "calm" });
+        expect(calm.class()).toBe(cls("calm reader-calm"));
+      });
+
+      test("filters inside an extend without callbacks", () => {
+        const leaf = cv({ variants: { tone: { loud: "leaf", calm: "leaf" } } });
+        const filtered = cv({
+          extend: [leaf],
+          variants: { tone: { loud: null } },
+        });
+        const loud = cv({
+          extend: [createTone("loud"), filtered, createReader()],
+        });
+        expect(loud.getVariants()).toEqual({});
+        expect(loud.class()).toBe("");
+        const calm = cv({
+          extend: [createTone("calm"), filtered, createReader()],
+        });
+        expect(calm.getVariants()).toEqual({ tone: "calm" });
+        expect(calm.class()).toBe(cls("calm leaf reader-calm"));
+      });
+
+      test("filters inside a nested extend without callbacks", () => {
+        const leaf = cv({ variants: { tone: { loud: "leaf", calm: "leaf" } } });
+        const filtered = cv({
+          extend: [leaf],
+          variants: { tone: { loud: null } },
+        });
+        const wrapper = cv({ extend: [filtered] });
+        const recipe = cv({
+          extend: [createTone("loud"), wrapper, createReader()],
+        });
+        expect(recipe.getVariants()).toEqual({});
+        expect(recipe.class()).toBe("");
+      });
+
+      test("resolves through extends from an older copy", () => {
+        const plain = removeResolveVariants(
+          cv({ variants: { gap: { true: "gap" } } }),
+        );
+        const tone = removeResolveVariants(createTone("calm"));
+        const recipe = cv({ extend: [plain, tone, createReader()] });
+        expect(recipe.getVariants()).toEqual({ tone: "calm" });
+        expect(recipe.class()).toBe(cls("calm reader-calm"));
       });
     });
   });
