@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, test } from "vitest";
 import { cv } from "../src/index.ts";
-import type { AnyRecipe } from "../src/types.ts";
+import type { AnyRecipe, RecipeLike } from "../src/types.ts";
 
 const callback = (value: string) => value.toUpperCase();
 
@@ -610,6 +610,39 @@ describe("variants type inference", () => {
         tone?: "calm" | "soft";
         gap?: "sm";
       }>();
+    });
+
+    test("union-typed sibling keeps the values of each member", () => {
+      const first = cv({ variants: { size: { sm: "a" } } });
+      const second = cv({ variants: { size: { lg: "b" } } });
+      const third = cv({ variants: { size: { xl: "c" } } });
+      // The cast keeps TypeScript from narrowing the condition to one branch.
+      const recipe = cv({
+        extend: [(false as boolean) ? first : second, third],
+      });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        size?: "sm" | "lg" | "xl";
+      }>();
+    });
+
+    test("union-typed definition keeps the values of each member", () => {
+      // The cast keeps TypeScript from narrowing the definition to one member.
+      const definition = { sm: "a" } as { sm: string } | { lg: string };
+      const first = cv({ variants: { size: definition } });
+      const second = cv({ variants: { size: { xl: "b" } } });
+      const recipe = cv({ extend: [first, second] });
+      expectTypeOf(recipe.getVariants()).toEqualTypeOf<{
+        size?: "sm" | "lg" | "xl";
+      }>();
+    });
+
+    test("generic sibling keeps variant reads", () => {
+      const disclosure = cv({ variants: { open: "a" } });
+      const sibling = cv({ variants: { size: { sm: "b" } } });
+      const readSize = <R extends RecipeLike<typeof disclosure, R>>(
+        recipe: R,
+      ) => cv({ extend: [recipe, sibling] }).getVariants().size;
+      expectTypeOf(readSize(disclosure)).toEqualTypeOf<"sm" | undefined>();
     });
   });
 });
