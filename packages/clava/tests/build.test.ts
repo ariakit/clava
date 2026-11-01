@@ -1,5 +1,14 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -41,6 +50,68 @@ async function bundleProductionEntry(
     await build(createBundleSizeBuildConfig({ entry, root: tempDir }));
 
     return stripBundleRegionComments(await readFile(bundle, "utf8"));
+  } finally {
+    await rm(tempDir, { force: true, recursive: true });
+  }
+}
+
+// Installs the package like pnpm does: each package has its own store folder,
+// and only symlinks connect them. The consumer can't resolve clsx or csstype.
+async function installPackage(tempDir: string) {
+  const modules = join(tempDir, "node_modules");
+  const store = join(modules, ".pnpm");
+  const clavaModules = join(store, "clava/node_modules");
+  const clavaPackage = join(clavaModules, "clava");
+  await mkdir(clavaPackage, { recursive: true });
+  await cp(join(root, "dist"), join(clavaPackage, "dist"), { recursive: true });
+  await cp(join(root, "package.json"), join(clavaPackage, "package.json"));
+  for (const dependency of ["clsx", "csstype"]) {
+    const source = await realpath(join(root, "node_modules", dependency));
+    const target = join(store, dependency, "node_modules", dependency);
+    await cp(source, target, { recursive: true });
+    await symlink(target, join(clavaModules, dependency));
+  }
+  await symlink(clavaPackage, join(modules, "clava"));
+}
+
+// Returns the diagnostics that a compiler reports with `declaration: true`.
+async function getDeclarationDiagnostics(compiler: string, source: string) {
+  const tempDir = await mkdtemp(join(tmpdir(), "clava-declarations-"));
+  try {
+    await installPackage(tempDir);
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ private: true, type: "module" }),
+    );
+    await writeFile(join(tempDir, "consumer.ts"), source);
+    await writeFile(
+      join(tempDir, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: {
+          declaration: true,
+          emitDeclarationOnly: true,
+          module: "nodenext",
+          moduleResolution: "nodenext",
+          outDir: "out",
+          skipLibCheck: true,
+          strict: true,
+          target: "ES2022",
+          types: [],
+        },
+        files: ["consumer.ts"],
+      }),
+    );
+    const bin = join(root, "../../node_modules/.bin", compiler);
+    const result = await exec(bin, ["-p", tempDir, "--pretty", "false"]).catch(
+      // tsc reports diagnostics to stdout and exits with a numeric code. Any
+      // other error, such as a missing binary, must not read as no diagnostics.
+      (error: { code: unknown; stdout: string; stderr: string }) => {
+        if (typeof error.code !== "number") throw error;
+        return error;
+      },
+    );
+    // A compiler that fails to start can exit with a code and only use stderr.
+    return `${result.stdout}${result.stderr}`;
   } finally {
     await rm(tempDir, { force: true, recursive: true });
   }
@@ -198,3 +269,31 @@ export function wrap<V extends Record<string, string>>(variants: V) {
     }
   });
 }, 60_000);
+
+test.each(["tsc", "tsc6"])(
+  "exported create results emit declarations with %s",
+  async (compiler) => {
+    await withPackageBuildLock(async () => {
+      await buildPackage();
+
+      const diagnostics = await getDeclarationDiagnostics(
+        compiler,
+        `import { create } from "clava";
+
+export const customCv = create().cv;
+export const { cv, cx } = create();
+export const factory = create();
+export function createCv() {
+  return create().cv;
+}
+export const jsxButton = customCv({
+  variants: { size: { sm: "sm" } },
+}).jsx;
+`,
+      );
+
+      expect(diagnostics).toBe("");
+    });
+  },
+  60_000,
+);
