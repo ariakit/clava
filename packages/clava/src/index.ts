@@ -1942,6 +1942,10 @@ export function create(params: CreateParams = {}) {
             variantProps,
             false,
           );
+        } else if (canResolveVariants) {
+          // No callback in this chain can restore a removed value, so one pass
+          // reaches the state that render ends with.
+          resolvedVariants = resolveRefineOnce(resolvedVariants, variantProps);
         }
         return resolvedVariants as VariantValues<MergedVariants>;
       };
