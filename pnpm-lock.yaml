@@ -272,8 +272,8 @@ importers:
         specifier: workspace:*
         version: link:../scripts
       solid-js:
-        specifier: 1.9.17
-        version: 1.9.17
+        specifier: 1.9.18
+        version: 1.9.18
       test-utils:
         specifier: workspace:*
         version: link:../test-utils
@@ -1426,8 +1426,8 @@ packages:
     peerDependencies:
       seroval: ^1.0
 
-  seroval@1.6.9:
-    resolution: {integrity: sha512-UeEzHwAK+yl0YLbsvROV1t5yMYEwZZ0CfKYxDvUgS2fO9Vxdf8djqVIB+OuVpuawRNPqw68LE1Du/GMsW2ZPqA==}
+  seroval@1.6.12:
+    resolution: {integrity: sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg==}
     engines: {node: '>=10'}
 
   shell-quote@1.10.0:
@@ -1437,8 +1437,8 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
-  solid-js@1.9.17:
-    resolution: {integrity: sha512-4GAmLOWPfNV8H9Jfn2LSFTpNEG6jiOKPiwd5lnLGQtehHaX6l3TOLzJqQ7mqwB/3k1Yy3zyumFVopmc/tm34ow==}
+  solid-js@1.9.18:
+    resolution: {integrity: sha512-CHGO5YFk6Y9m/1YSxVtKnXfrW7JD3Tmof8HmR4z6TmCPsS8efo8LnzIR8CQh3cUvffqYm6DWyBFfk8dQw1CNQQ==}
 
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
@@ -2301,21 +2301,21 @@ snapshots:
 
   semver@7.8.5: {}
 
-  seroval-plugins@1.6.9(seroval@1.6.9):
+  seroval-plugins@1.6.9(seroval@1.6.12):
     dependencies:
-      seroval: 1.6.9
+      seroval: 1.6.12
 
-  seroval@1.6.9: {}
+  seroval@1.6.12: {}
 
   shell-quote@1.10.0: {}
 
   sisteransi@1.0.5: {}
 
-  solid-js@1.9.17:
+  solid-js@1.9.18:
     dependencies:
       csstype: 3.2.3
-      seroval: 1.6.9
-      seroval-plugins: 1.6.9(seroval@1.6.9)
+      seroval: 1.6.12
+      seroval-plugins: 1.6.9(seroval@1.6.12)
 
   source-map-js@1.2.2: {}
 
