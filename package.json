@@ -33,7 +33,7 @@
     "@types/node": "26.6.6",
     "lefthook": "2.2.2",
     "oxfmt": "0.76.0",
-    "oxlint": "1.90.0",
+    "oxlint": "1.91.0",
     "oxlint-tsgolint": "7.0.2005",
     "scripts": "workspace:*",
     "typescript": "npm:@typescript/typescript6@6.0.2",
