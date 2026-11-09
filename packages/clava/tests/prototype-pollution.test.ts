@@ -223,6 +223,14 @@ test("create ignores a transformClass inherited from Object.prototype", () => {
   expect(cx("button")).toBe("button");
 });
 
+test("create ignores a debug option inherited from Object.prototype", () => {
+  proto.debug = true;
+  const { cv: localCv } = create();
+  expect(localCv({ class: "button" }).jsx()).not.toHaveProperty(
+    "data-clava-debug",
+  );
+});
+
 // Each `cv()` setting is read by a fixed key that the caller may omit, so each
 // one needs its own case: a single unguarded read would otherwise let a
 // polluted prototype configure every recipe.

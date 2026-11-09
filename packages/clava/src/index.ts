@@ -1,5 +1,10 @@
 import clsx, { type ClassValue as ClsxClassValue } from "clsx";
 import {
+  DEBUG_ATTRIBUTE,
+  formatDebugAttribute,
+  isDebugEnabled,
+} from "./debug.ts";
+import {
   REFINE_UNSTABLE_TRACKING_WINDOW,
   type VariantChange,
   accumulateUnstableVariantChanges,
@@ -457,6 +462,12 @@ export interface CVConfig<V extends Variants = {}, E extends AnyRecipe[] = []> {
 
 interface CreateParams {
   transformClass?: (className: string) => string;
+  /**
+   * Whether recipes add a `data-clava-debug` attribute that lists their
+   * resolved variants. Defaults to `true` when `NODE_ENV` is
+   * `"development"`. The attribute is never added in production.
+   */
+  debug?: boolean;
 }
 
 function identityClass(className: string) {
@@ -555,6 +566,10 @@ function splitPropsImpl(
   const sourcesLength = sources.length;
   const results: Record<string, unknown>[] = [];
   let stylingClaimed = selfIsRecipe;
+  // The recipe that claims styling props also receives an incoming debug
+  // attribute, so it can append the value to its own. The rest props keep the
+  // value too, so it still reaches the element through `.class()`.
+  let stylingResult: Record<string, unknown> | null = null;
 
   const selfResult: Record<string, unknown> = {};
   const selfKeysLength = selfKeys.length;
@@ -565,6 +580,9 @@ function splitPropsImpl(
     }
   }
   results.push(selfResult);
+  if (selfIsRecipe) {
+    stylingResult = selfResult;
+  }
 
   // Track effective key arrays for the rest computation — for typical inputs
   // a linear scan beats building a Set up-front.
@@ -596,6 +614,7 @@ function splitPropsImpl(
 
     if (sourceIsRecipe && !stylingClaimed) {
       stylingClaimed = true;
+      stylingResult = sourceResult;
     }
   }
 
@@ -606,6 +625,12 @@ function splitPropsImpl(
   outer: for (let i = 0; i < propKeysLength; i++) {
     const key = propKeys[i];
     if (key === undefined) continue;
+    // Checked in this loop, which already visits every own enumerable key, so
+    // that calls without the attribute don't pay for a separate `hasOwn`
+    // lookup.
+    if (key === DEBUG_ATTRIBUTE && stylingResult) {
+      stylingResult[key] = props[key];
+    }
     for (let g = 0; g < groupCount; g++) {
       const arr = effectiveKeyArrays[g];
       if (arr === undefined) continue;
@@ -697,6 +722,11 @@ export function create(params: CreateParams = {}) {
   // `Object.prototype` could use to rewrite every class string this factory
   // produces, including those of the package-level `cv`.
   const transformClass = getOwn(params, "transformClass") ?? identityClass;
+  // The production check stays here, so bundlers can fold `debug` to `false`
+  // and remove the debug code from production bundles.
+  const debug =
+    process.env.NODE_ENV !== "production" &&
+    isDebugEnabled(getOwn(params, "debug"));
 
   // The root `cx` type lets consumers emit `typeof cx` for an exported result.
   // Otherwise, emit must name clsx's `ClassValue`, which pnpm installs hide.
@@ -1983,7 +2013,11 @@ export function create(params: CreateParams = {}) {
       // assembles className and style with user-provided class/style overrides.
       const computeResult = (
         props: RecipeProps<MergedVariants> = EMPTY_DEFAULTS as RecipeProps<MergedVariants>,
-      ): { className: string; style: StyleValue } => {
+      ): {
+        className: string;
+        style: StyleValue;
+        variants: Record<string, unknown>;
+      } => {
         const propsRecord = props as Record<string, unknown>;
 
         let resolved: Record<string, unknown> = {};
@@ -2026,7 +2060,14 @@ export function create(params: CreateParams = {}) {
         // on top.
         const allClasses: ClsxClassValue[] = [computedBaseClass];
         const style: StyleValue = {};
-        compute(resolved, userVariantProps, null, null, allClasses, style);
+        const variants = compute(
+          resolved,
+          userVariantProps,
+          null,
+          null,
+          allClasses,
+          style,
+        );
 
         // Apply user-provided class / className. Own-property checks keep these
         // consistent with the variant props read above: only what the caller
@@ -2054,7 +2095,22 @@ export function create(params: CreateParams = {}) {
         return {
           className: transformClass(clsx(allClasses)),
           style,
+          variants,
         };
+      };
+
+      // Adds the debug attribute to a mode result. Call only when `debug` is
+      // true.
+      const setDebugAttribute = (
+        result: Record<string, unknown>,
+        props: RecipeProps<MergedVariants>,
+        variants: Record<string, unknown>,
+      ) => {
+        result[DEBUG_ATTRIBUTE] = formatDebugAttribute({
+          variantKeys,
+          variants,
+          incoming: getOwn(props as Record<string, unknown>, DEBUG_ATTRIBUTE),
+        });
       };
 
       const getVariants = (variants?: VariantValues<MergedVariants>) => {
@@ -2140,8 +2196,12 @@ export function create(params: CreateParams = {}) {
 
       // Default recipe
       const defaultRecipe = ((props: RecipeProps<MergedVariants> = {}) => {
-        const { className, style } = computeResult(props);
-        return { class: className, style };
+        const { className, style, variants } = computeResult(props);
+        const result = { class: className, style };
+        if (debug) {
+          setDebugAttribute(result, props, variants);
+        }
+        return result;
       }) as Recipe<V, E>;
       initRecipe(defaultRecipe, inputPropsKeys, (props = {}) => {
         return computeResult(props).style;
@@ -2149,8 +2209,12 @@ export function create(params: CreateParams = {}) {
 
       // JSX recipe
       const jsxRecipe = ((props: RecipeProps<MergedVariants> = {}) => {
-        const { className, style } = computeResult(props);
-        return { className, style };
+        const { className, style, variants } = computeResult(props);
+        const result = { className, style };
+        if (debug) {
+          setDebugAttribute(result, props, variants);
+        }
+        return result;
       }) as ModalRecipe<MergedVariants, JSXProps>;
       initRecipe(
         jsxRecipe,
@@ -2160,8 +2224,15 @@ export function create(params: CreateParams = {}) {
 
       // HTML recipe
       const htmlRecipe = ((props: RecipeProps<MergedVariants> = {}) => {
-        const { className, style } = computeResult(props);
-        return { class: className, style: styleValueToHTMLStyle(style) };
+        const { className, style, variants } = computeResult(props);
+        const result = {
+          class: className,
+          style: styleValueToHTMLStyle(style),
+        };
+        if (debug) {
+          setDebugAttribute(result, props, variants);
+        }
+        return result;
       }) as ModalRecipe<MergedVariants, HTMLProps>;
       initRecipe(htmlRecipe, ["class", "style", ...variantKeys], (props = {}) =>
         styleValueToHTMLStyle(computeResult(props).style),
@@ -2169,8 +2240,15 @@ export function create(params: CreateParams = {}) {
 
       // HTMLObj recipe
       const htmlObjRecipe = ((props: RecipeProps<MergedVariants> = {}) => {
-        const { className, style } = computeResult(props);
-        return { class: className, style: styleValueToHTMLObjStyle(style) };
+        const { className, style, variants } = computeResult(props);
+        const result = {
+          class: className,
+          style: styleValueToHTMLObjStyle(style),
+        };
+        if (debug) {
+          setDebugAttribute(result, props, variants);
+        }
+        return result;
       }) as ModalRecipe<MergedVariants, HTMLObjProps>;
       initRecipe(
         htmlObjRecipe,

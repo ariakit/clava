@@ -23,6 +23,7 @@ import type { Variant, VariantProps } from "clava";
 - [React](#react)
 - [Solid](#solid)
 - [`create()` And `cx()`](#create-and-cx)
+- [Debugging](#debugging)
 - [Type Helpers](#type-helpers)
 - [Comparison](#comparison)
 - [API Summary](#api-summary)
@@ -612,6 +613,61 @@ title().class;
 
 When a recipe created by one factory extends a recipe created by another factory, the extended recipe's transform is preserved for its own classes and the parent transform still runs on the final joined string.
 
+## Debugging
+
+In development, recipe results include a `data-clava-debug` attribute. It shows the resolved variants, so you can inspect them in the browser's developer tools.
+
+```tsx
+const button = cv({
+  variants: {
+    size: { sm: "button-sm", lg: "button-lg" },
+    intent: { primary: "button-primary" },
+  },
+  defaultVariants: { size: "sm", intent: "primary" },
+});
+
+<button {...button.jsx({ size: "lg" })} />;
+```
+
+```html
+<button
+  class="button-lg button-primary"
+  data-clava-debug="size='lg' intent='primary'"
+></button>
+```
+
+The value lists the variants that [`getVariants()`](#output-modes) returns as `key=value` pairs, in variant order. These values include defaults and [`refine`](#refine) updates. Strings use single quotes. The attribute doesn't show where a recipe was created, because a source location can differ between server-rendered HTML and the browser, which would cause hydration mismatches.
+
+When a recipe receives a `data-clava-debug` prop, it adds the incoming value after its own. [`splitProps()`](#splitting-props) sends this prop to the first recipe, together with `class`, `className`, and `style`, and also keeps it in the rest props. In a wrapper component, the element then lists the variants of the recipe that renders it first, followed by those of the outer recipes:
+
+```tsx
+function Button(props: ButtonProps) {
+  const [variantProps, rest] = splitProps(props, button);
+  return <Clickable {...rest} {...button.jsx(variantProps)} />;
+}
+```
+
+```html
+<button
+  class="clickable button-lg button-primary"
+  data-clava-debug="disabled=false size='lg' intent='primary'"
+></button>
+```
+
+The attribute is added only when `process.env.NODE_ENV` is `"development"`, so test snapshots don't change. Use the `debug` option of [`create()`](#create-and-cx) to change this. The attribute is never added in production, and bundlers remove the code that builds it from production builds. Don't use it to select or style elements.
+
+```ts
+import { create } from "clava";
+
+// Add it in tests too.
+const { cv } = create({ debug: true });
+
+// Never add it.
+const { cv: quietCv } = create({ debug: false });
+```
+
+Clava reads `process.env.NODE_ENV` when it creates a factory, including the package-level `cv` on import. Bundlers replace this expression. If you load Clava without a bundler, define `process.env.NODE_ENV` first.
+
 ## Type Helpers
 
 Use `RecipeLike<typeof recipe, R>` to constrain a generic component's recipe prop to a structurally compatible recipe. Use `VariantPropsWithRecipe<typeof recipe, R>` to combine the selected recipe's variant props with its `recipe` prop, or pass a third type argument for a custom prop name. See [Constraining Recipe Props](#constraining-recipe-props).
@@ -745,4 +801,4 @@ Both groups resolve one fixed prop set on every iteration, so every package with
 
 `cx(...classes)` joins class values with `clsx` and applies the factory's `transformClass`.
 
-`create(options?)` returns isolated `{ cv, cx }` helpers. The only option is `transformClass?: (className: string) => string`.
+`create(options?)` returns isolated `{ cv, cx }` helpers. The options are `transformClass?: (className: string) => string` and `debug?: boolean`. See [Debugging](#debugging).

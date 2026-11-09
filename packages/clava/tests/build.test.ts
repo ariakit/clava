@@ -145,6 +145,7 @@ test("package contains only published files", async () => {
       "dist/index.js.map",
       "license",
       "package.json",
+      "src/debug.ts",
       "src/index.ts",
       "src/refine-warning.ts",
       "src/types.ts",
@@ -212,6 +213,31 @@ test("vite removes warning logic from the production bundle", async () => {
     expect(code).not.toContain("Recipe created at");
     expect(code).not.toContain("captureStackTrace");
     expect(code).not.toMatch(/\.warned\b|["']warned["']/);
+  });
+}, 60_000);
+
+test("vite removes debug logic from the production bundle", async () => {
+  await withPackageBuildLock(async () => {
+    const code = await bundleProductionEntry(
+      (packageUrl) => `
+        import { create } from ${JSON.stringify(packageUrl)};
+
+        const { cv } = create({ debug: true });
+
+        export const button = cv({
+          variants: {
+            tone: {
+              primary: "primary",
+            },
+          },
+        });
+
+        button({ tone: "primary" });
+      `,
+    );
+
+    expect(code).not.toContain("data-clava-debug");
+    expect(code).not.toContain("{...}");
   });
 }, 60_000);
 
