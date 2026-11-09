@@ -618,10 +618,6 @@ function splitPropsImpl(
     }
   }
 
-  if (stylingResult && hasOwn(props, DEBUG_ATTRIBUTE)) {
-    stylingResult[DEBUG_ATTRIBUTE] = props[DEBUG_ATTRIBUTE];
-  }
-
   const rest: Record<string, unknown> = {};
   const propKeys = Object.keys(props);
   const propKeysLength = propKeys.length;
@@ -629,6 +625,12 @@ function splitPropsImpl(
   outer: for (let i = 0; i < propKeysLength; i++) {
     const key = propKeys[i];
     if (key === undefined) continue;
+    // Checked in this loop, which already visits every own enumerable key, so
+    // that calls without the attribute don't pay for a separate `hasOwn`
+    // lookup.
+    if (key === DEBUG_ATTRIBUTE && stylingResult) {
+      stylingResult[key] = props[key];
+    }
     for (let g = 0; g < groupCount; g++) {
       const arr = effectiveKeyArrays[g];
       if (arr === undefined) continue;

@@ -220,4 +220,27 @@ describe("debug attribute with splitProps", () => {
     });
     expect(clickable.jsx(variantProps)).not.toHaveProperty(ATTRIBUTE);
   });
+
+  test("routes an incoming value only to the first recipe source", () => {
+    const { clickable, buttonOutput } = setupWrapper(true);
+    const field = create({ debug: true }).cv({
+      variants: { invalid: { true: "invalid", false: "" } },
+    });
+    const props = { id: "button", ...buttonOutput };
+    const value = "size='lg'";
+    expect(getDebug(buttonOutput)).toBe(value);
+
+    const [ids, arrayRest] = splitProps(props, ["id"]);
+    expect(Object.hasOwn(ids, ATTRIBUTE)).toBe(false);
+    expect(getDebug(arrayRest)).toBe(value);
+
+    const [clickableProps, fieldProps, rest] = splitProps(
+      props,
+      clickable.jsx,
+      field.jsx,
+    );
+    expect(getDebug(clickableProps)).toBe(value);
+    expect(Object.hasOwn(fieldProps, ATTRIBUTE)).toBe(false);
+    expect(getDebug(rest)).toBe(value);
+  });
 });
