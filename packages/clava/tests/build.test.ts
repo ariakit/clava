@@ -74,8 +74,9 @@ async function installPackage(tempDir: string) {
   await symlink(clavaPackage, join(modules, "clava"));
 }
 
-// Returns the diagnostics that a compiler reports with `declaration: true`.
-async function getDeclarationDiagnostics(compiler: string, source: string) {
+// Returns the diagnostics and emitted `.d.ts` that a compiler produces with
+// `declaration: true`.
+async function emitDeclarations(compiler: string, source: string) {
   const tempDir = await mkdtemp(join(tmpdir(), "clava-declarations-"));
   try {
     await installPackage(tempDir);
@@ -110,11 +111,20 @@ async function getDeclarationDiagnostics(compiler: string, source: string) {
         return error;
       },
     );
+    const declaration = await readFile(
+      join(tempDir, "out/consumer.d.ts"),
+      "utf8",
+    ).catch(() => "");
     // A compiler that fails to start can exit with a code and only use stderr.
-    return `${result.stdout}${result.stderr}`;
+    return { diagnostics: `${result.stdout}${result.stderr}`, declaration };
   } finally {
     await rm(tempDir, { force: true, recursive: true });
   }
+}
+
+async function getDeclarationDiagnostics(compiler: string, source: string) {
+  const { diagnostics } = await emitDeclarations(compiler, source);
+  return diagnostics;
 }
 
 test("build preserves the production warning guard for consumers", async () => {
@@ -330,7 +340,7 @@ test.each(["tsc", "tsc6"])(
     await withPackageBuildLock(async () => {
       await buildPackage();
 
-      const diagnostics = await getDeclarationDiagnostics(
+      const { diagnostics, declaration } = await emitDeclarations(
         compiler,
         `import { cv, splitProps } from "clava";
 
@@ -350,10 +360,16 @@ export const htmlObjStyleFn = button.htmlObj.style;
 export const jsxStyle = button.jsx.style();
 export const htmlObjStyle = button.htmlObj.style();
 export const defaultStyle = button.style();
+export function readClass(props?: Parameters<typeof button.htmlObj>[0]) {
+  return props?.class;
+}
 `,
       );
 
       expect(diagnostics).toBe("");
+      expect(declaration).toContain(
+        'export declare function readClass(props?: Parameters<typeof button.htmlObj>[0]): import("clava").ClassPropValue;',
+      );
     });
   },
   60_000,

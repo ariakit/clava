@@ -1,5 +1,5 @@
-import type { ComponentProps, JSX } from "solid-js";
-import { splitProps as splitSolidProps } from "solid-js";
+import type { ComponentProps, JSX } from "@solidjs/web";
+import { omit } from "solid-js";
 import { expect, expectTypeOf, test } from "vitest";
 import { type VariantProps, cv, splitProps } from "../src/index.ts";
 import { type HTMLObjProps } from "../src/types.ts";
@@ -12,9 +12,9 @@ test("splitProps", () => {
 
   const [variantProps, rest] = splitProps(props, recipe);
   expectTypeOf(variantProps.style).toEqualTypeOf<
-    string | JSX.CSSProperties | undefined
+    string | JSX.CSSProperties | false | undefined
   >();
-  expectTypeOf(variantProps.class).toEqualTypeOf<string | undefined>();
+  expectTypeOf(variantProps.class).toEqualTypeOf<JSX.ClassValue>();
   expect(variantProps.class).toBe("custom");
   expect(variantProps).toEqual({ size: "md", class: "custom" });
   expect(rest).toEqual({ id: "my-div" });
@@ -24,15 +24,31 @@ test("split props feed back into the recipe", () => {
   const recipe = cv({ variants: { size: { sm: "sm", md: "md" } } });
 
   interface Props extends ComponentProps<"div">, VariantProps<typeof recipe> {}
-  const props: Props = { style: { color: "red" }, size: "md" };
+  const props: Props = {
+    class: ["custom", { active: true, hidden: false }, false],
+    style: { color: "red" },
+    size: "md",
+  };
 
-  // Solid types `style` as `string | JSX.CSSProperties`, whose `-${string}`
-  // index allows `undefined`, so the style input type must keep accepting it.
+  // Solid 2 types `style` as `string | JSX.CSSProperties | false | undefined`
+  // (whose `-${string}` index allows `undefined`) and `class` as
+  // `JSX.ClassValue`, so recipe props must keep accepting both.
   // https://github.com/ariakit/clava/issues/483#issuecomment-5447514407
   const [variantProps] = splitProps(props, recipe);
   expect(recipe.htmlObj(variantProps)).toEqual({
-    class: "md",
+    class: "md custom active",
     style: { color: "red" },
+  });
+  expect(recipe.html(variantProps)).toEqual({
+    class: "md custom active",
+    style: "color: red;",
+  });
+
+  const removedStyleProps: Props = { style: false, size: "sm" };
+  const [removedVariantProps] = splitProps(removedStyleProps, recipe);
+  expect(recipe.htmlObj(removedVariantProps)).toEqual({
+    class: "sm",
+    style: {},
   });
 });
 
@@ -49,7 +65,7 @@ test("recipe props", () => {
   });
 });
 
-test("solid splitProps accepts html propKeys", () => {
+test("solid omit accepts html propKeys", () => {
   const recipe = cv({ variants: { size: { sm: "sm", md: "md" } } });
   expect(recipe.html.propKeys).toEqual(["class", "style", "size"]);
 
@@ -57,12 +73,23 @@ test("solid splitProps accepts html propKeys", () => {
     extends ComponentProps<"button">, VariantProps<typeof recipe> {}
   const props: Props = { class: "custom", size: "md", id: "my-button" };
 
-  const [variantProps, rest] = splitSolidProps(props, recipe.html.propKeys);
-  expect(variantProps).toEqual({ class: "custom", size: "md" });
+  const rest = omit(props, ...recipe.html.propKeys);
+  expect(
+    // @ts-expect-error omitted props should not have class
+    rest.class,
+  ).toBeUndefined();
+  expect(
+    // @ts-expect-error omitted props should not have style
+    rest.style,
+  ).toBeUndefined();
+  expect(
+    // @ts-expect-error omitted props should not have size
+    rest.size,
+  ).toBeUndefined();
   expect(rest).toEqual({ id: "my-button" });
 });
 
-test("solid splitProps accepts htmlObj propKeys", () => {
+test("solid omit accepts htmlObj propKeys", () => {
   const recipe = cv({ variants: { size: { sm: "sm", md: "md" } } });
   expect(recipe.htmlObj.propKeys).toEqual(["class", "style", "size"]);
 
@@ -70,7 +97,18 @@ test("solid splitProps accepts htmlObj propKeys", () => {
     extends ComponentProps<"button">, VariantProps<typeof recipe> {}
   const props: Props = { class: "custom", size: "md", id: "my-button" };
 
-  const [variantProps, rest] = splitSolidProps(props, recipe.htmlObj.propKeys);
-  expect(variantProps).toEqual({ class: "custom", size: "md" });
+  const rest = omit(props, ...recipe.htmlObj.propKeys);
+  expect(
+    // @ts-expect-error omitted props should not have class
+    rest.class,
+  ).toBeUndefined();
+  expect(
+    // @ts-expect-error omitted props should not have style
+    rest.style,
+  ).toBeUndefined();
+  expect(
+    // @ts-expect-error omitted props should not have size
+    rest.size,
+  ).toBeUndefined();
   expect(rest).toEqual({ id: "my-button" });
 });

@@ -563,8 +563,8 @@ function Button(props: ButtonProps) {
 Use `.htmlObj` for Solid components when you want `class` and hyphenated style object output.
 
 ```tsx
+import type { ComponentProps } from "@solidjs/web";
 import { type VariantProps, cv, splitProps } from "clava";
-import type { ComponentProps } from "solid-js";
 
 const button = cv({
   class: "button",
@@ -717,7 +717,7 @@ const button: Recipe<{ size: { sm: string; lg: string } }> = cv({
 });
 ```
 
-The package also exports `ClassValue`, `StyleValue`, `StyleClassProps`, `StyleClassValue`, `JSXProps`, `HTMLProps`, `HTMLObjProps`, `JSXCSSProperties`, `HTMLCSSProperties`, and `CVConfig`.
+The package also exports `ClassValue`, `ClassPropValue`, `StyleValue`, `StyleClassProps`, `StyleClassValue`, `JSXProps`, `HTMLProps`, `HTMLObjProps`, `JSXCSSProperties`, `HTMLCSSProperties`, and `CVConfig`.
 
 ## Comparison
 

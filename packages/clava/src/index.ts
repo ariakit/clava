@@ -13,6 +13,7 @@ import {
 } from "./refine-warning.ts";
 import type {
   AnyRecipe,
+  ClassPropValue,
   ClassValue,
   DefaultVariants,
   ExtendableVariants,
@@ -293,6 +294,7 @@ function withVariant(
 }
 
 export type {
+  ClassPropValue,
   ClassValue,
   StyleValue,
   StyleClassProps,
