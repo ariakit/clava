@@ -263,7 +263,7 @@ importers:
         version: 2.1.1
       csstype:
         specifier: ^3.0.0
-        version: 3.2.3
+        version: 3.2.4
     devDependencies:
       '@types/node':
         specifier: 26.6.6
@@ -1121,8 +1121,8 @@ packages:
     resolution: {integrity: sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==}
     engines: {node: '>=22.12.0'}
 
-  csstype@3.2.3:
-    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+  csstype@3.2.4:
+    resolution: {integrity: sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ==}
 
   cva@1.0.0-beta.12:
     resolution: {integrity: sha512-Xn85p3Jyr4oVh5t69/9uOyKlEazrYdolpXXPB1bpr5apy1MS76lde5ET/WLRk3TZNldsXnj/e4Dpyh1NXFSgUg==}
@@ -2160,7 +2160,7 @@ snapshots:
 
   '@types/react@19.3.0':
     dependencies:
-      csstype: 3.2.3
+      csstype: 3.2.4
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
@@ -2269,7 +2269,7 @@ snapshots:
 
   commander@15.1.0: {}
 
-  csstype@3.2.3: {}
+  csstype@3.2.4: {}
 
   cva@1.0.0-beta.12(@typescript/typescript6@6.0.2):
     dependencies:
@@ -2570,7 +2570,7 @@ snapshots:
 
   solid-js@1.9.19:
     dependencies:
-      csstype: 3.2.3
+      csstype: 3.2.4
       seroval: 1.6.12
       seroval-plugins: 1.6.9(seroval@1.6.12)
 
