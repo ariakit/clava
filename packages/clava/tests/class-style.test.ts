@@ -50,6 +50,30 @@ test("rejects invalid style values from widened objects", () => {
   });
 });
 
+test("accepts class objects, arrays, and false style inputs", () => {
+  const recipe = cv({ class: "base", style: { color: "red" } });
+  expect(
+    recipe.htmlObj({
+      class: ["extra", { active: true, hidden: false, empty: undefined }, 0],
+      style: false,
+    }),
+  ).toEqual({
+    class: "base extra active",
+    style: { color: "red" },
+  });
+
+  recipe.htmlObj({
+    // @ts-expect-error class dictionary values must be boolean or nullish
+    class:
+      // no error
+      { color: "red" },
+    // @ts-expect-error `true` is not a valid style value
+    style:
+      // no error
+      true,
+  });
+});
+
 for (const config of [CONFIGS.default, CONFIGS.uppercase]) {
   const mode = getConfigMode(config);
   const cv = createCVFromConfig(config);

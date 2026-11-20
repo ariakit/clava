@@ -155,12 +155,31 @@ type AllRecipeResultKeys =
   | keyof HTMLProps
   | keyof HTMLObjProps;
 
+/**
+ * A class value accepted by a recipe's `class` prop. It supports strings,
+ * numbers, booleans, nullish values, class dictionaries, and nested arrays.
+ *
+ * @example
+ * ```ts
+ * import type { ClassPropValue } from "clava";
+ *
+ * const className: ClassPropValue = [
+ *   "button",
+ *   { "button-active": true, "button-hidden": false },
+ * ];
+ * ```
+ */
+export type ClassPropValue =
+  | ClassValue
+  | Record<string, boolean | null | undefined>
+  | readonly ClassPropValue[];
+
 type RecipeResultValue<K extends AllRecipeResultKeys> = K extends "style"
-  ? StyleProperty
+  ? StyleProperty | false
   : K extends "className"
     ? string
     : K extends "class"
-      ? string
+      ? ClassPropValue
       : never;
 
 export type NullableRecipeResult = {
