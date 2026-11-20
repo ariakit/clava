@@ -536,9 +536,8 @@ type DefaultVariantValue<V, K extends keyof V> = [
   NonFunctionVariantValue<ExtractVariantValue<V[K]>>,
 ] extends [never]
   ? ComputedDefaultVariant<V, K>
-  :
-      | NonFunctionVariantValue<ExtractVariantValue<V[K]>>
-      | ComputedDefaultVariant<V, K>;
+  : | NonFunctionVariantValue<ExtractVariantValue<V[K]>>
+    | ComputedDefaultVariant<V, K>;
 
 export type DefaultVariants<V> = {
   [K in keyof V]?: DefaultVariantValue<V, K> | undefined;
