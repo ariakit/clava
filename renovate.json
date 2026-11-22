@@ -14,13 +14,19 @@
       "matchPackageNames": ["/^oxlint/", "/^oxfmt/"]
     },
     {
+      "groupName": "solid-js",
+      "matchPackageNames": ["solid-js", "/^@solidjs//"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
       "matchPackageNames": [
         "pnpm",
         "/^@types//",
         "/^oxlint/",
         "/^oxfmt/",
         "/^rolldown/",
-        "solid-js",
         "/^vite/",
         "/^commander/",
         "@typescript/typescript6",
