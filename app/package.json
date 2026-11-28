@@ -12,7 +12,7 @@
     "clava": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "26.6.7",
+    "@types/node": "26.6.10",
     "vite": "8.3.8"
   }
 }
